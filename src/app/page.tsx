@@ -4,28 +4,110 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useSession } from "next-auth/react";
-import { Play, Pause, Music2, Clock3, ListMusic } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Music2,
+  Clock3,
+  ListMusic,
+  Shuffle,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 
-const QUICK_PROMPTS = [
-  "Yaz akşamı sahilde neşeli pop",
-  "Hüzünlü bir ayrılık şarkısı",
-  "Enerjik sabah motivasyon",
-  "Lo-fi çalışma müziği",
-  "Epik orkestra film müziği",
-  "Retro 80s synthwave",
+/* ── Prompt Builder data ── */
+const MOODS = [
+  { label: "Mutlu", emoji: "😄" },
+  { label: "Hüzünlü", emoji: "😢" },
+  { label: "Enerjik", emoji: "⚡" },
+  { label: "Romantik", emoji: "💕" },
+  { label: "Nostaljik", emoji: "🌅" },
+  { label: "Öfkeli", emoji: "🔥" },
+  { label: "Sakin", emoji: "🌊" },
+  { label: "Eğlenceli", emoji: "🎉" },
 ];
+
+const GENRES = [
+  { label: "Türk Pop", emoji: "🎵" },
+  { label: "Arabesk", emoji: "🌙" },
+  { label: "Hip-Hop", emoji: "🎤" },
+  { label: "Rock", emoji: "🎸" },
+  { label: "Elektronik", emoji: "🎛️" },
+  { label: "Türk Halk", emoji: "🪘" },
+  { label: "R&B", emoji: "💜" },
+  { label: "Lo-fi", emoji: "📻" },
+  { label: "Jazz", emoji: "🎺" },
+  { label: "Klasik", emoji: "🎻" },
+];
+
+const TOPICS = [
+  { label: "Aşk", emoji: "❤️" },
+  { label: "Ayrılık", emoji: "💔" },
+  { label: "Özlem", emoji: "🥺" },
+  { label: "Arkadaşlık", emoji: "🤝" },
+  { label: "İstanbul", emoji: "🌉" },
+  { label: "Yaz", emoji: "☀️" },
+  { label: "Gece", emoji: "🌃" },
+  { label: "Özgürlük", emoji: "🕊️" },
+  { label: "Memleket", emoji: "🏡" },
+  { label: "Gençlik", emoji: "✨" },
+];
+
+const TEMPOS = [
+  { label: "Yavaş", emoji: "🐢" },
+  { label: "Orta", emoji: "🚶" },
+  { label: "Hızlı", emoji: "🏃" },
+];
+
+function buildPrompt(
+  mood: string,
+  genre: string,
+  topic: string,
+  tempo: string,
+): string {
+  const parts = [];
+  if (mood) parts.push(mood);
+  if (genre) parts.push(genre + " tarzında");
+  if (topic) parts.push(topic + " temalı");
+  if (tempo) parts.push(tempo + " tempolu");
+  if (parts.length === 0) return "";
+  return parts.join(", ") + " bir şarkı";
+}
+
+function randomFrom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/* ── Chip component ── */
+function Chip({
+  emoji,
+  label,
+  selected,
+  onClick,
+}: {
+  emoji: string;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold transition-all pressable ${
+        selected
+          ? "bg-[#1db954] text-black scale-105"
+          : "bg-[#1a1a1a] text-[#a7a7a7] border border-[#2a2a2a] hover:border-[#535353] hover:text-white"
+      }`}
+    >
+      <span>{emoji}</span>
+      <span>{label}</span>
+    </button>
+  );
+}
 
 function fmt(s?: number) {
   if (!s || isNaN(s)) return "--:--";
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-}
-
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Günaydın";
-  if (h < 18) return "İyi öğleden sonralar";
-  return "İyi akşamlar";
 }
 
 /* ── Section rail ── */
@@ -146,45 +228,6 @@ function PlaylistTile({ playlist }: { playlist: Playlist }) {
 }
 
 /* ── Quick resume tile (6 items grid) ── */
-function ResumeTile({
-  song,
-  onPlay,
-  isPlaying,
-}: {
-  song: Song;
-  onPlay: () => void;
-  isPlaying: boolean;
-}) {
-  return (
-    <button
-      onClick={onPlay}
-      className={`flex items-center gap-3 rounded-md overflow-hidden transition-colors text-left group pressable ${
-        isPlaying ? "bg-[#3e3e3e]" : "bg-[#ffffff14] hover:bg-[#ffffff1f]"
-      }`}
-    >
-      <div className="w-12 h-12 flex-shrink-0 relative">
-        {song.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={song.imageUrl}
-            alt={song.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-[#282828] flex items-center justify-center">
-            <Music2 size={16} className="text-[#535353]" />
-          </div>
-        )}
-      </div>
-      <span
-        className={`text-sm font-semibold pr-4 truncate ${isPlaying ? "text-[#1db954]" : "text-white"}`}
-      >
-        {song.title}
-      </span>
-    </button>
-  );
-}
-
 /* ── Track row (for generated songs section) ── */
 function TrackRow({
   song,
@@ -275,10 +318,37 @@ export default function HomePage() {
   const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [generatedSongs, setGeneratedSongs] = useState<Song[]>([]);
-  const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const topRef = useRef<HTMLDivElement>(null);
+
+  // Prompt builder state
+  const [selMood, setSelMood] = useState("");
+  const [selGenre, setSelGenre] = useState("");
+  const [selTopic, setSelTopic] = useState("");
+  const [selTempo, setSelTempo] = useState("");
+  const [freeText, setFreeText] = useState("");
+  const [showFree, setShowFree] = useState(false);
+
+  const builtPrompt = buildPrompt(selMood, selGenre, selTopic, selTempo);
+  const finalPrompt = showFree ? freeText : builtPrompt;
+
+  const handleSurprise = () => {
+    setSelMood(randomFrom(MOODS).label);
+    setSelGenre(randomFrom(GENRES).label);
+    setSelTopic(randomFrom(TOPICS).label);
+    setSelTempo(randomFrom(TEMPOS).label);
+    setShowFree(false);
+  };
+
+  const resetBuilder = () => {
+    setSelMood("");
+    setSelGenre("");
+    setSelTopic("");
+    setSelTempo("");
+    setFreeText("");
+    setShowFree(false);
+  };
 
   useEffect(() => {
     fetch("/api/all-songs")
@@ -343,14 +413,15 @@ export default function HomePage() {
     [handleSongsAdded],
   );
 
-  const handleGenerate = async (p: string) => {
-    if (!p.trim() || loading) return;
+  const handleGenerate = async (p?: string) => {
+    const prompt = (p ?? finalPrompt).trim();
+    if (!prompt || loading) return;
     setError("");
     setLoading(true);
 
     const tempSongs: Song[] = [1, 2].map((i) => ({
       id: `temp-${Date.now()}-${i}`,
-      title: p.slice(0, 40),
+      title: prompt.slice(0, 40),
       status: "processing" as const,
       createdAt: new Date().toISOString(),
     }));
@@ -361,7 +432,7 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: p.trim(),
+          prompt,
           customMode: false,
           instrumental: false,
         }),
@@ -381,15 +452,11 @@ export default function HomePage() {
       handleSongsAdded([]);
     } finally {
       setLoading(false);
-      setPrompt("");
+      resetBuilder();
     }
   };
 
-  // Hero gradient color — current song cover'ından (basit dark gradient)
-  const heroBg = "linear-gradient(180deg, #1a3a2a 0%, #121212 40%)";
-
-  const recentSongs = allSongs.slice(0, 6);
-  const moreSongs = allSongs.slice(6, 18);
+  const moreSongs = allSongs.slice(0, 18);
 
   // Mobile padding
   const mobilePad = currentSong
@@ -398,50 +465,167 @@ export default function HomePage() {
 
   return (
     <div className={`min-h-full ${mobilePad} md:pb-0`} ref={topRef}>
-      {/* ── Hero: Şarkı Oluştur ── */}
+      {/* ── Hero: Prompt Builder ── */}
       <div
         className="pt-16 md:pt-20 pb-8 px-6"
         style={{
           background: "linear-gradient(180deg, #0d2b1a 0%, #121212 100%)",
         }}
       >
-        <p className="text-[#1db954] text-xs font-bold uppercase tracking-widest mb-2">
-          Yapay Zeka ile Müzik
-        </p>
-        <h1 className="text-white text-3xl md:text-4xl font-black leading-tight mb-6">
-          Kendi şarkını
-          <br />
-          <span className="text-[#1db954]">saniyeler içinde</span> yap
-        </h1>
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <p className="text-[#1db954] text-xs font-bold uppercase tracking-widest mb-1">
+              Yapay Zeka ile Müzik
+            </p>
+            <h1 className="text-white text-2xl md:text-3xl font-black leading-tight">
+              Kendi şarkını yap
+            </h1>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSurprise}
+              disabled={loading}
+              title="Sürpriz yap"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] text-[#a7a7a7] text-xs font-semibold pressable hover:border-[#1db954] hover:text-[#1db954] transition-colors disabled:opacity-40"
+            >
+              <Shuffle size={13} />
+              Sürpriz
+            </button>
+            {(selMood || selGenre || selTopic || selTempo || freeText) && (
+              <button
+                onClick={resetBuilder}
+                className="p-2 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] text-[#a7a7a7] pressable hover:text-white transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
 
-        {/* Prompt alanı */}
-        <div className="max-w-2xl">
-          <div className="relative">
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleGenerate(prompt);
-                }
-              }}
-              placeholder="Nasıl bir şarkı istiyorsun? Örn: Hüzünlü bir yaz akşamı, sahilde pop..."
-              rows={3}
-              maxLength={500}
-              className="w-full bg-[#1a1a1a] border-2 border-[#2a2a2a] focus:border-[#1db954] rounded-2xl px-5 py-4 text-white text-base placeholder-[#535353] resize-none focus:outline-none transition-colors"
-            />
-            <span className="absolute bottom-3 right-4 text-[#535353] text-xs tabular-nums">
-              {prompt.length}/500
-            </span>
+        <div className="max-w-2xl space-y-4">
+          {/* Duygu */}
+          <div>
+            <p className="text-[#535353] text-[11px] font-bold uppercase tracking-widest mb-2">
+              Nasıl hissettirsin?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {MOODS.map((m) => (
+                <Chip
+                  key={m.label}
+                  emoji={m.emoji}
+                  label={m.label}
+                  selected={selMood === m.label}
+                  onClick={() => setSelMood(selMood === m.label ? "" : m.label)}
+                />
+              ))}
+            </div>
           </div>
 
-          {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+          {/* Tarz */}
+          <div>
+            <p className="text-[#535353] text-[11px] font-bold uppercase tracking-widest mb-2">
+              Hangi tarzda?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {GENRES.map((g) => (
+                <Chip
+                  key={g.label}
+                  emoji={g.emoji}
+                  label={g.label}
+                  selected={selGenre === g.label}
+                  onClick={() =>
+                    setSelGenre(selGenre === g.label ? "" : g.label)
+                  }
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Konu */}
+          <div>
+            <p className="text-[#535353] text-[11px] font-bold uppercase tracking-widest mb-2">
+              Ne hakkında?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {TOPICS.map((t) => (
+                <Chip
+                  key={t.label}
+                  emoji={t.emoji}
+                  label={t.label}
+                  selected={selTopic === t.label}
+                  onClick={() =>
+                    setSelTopic(selTopic === t.label ? "" : t.label)
+                  }
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Tempo */}
+          <div>
+            <p className="text-[#535353] text-[11px] font-bold uppercase tracking-widest mb-2">
+              Tempo
+            </p>
+            <div className="flex gap-2">
+              {TEMPOS.map((t) => (
+                <Chip
+                  key={t.label}
+                  emoji={t.emoji}
+                  label={t.label}
+                  selected={selTempo === t.label}
+                  onClick={() =>
+                    setSelTempo(selTempo === t.label ? "" : t.label)
+                  }
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Oluşan prompt önizlemesi */}
+          {builtPrompt && !showFree && (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[#1db954]/10 border border-[#1db954]/20">
+              <span className="text-[#1db954] text-sm flex-1">
+                &ldquo;{builtPrompt}&rdquo;
+              </span>
+            </div>
+          )}
+
+          {/* Serbest yazma toggle */}
+          <button
+            onClick={() => setShowFree(!showFree)}
+            className="text-[#535353] hover:text-[#a7a7a7] text-xs underline pressable transition-colors"
+          >
+            {showFree ? "← Seçimlere dön" : "Kendin yaz →"}
+          </button>
+
+          {showFree && (
+            <div className="relative">
+              <textarea
+                value={freeText}
+                onChange={(e) => setFreeText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleGenerate();
+                  }
+                }}
+                placeholder="Nasıl bir şarkı istiyorsun? Örn: Yaz akşamı sahilde hüzünlü pop..."
+                rows={3}
+                maxLength={500}
+                className="w-full bg-[#1a1a1a] border-2 border-[#2a2a2a] focus:border-[#1db954] rounded-2xl px-5 py-4 text-white text-sm placeholder-[#535353] resize-none focus:outline-none transition-colors"
+              />
+              <span className="absolute bottom-3 right-4 text-[#535353] text-xs tabular-nums">
+                {freeText.length}/500
+              </span>
+            </div>
+          )}
+
+          {error && <p className="text-red-400 text-sm">{error}</p>}
 
           <button
-            onClick={() => handleGenerate(prompt)}
-            disabled={loading || !prompt.trim()}
-            className="mt-3 w-full py-4 rounded-2xl font-bold text-base tracking-wide transition-all pressable disabled:opacity-40"
+            onClick={() => handleGenerate()}
+            disabled={loading || !finalPrompt.trim()}
+            className="w-full py-4 rounded-2xl font-bold text-base tracking-wide transition-all pressable disabled:opacity-40"
             style={{
               background: loading ? "#1a1a1a" : "#1db954",
               color: loading ? "#a7a7a7" : "black",
@@ -452,24 +636,12 @@ export default function HomePage() {
                 <span className="w-4 h-4 border-2 border-[#a7a7a7]/40 border-t-[#a7a7a7] rounded-full animate-spin" />
                 Oluşturuluyor... (~30–60 sn)
               </span>
-            ) : (
+            ) : finalPrompt ? (
               "Şarkı Oluştur"
+            ) : (
+              "Seçim yap veya kendin yaz"
             )}
           </button>
-
-          {/* Quick prompts */}
-          <div className="flex gap-2 mt-3 flex-wrap">
-            {QUICK_PROMPTS.map((p) => (
-              <button
-                key={p}
-                onClick={() => handleGenerate(p)}
-                disabled={loading}
-                className="px-3 py-1.5 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] text-[#a7a7a7] text-xs font-medium pressable hover:border-[#1db954] hover:text-white transition-colors disabled:opacity-40"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
