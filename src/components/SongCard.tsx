@@ -6,6 +6,7 @@ import { Song } from "@/types";
 interface SongCardProps {
   song: Song;
   onPlay: (song: Song) => void;
+  onDetail?: (song: Song) => void;
   isPlaying?: boolean;
   variant?: "grid" | "row";
 }
@@ -15,9 +16,39 @@ function fmtDur(s?: number) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
+function WaveBars({ color = "white" }: { color?: string }) {
+  return (
+    <span className="flex items-end gap-[3px]" style={{ height: "16px" }}>
+      <span
+        className="wave-bar rounded-sm"
+        style={{ width: "3px", height: "100%", background: color }}
+      />
+      <span
+        className="wave-bar rounded-sm"
+        style={{
+          width: "3px",
+          height: "100%",
+          background: color,
+          animationDelay: "0.15s",
+        }}
+      />
+      <span
+        className="wave-bar rounded-sm"
+        style={{
+          width: "3px",
+          height: "100%",
+          background: color,
+          animationDelay: "0.3s",
+        }}
+      />
+    </span>
+  );
+}
+
 export default function SongCard({
   song,
   onPlay,
+  onDetail,
   isPlaying,
   variant = "grid",
 }: SongCardProps) {
@@ -29,8 +60,8 @@ export default function SongCard({
         className="flex items-center gap-3 px-4 py-2.5 active:bg-[#1a1a1a] rounded-xl pressable"
         onClick={() => ready && onPlay(song)}
       >
-        {/* Cover */}
-        <div className="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden bg-[#222]">
+        {/* Cover with playing overlay */}
+        <div className="relative w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden bg-[#222]">
           {song.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -45,6 +76,13 @@ export default function SongCard({
               ) : (
                 <Music2 size={16} className="text-[#535353]" />
               )}
+            </div>
+          )}
+
+          {/* Playing overlay */}
+          {isPlaying && (
+            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+              <WaveBars />
             </div>
           )}
         </div>
@@ -65,14 +103,7 @@ export default function SongCard({
 
         {/* Right */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {isPlaying && (
-            <span className="flex items-end gap-[2px] h-3 mr-1">
-              <span className="wave-bar w-[3px] h-full" />
-              <span className="wave-bar w-[3px] h-full" />
-              <span className="wave-bar w-[3px] h-full" />
-            </span>
-          )}
-          {song.duration && (
+          {song.duration && !isPlaying && (
             <span className="text-[#535353] text-xs tabular-nums">
               {fmtDur(song.duration)}
             </span>
@@ -91,8 +122,8 @@ export default function SongCard({
   // Grid variant
   return (
     <div
-      className="pressable rounded-xl overflow-hidden bg-[#111] active:bg-[#1a1a1a]"
-      onClick={() => ready && onPlay(song)}
+      className="group pressable rounded-xl overflow-hidden bg-[#111] active:opacity-80"
+      onClick={() => (onDetail ? onDetail(song) : ready && onPlay(song))}
     >
       {/* Cover */}
       <div className="relative aspect-square bg-[#222]">
@@ -113,20 +144,25 @@ export default function SongCard({
           </div>
         )}
 
-        {/* Play indicator */}
+        {/* Playing overlay */}
         {isPlaying && (
-          <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-[#1db954] flex items-center justify-center">
-            <span className="flex items-end gap-[2px] h-3">
-              <span className="wave-bar w-[2px] h-full" />
-              <span className="wave-bar w-[2px] h-full" />
-              <span className="wave-bar w-[2px] h-full" />
-            </span>
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <WaveBars />
           </div>
         )}
 
+        {/* Play button on hover (not playing) */}
         {ready && !isPlaying && (
-          <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-[#1db954] flex items-center justify-center opacity-0 group-hover:opacity-100">
-            <Play size={14} fill="black" className="text-black ml-0.5" />
+          <div
+            className="absolute inset-0 bg-black/40 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay(song);
+            }}
+          >
+            <div className="w-9 h-9 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg">
+              <Play size={16} fill="black" className="text-black ml-0.5" />
+            </div>
           </div>
         )}
       </div>

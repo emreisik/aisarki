@@ -28,6 +28,17 @@ interface PlayerCtx {
 
 const PlayerContext = createContext<PlayerCtx | null>(null);
 
+const STORAGE_KEY = "aisarki_player";
+
+function saveState(song: Song, pl: Song[], idx: number, time: number) {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ song, playlist: pl, index: idx, time }),
+    );
+  } catch {}
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -38,23 +49,87 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Şarkı değişince yükle ve çal
+  // Sayfa yenilendiğinde çalındığı yerden geri yüklemek için
+  const restoreTimeRef = useRef(0);
+  const playlistRef = useRef<Song[]>([]);
+  const currentIndexRef = useRef(-1);
+
+  playlistRef.current = playlist;
+  currentIndexRef.current = currentIndex;
+
+  // ── Mount: localStorage'dan geri yükle ──
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const { song, playlist: pl, index, time } = JSON.parse(raw);
+      if (!song?.audioUrl) return;
+
+      restoreTimeRef.current = time ?? 0;
+      setCurrentSong(song);
+      setPlaylist(pl || [song]);
+      setCurrentIndex(index ?? 0);
+      setPlayerOpen(true); // mini player görünsün
+      // playing = false kalır (autoplay politikası)
+    } catch {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Şarkı değişince yükle ──
   useEffect(() => {
     if (!audioRef.current || !currentSong?.audioUrl) return;
+
+    const savedTime = restoreTimeRef.current;
+    restoreTimeRef.current = 0; // bir sonraki normal çalma etkilenmesin
+
     audioRef.current.src = currentSong.audioUrl;
     audioRef.current.load();
-    audioRef.current
-      .play()
-      .then(() => setPlaying(true))
-      .catch(() => setPlaying(false));
+
+    if (savedTime > 1) {
+      // Geri yükleme: pozisyona seek et, ama çalma
+      const onCanPlay = () => {
+        if (audioRef.current) {
+          audioRef.current.currentTime = savedTime;
+        }
+        audioRef.current?.removeEventListener("canplay", onCanPlay);
+      };
+      audioRef.current.addEventListener("canplay", onCanPlay);
+      setPlaying(false);
+    } else {
+      // Normal çalma: otomatik başlat
+      audioRef.current
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => setPlaying(false));
+    }
   }, [currentSong?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 5 saniyede bir pozisyonu localStorage'a kaydet ──
+  useEffect(() => {
+    if (!currentSong) return;
+    const id = setInterval(() => {
+      const t = audioRef.current?.currentTime ?? 0;
+      saveState(currentSong, playlistRef.current, currentIndexRef.current, t);
+    }, 5000);
+    return () => clearInterval(id);
+  }, [currentSong]);
+
+  // ── Şarkı değişince hemen kaydet ──
+  useEffect(() => {
+    if (currentSong) {
+      saveState(
+        currentSong,
+        playlistRef.current,
+        currentIndexRef.current,
+        audioRef.current?.currentTime ?? 0,
+      );
+    }
+  }, [currentSong]);
 
   const playSong = useCallback((song: Song, pl: Song[]) => {
     const idx = pl.findIndex((s) => s.id === song.id);
     setPlaylist(pl);
     setCurrentIndex(idx >= 0 ? idx : 0);
     setCurrentSong(song);
-    setPlayerOpen(true);
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -73,28 +148,33 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const playNext = useCallback(() => {
     setCurrentIndex((prev) => {
       const next = prev + 1;
-      if (next >= playlist.length) return prev;
-      const s = playlist[next];
+      if (next >= playlistRef.current.length) return prev;
+      const s = playlistRef.current[next];
       if (s?.status === "complete") {
         setCurrentSong(s);
         return next;
       }
       return prev;
     });
-  }, [playlist]);
+  }, []);
 
   const playPrev = useCallback(() => {
+    // İlk 3 saniyedeyse önceki şarkıya geç, değilse başa al
+    if (audioRef.current && audioRef.current.currentTime > 3) {
+      audioRef.current.currentTime = 0;
+      return;
+    }
     setCurrentIndex((prev) => {
       const p = prev - 1;
       if (p < 0) return prev;
-      const s = playlist[p];
+      const s = playlistRef.current[p];
       if (s?.status === "complete") {
         setCurrentSong(s);
         return p;
       }
       return prev;
     });
-  }, [playlist]);
+  }, []);
 
   const handleTimeUpdate = useCallback(() => {
     const t = audioRef.current?.currentTime ?? 0;
@@ -105,18 +185,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const handleEnded = useCallback(() => {
     setPlaying(false);
-    // playNext'i doğrudan çağırabilmek için ref kullan
     setCurrentIndex((prev) => {
       const next = prev + 1;
-      if (next >= playlist.length) return prev;
-      const s = playlist[next];
+      if (next >= playlistRef.current.length) return prev;
+      const s = playlistRef.current[next];
       if (s?.status === "complete") {
         setCurrentSong(s);
         return next;
       }
       return prev;
     });
-  }, [playlist]);
+  }, []);
 
   return (
     <PlayerContext.Provider
