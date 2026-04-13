@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Song, Playlist } from "@/types";
-import { usePlayer } from "@/contexts/PlayerContext";
-import { useSession } from "next-auth/react";
+import { type LucideIcon } from "lucide-react";
 import {
   Play,
   Pause,
@@ -11,101 +9,118 @@ import {
   Clock3,
   ListMusic,
   ChevronRight,
+  Heart,
+  Flower2,
+  Shield,
+  Users,
+  Baby,
+  GraduationCap,
+  Cake,
+  Gem,
+  Calendar,
+  PartyPopper,
+  Star,
+  Moon,
+  HeartCrack,
+  CloudRain,
+  Zap,
+  Smile,
+  Wind,
+  Flame,
+  Clock,
+  Landmark,
+  Home,
+  Sun,
+  Film,
+  Coffee,
+  Mic2,
+  MapPin,
 } from "lucide-react";
 import Link from "next/link";
+import { Song, Playlist } from "@/types";
+import { usePlayer } from "@/contexts/PlayerContext";
+import { useSession } from "next-auth/react";
 
 /* ── Kategori sistemi ── */
 interface CategoryItem {
-  emoji: string;
+  icon: LucideIcon;
   title: string;
   prompt: string;
 }
-
 interface CategoryGroup {
   label: string;
-  color: string; // gradient başlangıç
+  color: string;
   items: CategoryItem[];
 }
 
 const CATEGORY_GROUPS: CategoryGroup[] = [
   {
     label: "Kişiye Özel",
-    color: "#be185d",
+    color: "#f43f5e",
     items: [
       {
-        emoji: "💕",
+        icon: Heart,
         title: "Sevgiliye",
-        prompt:
-          "Sevgilime özel, romantik ve içten duygular anlatan aşk şarkısı",
+        prompt: "Sevgilime özel romantik ve içten duygular anlatan aşk şarkısı",
       },
       {
-        emoji: "🌸",
+        icon: Flower2,
         title: "Anneme",
         prompt: "Anneme sonsuz sevgi ve minnettarlık anlatan duygusal şarkı",
       },
       {
-        emoji: "👨",
+        icon: Shield,
         title: "Babama",
         prompt: "Babama saygı, sevgi ve teşekkür anlatan güçlü bir şarkı",
       },
       {
-        emoji: "🤝",
+        icon: Users,
         title: "Arkadaşıma",
-        prompt: "En iyi arkadaşıma ithaf, neşeli ve samimi dostluk şarkısı",
+        prompt: "En iyi arkadaşıma neşeli ve samimi dostluk şarkısı",
       },
       {
-        emoji: "👶",
+        icon: Baby,
         title: "Bebeğime",
-        prompt: "Bebeğime ninni tarzında yumuşak, sevgi dolu bir şarkı",
+        prompt: "Bebeğime ninni tarzında yumuşak ve sevgi dolu şarkı",
       },
       {
-        emoji: "👩‍🏫",
+        icon: GraduationCap,
         title: "Öğretmenime",
         prompt: "Öğretmenime teşekkür ve saygı anlatan içten bir şarkı",
-      },
-      {
-        emoji: "❤️",
-        title: "Kardeşime",
-        prompt: "Kardeşime sevgi, birliktelik ve paylaşımı anlatan şarkı",
       },
     ],
   },
   {
     label: "Özel Günler",
-    color: "#b45309",
+    color: "#f59e0b",
     items: [
       {
-        emoji: "🎂",
+        icon: Cake,
         title: "Doğum Günü",
         prompt: "Doğum günü için neşeli, enerjik ve kutlama ruhunda şarkı",
       },
       {
-        emoji: "💍",
+        icon: Gem,
         title: "Düğün",
         prompt: "Düğün için romantik, mutlu ve kutlama dolu özel bir şarkı",
       },
       {
-        emoji: "🥂",
+        icon: Calendar,
         title: "Yıl Dönümü",
-        prompt: "Yıl dönümü için romantik, birlikteliği anlatan özel şarkı",
+        prompt: "Yıl dönümü için romantik ve birlikteliği anlatan şarkı",
       },
       {
-        emoji: "🎉",
-        title: "Parti Gecesi",
-        prompt: "Parti için dans ettiren, enerjik ve eğlenceli bir şarkı",
+        icon: PartyPopper,
+        title: "Parti",
+        prompt: "Parti için dans ettiren, enerjik ve eğlenceli şarkı",
       },
       {
-        emoji: "🕌",
+        icon: Star,
         title: "Bayram",
         prompt: "Bayram için kutlama, sevinç ve birliktelik temalı şarkı",
       },
       {
-        emoji: "🎓",
-        title: "Mezuniyet",
-        prompt: "Mezuniyet için gurur verici, coşkulu bir kutlama şarkısı",
-      },
-      {
-        emoji: "🌙",
+        icon: Moon,
         title: "Ramazan",
         prompt: "Ramazan ayına özel, manevi ve huzur dolu bir şarkı",
       },
@@ -113,40 +128,40 @@ const CATEGORY_GROUPS: CategoryGroup[] = [
   },
   {
     label: "Duygular",
-    color: "#4338ca",
+    color: "#8b5cf6",
     items: [
       {
-        emoji: "💔",
-        title: "Ayrılık Acısı",
+        icon: HeartCrack,
+        title: "Ayrılık",
         prompt: "Ayrılık acısı ve yalnızlığı anlatan derin hüzünlü şarkı",
       },
       {
-        emoji: "🌅",
+        icon: CloudRain,
         title: "Özlem",
-        prompt: "Uzakta birine duyulan özlemi anlatan hüzünlü bir şarkı",
+        prompt: "Uzakta birine duyulan özlemi anlatan hüzünlü şarkı",
       },
       {
-        emoji: "⚡",
+        icon: Zap,
         title: "Motivasyon",
         prompt: "Güçlü ve motive edici, hayata tutunmayı anlatan enerjik şarkı",
       },
       {
-        emoji: "✨",
-        title: "Mutlu & Neşeli",
+        icon: Smile,
+        title: "Mutluluk",
         prompt: "Hayatın güzelliğini anlatan neşeli ve pozitif bir şarkı",
       },
       {
-        emoji: "🌊",
-        title: "Huzur & Sakinlik",
-        prompt: "Sakinleştirici, huzurlu ve rahatlatıcı ambient bir şarkı",
+        icon: Wind,
+        title: "Huzur",
+        prompt: "Sakinleştirici, huzurlu ve rahatlatıcı ambient şarkı",
       },
       {
-        emoji: "🔥",
-        title: "Öfke & Güç",
-        prompt: "İçten gelen öfkeyi ve gücü anlatan rock tarzı şarkı",
+        icon: Flame,
+        title: "Güç & Öfke",
+        prompt: "İçten gelen gücü ve öfkeyi anlatan rock tarzı şarkı",
       },
       {
-        emoji: "🥺",
+        icon: Clock,
         title: "Nostalji",
         prompt: "Geçmiş günlere özlem, nostaljik ve duygusal bir şarkı",
       },
@@ -154,65 +169,70 @@ const CATEGORY_GROUPS: CategoryGroup[] = [
   },
   {
     label: "Türk Kültürü",
-    color: "#065f46",
+    color: "#10b981",
     items: [
       {
-        emoji: "🌉",
-        title: "İstanbul'a",
+        icon: Landmark,
+        title: "İstanbul",
         prompt: "İstanbul'un ruhunu ve güzelliğini anlatan Türk pop şarkısı",
       },
       {
-        emoji: "🏡",
-        title: "Memleket Özlemi",
+        icon: Home,
+        title: "Memleket",
         prompt: "Memleketini özleyen birinin hüzünlü Türk şarkısı",
       },
       {
-        emoji: "🌙",
+        icon: Mic2,
         title: "Arabesk",
         prompt: "Klasik arabesk tarzında kader ve aşkı anlatan derin şarkı",
       },
       {
-        emoji: "🪘",
+        icon: Music2,
         title: "Türk Halk",
         prompt: "Anadolu halk müziği tarzında kökleri anlatan şarkı",
       },
       {
-        emoji: "☀️",
+        icon: Sun,
         title: "Yaz & Sahil",
         prompt: "Yaz tatili, deniz ve güneş temalı neşeli Türk pop şarkısı",
       },
       {
-        emoji: "🎭",
+        icon: Film,
         title: "Dizi Müziği",
         prompt: "Türk dizisi için dramatik ve etkileyici fon müziği",
       },
       {
-        emoji: "🍵",
+        icon: Coffee,
         title: "Çay Saati",
         prompt: "Sohbet, çay ve sıcak anlara dair sakin ve samimi şarkı",
+      },
+      {
+        icon: MapPin,
+        title: "Anadolu",
+        prompt: "Anadolu'nun renklerini ve kültürünü anlatan şarkı",
       },
     ],
   },
 ];
 
-/* ── Kategori kartı ── */
-function CategoryCard({
+/* ── Kategori pill ── */
+function CategoryPill({
   item,
   color,
   onSelect,
 }: {
   item: CategoryItem;
   color: string;
-  onSelect: (prompt: string) => void;
+  onSelect: (p: string) => void;
 }) {
+  const Icon = item.icon;
   return (
     <button
       onClick={() => onSelect(item.prompt)}
-      className="flex-shrink-0 w-[120px] h-[80px] rounded-xl overflow-hidden relative pressable hover:scale-[1.04] transition-transform"
-      style={{ background: `linear-gradient(135deg, ${color}dd, ${color}88)` }}
+      className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#3a3a3a] hover:bg-[#222] transition-all pressable group"
     >
-      <span className="absolute top-2.5 left-3 text-2xl">{item.emoji}</span>
-      <span className="absolute bottom-2.5 left-3 right-2 text-white text-xs font-bold leading-tight text-left">
+      <Icon size={15} style={{ color }} className="flex-shrink-0" />
+      <span className="text-white text-xs font-semibold whitespace-nowrap">
         {item.title}
       </span>
     </button>
@@ -225,24 +245,24 @@ function CategoryRow({
   onSelect,
 }: {
   group: CategoryGroup;
-  onSelect: (prompt: string) => void;
+  onSelect: (p: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? group.items : group.items.slice(0, 5);
+  const shown = expanded ? group.items : group.items.slice(0, 6);
 
   return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-2 px-6">
-        <p className="text-white text-xs font-bold uppercase tracking-widest">
+    <div className="mb-3">
+      <div className="flex items-center justify-between mb-1.5 px-6">
+        <p className="text-[#535353] text-[10px] font-bold uppercase tracking-widest">
           {group.label}
         </p>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 text-[#a7a7a7] text-xs pressable hover:text-white transition-colors"
+          className="flex items-center gap-0.5 text-[#535353] text-[10px] pressable hover:text-[#a7a7a7] transition-colors"
         >
-          {expanded ? "Gizle" : "Tümünü Gör"}
+          {expanded ? "Kapat" : "Tümü"}
           <ChevronRight
-            size={12}
+            size={10}
             className={`transition-transform ${expanded ? "rotate-90" : ""}`}
           />
         </button>
@@ -251,7 +271,7 @@ function CategoryRow({
       {expanded ? (
         <div className="px-6 flex flex-wrap gap-2">
           {group.items.map((item) => (
-            <CategoryCard
+            <CategoryPill
               key={item.title}
               item={item}
               color={group.color}
@@ -260,9 +280,9 @@ function CategoryRow({
           ))}
         </div>
       ) : (
-        <div className="flex gap-2 overflow-x-auto scroll-area px-6 pb-1">
+        <div className="flex gap-2 overflow-x-auto scroll-area px-6 pb-0.5 no-scrollbar">
           {shown.map((item) => (
-            <CategoryCard
+            <CategoryPill
               key={item.title}
               item={item}
               color={group.color}
@@ -280,7 +300,6 @@ function fmt(s?: number) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
-/* ── Section rail ── */
 function Rail({
   title,
   children,
@@ -290,17 +309,16 @@ function Rail({
 }) {
   return (
     <section className="mb-8">
-      <div className="flex items-center justify-between mb-4 px-6">
-        <h2 className="text-white text-2xl font-black">{title}</h2>
+      <div className="px-6 mb-4">
+        <h2 className="text-white text-xl font-black">{title}</h2>
       </div>
-      <div className="flex gap-4 overflow-x-auto scroll-area px-6 pb-2">
+      <div className="flex gap-3 overflow-x-auto scroll-area px-6 pb-2">
         {children}
       </div>
     </section>
   );
 }
 
-/* ── Song tile (horizontal rail) ── */
 function SongTile({
   song,
   onPlay,
@@ -313,9 +331,9 @@ function SongTile({
   return (
     <button
       onClick={onPlay}
-      className="flex-shrink-0 w-[160px] bg-[#181818] hover:bg-[#282828] rounded-lg p-3 transition-colors text-left group pressable"
+      className="flex-shrink-0 w-[150px] bg-[#181818] hover:bg-[#222] rounded-xl p-3 transition-colors text-left group pressable"
     >
-      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-3 shadow-lg">
+      <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#282828] mb-3">
         {song.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -325,37 +343,36 @@ function SongTile({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={32} className="text-[#535353]" />
+            <Music2 size={28} className="text-[#535353]" />
           </div>
         )}
-        <div className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
+        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
           {isPlaying ? (
-            <Pause size={16} fill="black" className="text-black" />
+            <Pause size={14} fill="black" className="text-black" />
           ) : (
-            <Play size={16} fill="black" className="text-black ml-0.5" />
+            <Play size={14} fill="black" className="text-black ml-0.5" />
           )}
         </div>
       </div>
       <p
-        className={`text-sm font-semibold truncate mb-0.5 ${isPlaying ? "text-[#1db954]" : "text-white"}`}
+        className={`text-xs font-semibold truncate mb-0.5 ${isPlaying ? "text-[#1db954]" : "text-white"}`}
       >
         {song.title}
       </p>
-      <p className="text-[#a7a7a7] text-xs truncate">
+      <p className="text-[#535353] text-[11px] truncate">
         {song.style?.split(",")[0] || "AI Müzik"}
       </p>
     </button>
   );
 }
 
-/* ── Playlist tile ── */
 function PlaylistTile({ playlist }: { playlist: Playlist }) {
   return (
     <Link
       href={`/playlist/${playlist.id}`}
-      className="flex-shrink-0 w-[160px] bg-[#181818] hover:bg-[#282828] rounded-lg p-3 transition-colors group pressable"
+      className="flex-shrink-0 w-[150px] bg-[#181818] hover:bg-[#222] rounded-xl p-3 transition-colors group pressable"
     >
-      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-3 shadow-lg">
+      <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#282828] mb-3">
         {playlist.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -365,22 +382,23 @@ function PlaylistTile({ playlist }: { playlist: Playlist }) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#450af5] to-[#c4efd9]">
-            <ListMusic size={36} className="text-white" />
+            <ListMusic size={32} className="text-white" />
           </div>
         )}
-        <div className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
-          <Play size={16} fill="black" className="text-black ml-0.5" />
+        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
+          <Play size={14} fill="black" className="text-black ml-0.5" />
         </div>
       </div>
-      <p className="text-white text-sm font-semibold truncate mb-0.5">
+      <p className="text-white text-xs font-semibold truncate mb-0.5">
         {playlist.title}
       </p>
-      <p className="text-[#a7a7a7] text-xs">{playlist.songCount ?? 0} şarkı</p>
+      <p className="text-[#535353] text-[11px]">
+        {playlist.songCount ?? 0} şarkı
+      </p>
     </Link>
   );
 }
 
-/* ── Track row ── */
 function TrackRow({
   song,
   index,
@@ -395,9 +413,9 @@ function TrackRow({
   return (
     <button
       onClick={onPlay}
-      className="w-full flex items-center gap-4 px-4 py-2 rounded-md hover:bg-[#ffffff1a] transition-colors group text-left pressable"
+      className="w-full flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-[#ffffff0f] transition-colors group text-left pressable"
     >
-      <div className="w-8 text-center flex-shrink-0">
+      <div className="w-7 text-center flex-shrink-0">
         {isPlaying ? (
           <span className="flex items-end justify-center gap-[2px] h-4">
             {[0, 0.15, 0.3].map((d, i) => (
@@ -414,28 +432,27 @@ function TrackRow({
           </span>
         ) : (
           <>
-            <span className="text-[#a7a7a7] text-sm group-hover:hidden">
+            <span className="text-[#535353] text-xs group-hover:hidden">
               {index + 1}
             </span>
             <Play
-              size={14}
+              size={13}
               fill="white"
               className="text-white hidden group-hover:block mx-auto"
             />
           </>
         )}
       </div>
-      <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-[#282828]">
+      <div className="w-9 h-9 rounded-lg flex-shrink-0 overflow-hidden bg-[#282828]">
         {song.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={song.imageUrl}
             alt={song.title}
             className="w-full h-full object-cover"
-          />
+          /> // eslint-disable-line @next/next/no-img-element
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={14} className="text-[#535353]" />
+            <Music2 size={13} className="text-[#535353]" />
           </div>
         )}
       </div>
@@ -445,14 +462,14 @@ function TrackRow({
         >
           {song.title}
         </p>
-        <p className="text-[#a7a7a7] text-xs truncate">
+        <p className="text-[#535353] text-xs truncate">
           {song.style?.split(",")[0] || "AI Müzik"}
         </p>
       </div>
       {song.status === "processing" && (
-        <span className="w-4 h-4 border-2 border-[#a7a7a7] border-t-transparent rounded-full animate-spin flex-shrink-0" />
+        <span className="w-3.5 h-3.5 border-2 border-[#535353] border-t-transparent rounded-full animate-spin flex-shrink-0" />
       )}
-      <span className="text-[#a7a7a7] text-xs tabular-nums flex-shrink-0 ml-auto">
+      <span className="text-[#535353] text-xs tabular-nums flex-shrink-0">
         {song.status === "complete" ? fmt(song.duration) : "—"}
       </span>
     </button>
@@ -487,7 +504,6 @@ export default function HomePage() {
 
   const handleCategorySelect = (p: string) => {
     setPrompt(p);
-    // Textarea'ya scroll et
     setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
@@ -526,8 +542,10 @@ export default function HomePage() {
             );
             setAllSongs((prev) => {
               const ids = new Set(prev.map((s) => s.id));
-              const fresh = data.songs.filter((s: Song) => !ids.has(s.id));
-              return [...fresh, ...prev];
+              return [
+                ...data.songs.filter((s: Song) => !ids.has(s.id)),
+                ...prev,
+              ];
             });
           } else {
             setTimeout(poll, 5000);
@@ -545,7 +563,6 @@ export default function HomePage() {
     if (!prompt.trim() || loading) return;
     setError("");
     setLoading(true);
-
     const tempSongs: Song[] = [1, 2].map((i) => ({
       id: `temp-${Date.now()}-${i}`,
       title: prompt.slice(0, 40),
@@ -553,7 +570,6 @@ export default function HomePage() {
       createdAt: new Date().toISOString(),
     }));
     handleSongsAdded(tempSongs);
-
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -591,19 +607,14 @@ export default function HomePage() {
   return (
     <div className={`min-h-full ${mobilePad} md:pb-0`}>
       {/* ── Hero ── */}
-      <div
-        className="pt-16 md:pt-20 pb-6"
-        style={{
-          background: "linear-gradient(180deg, #0d2b1a 0%, #121212 100%)",
-        }}
-      >
+      <div className="pt-16 md:pt-20 pb-6 bg-[#0a0a0a]">
         <div className="px-6 mb-5">
-          <p className="text-[#1db954] text-xs font-bold uppercase tracking-widest mb-1">
-            Yapay Zeka ile Müzik
-          </p>
-          <h1 className="text-white text-2xl md:text-3xl font-black leading-tight">
-            Hangi şarkıyı yapalım?
+          <h1 className="text-white text-2xl md:text-3xl font-black">
+            Şarkını Yap
           </h1>
+          <p className="text-[#535353] text-sm mt-0.5">
+            Bir kategori seç, AI üretsin
+          </p>
         </div>
 
         {/* Kategori satırları */}
@@ -616,40 +627,36 @@ export default function HomePage() {
         ))}
 
         {/* Textarea + buton */}
-        <div className="px-6 mt-4">
-          <div className="relative">
-            <textarea
-              ref={textareaRef}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleGenerate();
-                }
-              }}
-              placeholder="Bir kategori seç ya da kendin yaz..."
-              rows={2}
-              maxLength={500}
-              className="w-full bg-[#1a1a1a] border-2 border-[#2a2a2a] focus:border-[#1db954] rounded-2xl px-5 py-3.5 text-white text-sm placeholder-[#535353] resize-none focus:outline-none transition-colors"
-            />
-          </div>
-
-          {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
-
+        <div className="px-6 mt-5">
+          <textarea
+            ref={textareaRef}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleGenerate();
+              }
+            }}
+            placeholder="Bir kategori seç ya da kendin yaz..."
+            rows={2}
+            maxLength={500}
+            className="w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#1db954] rounded-2xl px-4 py-3.5 text-white text-sm placeholder-[#3a3a3a] resize-none focus:outline-none transition-colors"
+          />
+          {error && <p className="text-red-400 text-xs mt-1.5">{error}</p>}
           <button
             onClick={handleGenerate}
             disabled={loading || !prompt.trim()}
-            className="mt-2.5 w-full py-4 rounded-2xl font-bold text-base tracking-wide transition-all pressable disabled:opacity-40"
+            className="mt-2 w-full py-3.5 rounded-2xl font-bold text-sm tracking-wide transition-all pressable disabled:opacity-30"
             style={{
               background: loading ? "#1a1a1a" : "#1db954",
-              color: loading ? "#a7a7a7" : "black",
+              color: loading ? "#535353" : "black",
             }}
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-[#a7a7a7]/40 border-t-[#a7a7a7] rounded-full animate-spin" />
-                Oluşturuluyor... (~30–60 sn)
+                <span className="w-3.5 h-3.5 border-2 border-[#535353]/40 border-t-[#535353] rounded-full animate-spin" />
+                Oluşturuluyor...
               </span>
             ) : (
               "Şarkı Oluştur"
@@ -658,23 +665,23 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="bg-[#121212] pb-8">
+      <div className="bg-[#0a0a0a] pb-8">
         {/* Oluşturulanlar */}
         {generatedSongs.length > 0 && (
           <section className="mb-8 px-6 pt-6">
-            <h2 className="text-white text-2xl font-black mb-4">
+            <h2 className="text-white text-xl font-black mb-3">
               Oluşturulanlar
             </h2>
             <div className="flex flex-col">
-              <div className="flex items-center gap-4 px-4 pb-2 border-b border-[#282828] mb-1">
-                <span className="w-8 text-center text-[#a7a7a7] text-xs">
+              <div className="flex items-center gap-4 px-4 pb-2 border-b border-[#1a1a1a] mb-1">
+                <span className="w-7 text-center text-[#535353] text-xs">
                   #
                 </span>
-                <span className="w-10 flex-shrink-0" />
-                <span className="flex-1 text-[#a7a7a7] text-xs uppercase tracking-widest">
+                <span className="w-9 flex-shrink-0" />
+                <span className="flex-1 text-[#535353] text-xs uppercase tracking-widest">
                   Başlık
                 </span>
-                <Clock3 size={14} className="text-[#a7a7a7] ml-auto" />
+                <Clock3 size={13} className="text-[#535353]" />
               </div>
               {generatedSongs.map((song, i) => (
                 <TrackRow
@@ -689,16 +696,14 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* Playlists */}
         {playlists.length > 0 && (
-          <Rail title="Çalma listelerin">
+          <Rail title="Çalma Listelerim">
             {playlists.map((pl) => (
               <PlaylistTile key={pl.id} playlist={pl} />
             ))}
           </Rail>
         )}
 
-        {/* Tüm şarkılar */}
         {moreSongs.length > 0 && (
           <Rail title="Son Şarkılar">
             {moreSongs.map((song) => (
@@ -712,16 +717,15 @@ export default function HomePage() {
           </Rail>
         )}
 
-        {/* Boş durum */}
         {allSongs.length === 0 && generatedSongs.length === 0 && (
           <div className="px-6 pt-6">
-            <div className="rounded-2xl bg-gradient-to-br from-[#1a3a2a] to-[#0a1a10] p-8 text-center">
-              <Music2 size={40} className="text-[#1db954] mx-auto mb-4" />
-              <p className="text-white text-xl font-bold mb-2">
+            <div className="rounded-2xl border border-[#1a1a1a] p-8 text-center">
+              <Music2 size={32} className="text-[#2a2a2a] mx-auto mb-3" />
+              <p className="text-white text-base font-bold mb-1">
                 İlk şarkını oluştur
               </p>
-              <p className="text-[#a7a7a7] text-sm">
-                Bir kategori seç ve AI senin için şarkı üretsin
+              <p className="text-[#535353] text-sm">
+                Yukarıdan bir kategori seç
               </p>
             </div>
           </div>
