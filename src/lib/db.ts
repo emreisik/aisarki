@@ -1,9 +1,8 @@
 import { neon } from "@neondatabase/serverless";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL env değişkeni tanımlı değil");
-}
-
-const sql = neon(process.env.DATABASE_URL);
+// Build sırasında DATABASE_URL olmayabilir; neon sadece query anında bağlanır.
+const sql = neon(
+  process.env.DATABASE_URL ?? "postgresql://localhost/placeholder",
+);
 
 export default sql;
