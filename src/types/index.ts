@@ -11,6 +11,19 @@ export interface Song {
   createdAt: string;
 }
 
+export interface Playlist {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  coverUrl?: string;
+  isPublic: boolean;
+  songCount?: number;
+  songs?: Song[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface GenerateRequest {
   prompt: string;
   style?: string;

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import PlayerShell from "@/components/PlayerShell";
+import AppShell from "@/components/AppShell";
+import SessionProvider from "@/components/SessionProvider";
 
 export const metadata: Metadata = {
   title: "AI Şarkı – Yapay Zeka ile Müzik Oluştur",
@@ -20,10 +22,12 @@ export default function RootLayout({
   return (
     <html lang="tr" className="h-full">
       <body className="h-full">
-        <PlayerProvider>
-          <PlayerShell />
-          {children}
-        </PlayerProvider>
+        <SessionProvider>
+          <PlayerProvider>
+            <PlayerShell />
+            <AppShell>{children}</AppShell>
+          </PlayerProvider>
+        </SessionProvider>
       </body>
     </html>
   );

@@ -7,11 +7,13 @@ import {
   SkipBack,
   SkipForward,
   Volume2,
+  VolumeX,
   ChevronDown,
-  MoreHorizontal,
   Music2,
   Heart,
   Share2,
+  Shuffle,
+  Repeat,
 } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 
@@ -35,163 +37,369 @@ export default function AudioPlayer() {
 
   const [liked, setLiked] = useState(false);
   const [volume, setVolume] = useState(0.8);
+  const [muted, setMuted] = useState(false);
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const seek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const t = Number(e.target.value);
-    if (audioRef.current) audioRef.current.currentTime = t;
+    if (audioRef.current) audioRef.current.currentTime = Number(e.target.value);
   };
 
   const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value);
     setVolume(v);
+    setMuted(false);
     if (audioRef.current) audioRef.current.volume = v;
+  };
+
+  const toggleMute = () => {
+    if (!audioRef.current) return;
+    const next = !muted;
+    setMuted(next);
+    audioRef.current.volume = next ? 0 : volume;
   };
 
   if (!currentSong) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex flex-col"
-      style={{
-        background: "linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 60%)",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      }}
-    >
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <button onClick={() => setPlayerOpen(false)} className="pressable p-1">
-          <ChevronDown size={28} className="text-white" />
-        </button>
-        <div className="text-center">
-          <p className="text-[11px] font-semibold text-[#a7a7a7] uppercase tracking-widest">
+    <div className="fixed inset-0 z-[60] overflow-hidden">
+      {/* Blurred background — kapak görselinden renk atmosferi */}
+      <div className="absolute inset-0">
+        {currentSong.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={currentSong.imageUrl}
+            alt=""
+            className="w-full h-full object-cover scale-110"
+            style={{ filter: "blur(80px) brightness(0.25) saturate(1.8)" }}
+          />
+        ) : (
+          <div className="w-full h-full bg-[#1a1a2e]" />
+        )}
+        <div className="absolute inset-0 bg-black/40" />
+      </div>
+
+      {/* Close button */}
+      <button
+        onClick={() => setPlayerOpen(false)}
+        className="absolute top-4 left-4 md:top-6 md:left-6 z-20 pressable p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+        style={{ paddingTop: "max(8px, env(safe-area-inset-top, 8px))" }}
+      >
+        <ChevronDown size={22} className="text-white" />
+      </button>
+
+      {/* ── MOBILE layout ── */}
+      <div
+        className="relative z-10 md:hidden flex flex-col h-full"
+        style={{
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
+      >
+        {/* Mobile top bar label */}
+        <div className="flex items-center justify-center pt-4 pb-2 px-14">
+          <p className="text-[11px] font-semibold text-white/60 uppercase tracking-widest">
             Şimdi Çalıyor
           </p>
         </div>
-        <button className="pressable p-1">
-          <MoreHorizontal size={24} className="text-white" />
-        </button>
-      </div>
 
-      {/* Cover art */}
-      <div className="flex-1 flex items-center justify-center px-8 py-6">
-        <div
-          className="w-full rounded-2xl overflow-hidden shadow-2xl"
-          style={{ aspectRatio: "1", maxHeight: "340px" }}
-        >
-          {currentSong.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={currentSong.imageUrl}
-              alt={currentSong.title}
-              className="w-full h-full object-cover"
+        {/* Cover */}
+        <div className="flex-1 flex items-center justify-center px-8 py-4">
+          <div
+            className="w-full rounded-2xl overflow-hidden shadow-2xl"
+            style={{ aspectRatio: "1", maxHeight: "340px" }}
+          >
+            {currentSong.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={currentSong.imageUrl}
+                alt={currentSong.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-white/10 flex items-center justify-center">
+                <Music2 size={80} className="text-white/30" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Info + like */}
+        <div className="px-6 flex items-center justify-between mb-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-white text-xl font-bold truncate">
+              {currentSong.title || "İsimsiz"}
+            </p>
+            <p className="text-white/60 text-sm truncate mt-0.5">
+              {currentSong.style?.split(",")[0] || "AI Müzik"}
+            </p>
+          </div>
+          <button
+            onClick={() => setLiked(!liked)}
+            className="pressable ml-4 p-1"
+          >
+            <Heart
+              size={24}
+              className={liked ? "text-[#1db954]" : "text-white/60"}
+              fill={liked ? "#1db954" : "none"}
             />
-          ) : (
-            <div className="w-full h-full bg-[#222] flex items-center justify-center">
-              <Music2 size={80} className="text-[#535353]" />
+          </button>
+        </div>
+
+        {/* Progress */}
+        <MobileProgress
+          currentTime={currentTime}
+          duration={duration}
+          progress={progress}
+          seek={seek}
+        />
+
+        {/* Controls */}
+        <div className="flex items-center justify-between px-8 mb-5">
+          <button onClick={playPrev} className="pressable">
+            <SkipBack size={32} fill="white" className="text-white" />
+          </button>
+          <button
+            onClick={togglePlay}
+            className="w-16 h-16 rounded-full bg-white flex items-center justify-center pressable shadow-lg"
+          >
+            {playing ? (
+              <Pause size={28} fill="black" className="text-black" />
+            ) : (
+              <Play size={28} fill="black" className="text-black ml-1" />
+            )}
+          </button>
+          <button onClick={playNext} className="pressable">
+            <SkipForward size={32} fill="white" className="text-white" />
+          </button>
+        </div>
+
+        {/* Volume + share */}
+        <div className="px-6 mb-4 flex items-center gap-3">
+          <Volume2 size={16} className="text-white/50 flex-shrink-0" />
+          <div className="relative flex-1 h-4 flex items-center group">
+            <div className="w-full h-1 rounded-full bg-white/20 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-white/70"
+                style={{ width: `${volume * 100}%` }}
+              />
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Song info + like */}
-      <div className="px-6 flex items-center justify-between mb-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-white text-xl font-bold truncate">
-            {currentSong.title || "İsimsiz"}
-          </p>
-          <p className="text-[#a7a7a7] text-sm truncate mt-0.5">
-            {currentSong.style?.split(",")[0] || "AI Müzik"}
-          </p>
-        </div>
-        <button onClick={() => setLiked(!liked)} className="pressable ml-4 p-1">
-          <Heart
-            size={24}
-            className={liked ? "text-[#1db954]" : "text-[#a7a7a7]"}
-            fill={liked ? "#1db954" : "none"}
-          />
-        </button>
-      </div>
-
-      {/* Progress */}
-      <div className="px-6 mb-3">
-        <div className="relative">
-          <div className="h-1 rounded-full bg-[#333] overflow-hidden">
-            <div
-              className="h-full rounded-full bg-white"
-              style={{ width: `${progress}%` }}
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={volume}
+              onChange={handleVolume}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full"
             />
           </div>
-          <input
-            type="range"
-            min={0}
-            max={duration || 100}
-            value={currentTime}
-            onChange={seek}
-            className="absolute inset-0 opacity-0 cursor-pointer"
-          />
+          <Volume2 size={20} className="text-white/50 flex-shrink-0" />
         </div>
-        <div className="flex justify-between mt-1.5">
-          <span className="text-[#a7a7a7] text-[11px] tabular-nums">
-            {fmt(currentTime)}
-          </span>
-          <span className="text-[#a7a7a7] text-[11px] tabular-nums">
-            {fmt(duration)}
-          </span>
+
+        <div className="flex justify-center mb-6">
+          <button className="flex items-center gap-2 pressable">
+            <Share2 size={15} className="text-white/50" />
+            <span className="text-white/50 text-sm">Paylaş</span>
+          </button>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center justify-between px-8 mb-6">
-        <button onClick={playPrev} className="pressable">
-          <SkipBack size={32} fill="white" className="text-white" />
-        </button>
-        <button
-          onClick={togglePlay}
-          className="w-16 h-16 rounded-full bg-white flex items-center justify-center pressable shadow-lg"
-        >
-          {playing ? (
-            <Pause size={28} fill="black" className="text-black" />
-          ) : (
-            <Play size={28} fill="black" className="text-black ml-1" />
-          )}
-        </button>
-        <button onClick={playNext} className="pressable">
-          <SkipForward size={32} fill="white" className="text-white" />
-        </button>
-      </div>
-
-      {/* Volume */}
-      <div className="flex items-center gap-3 px-6 mb-8">
-        <Volume2 size={16} className="text-[#a7a7a7] flex-shrink-0" />
-        <div className="relative flex-1">
-          <div className="h-1 rounded-full bg-[#333] overflow-hidden">
-            <div
-              className="h-full rounded-full bg-[#a7a7a7]"
-              style={{ width: `${volume * 100}%` }}
-            />
+      {/* ── DESKTOP / TABLET layout ── */}
+      <div className="relative z-10 hidden md:flex h-full items-center justify-center px-12 lg:px-20 gap-12 lg:gap-20">
+        {/* Left: Cover art */}
+        <div className="flex-shrink-0 w-[38%] max-w-[420px]">
+          <div className="w-full aspect-square rounded-2xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.6)]">
+            {currentSong.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={currentSong.imageUrl}
+                alt={currentSong.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-white/10 flex items-center justify-center">
+                <Music2 size={100} className="text-white/20" />
+              </div>
+            )}
           </div>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            onChange={handleVolume}
-            className="absolute inset-0 opacity-0 cursor-pointer"
+        </div>
+
+        {/* Right: Info + controls */}
+        <div className="flex-1 max-w-md flex flex-col gap-6">
+          {/* Song info */}
+          <div>
+            <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-2">
+              Şimdi Çalıyor
+            </p>
+            <h1 className="text-white text-3xl lg:text-4xl font-black leading-tight">
+              {currentSong.title || "İsimsiz"}
+            </h1>
+            <p className="text-white/60 text-base mt-2">
+              {currentSong.style?.split(",")[0] || "AI Müzik"}
+            </p>
+          </div>
+
+          {/* Like + share */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setLiked(!liked)}
+              className="pressable flex items-center gap-2"
+            >
+              <Heart
+                size={22}
+                className={
+                  liked ? "text-[#1db954]" : "text-white/50 hover:text-white"
+                }
+                fill={liked ? "#1db954" : "none"}
+              />
+              <span
+                className={`text-sm font-medium ${liked ? "text-[#1db954]" : "text-white/50"}`}
+              >
+                {liked ? "Beğenildi" : "Beğen"}
+              </span>
+            </button>
+            <button className="pressable flex items-center gap-2">
+              <Share2 size={18} className="text-white/50 hover:text-white" />
+              <span className="text-white/50 text-sm hover:text-white">
+                Paylaş
+              </span>
+            </button>
+          </div>
+
+          {/* Progress bar */}
+          <div>
+            <div className="relative h-5 flex items-center group cursor-pointer">
+              <div className="w-full h-1 rounded-full bg-white/20 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-white group-hover:bg-[#1db954] transition-colors"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={duration || 100}
+                value={currentTime}
+                onChange={seek}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full"
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-white/50 text-xs tabular-nums">
+                {fmt(currentTime)}
+              </span>
+              <span className="text-white/50 text-xs tabular-nums">
+                {fmt(duration)}
+              </span>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center justify-between">
+            <button className="pressable text-white/40 hover:text-white transition-colors">
+              <Shuffle size={20} />
+            </button>
+            <button
+              onClick={playPrev}
+              className="pressable text-white hover:scale-110 transition-transform"
+            >
+              <SkipBack size={28} fill="white" className="text-white" />
+            </button>
+            <button
+              onClick={togglePlay}
+              className="w-16 h-16 rounded-full bg-white flex items-center justify-center pressable hover:scale-105 transition-transform shadow-xl"
+            >
+              {playing ? (
+                <Pause size={26} fill="black" className="text-black" />
+              ) : (
+                <Play size={26} fill="black" className="text-black ml-1" />
+              )}
+            </button>
+            <button
+              onClick={playNext}
+              className="pressable text-white hover:scale-110 transition-transform"
+            >
+              <SkipForward size={28} fill="white" className="text-white" />
+            </button>
+            <button className="pressable text-white/40 hover:text-white transition-colors">
+              <Repeat size={20} />
+            </button>
+          </div>
+
+          {/* Volume */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleMute}
+              className="pressable text-white/50 hover:text-white transition-colors flex-shrink-0"
+            >
+              {muted || volume === 0 ? (
+                <VolumeX size={20} />
+              ) : (
+                <Volume2 size={20} />
+              )}
+            </button>
+            <div className="relative flex-1 h-5 flex items-center group cursor-pointer">
+              <div className="w-full h-1 rounded-full bg-white/20 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-white/70 group-hover:bg-[#1db954] transition-colors"
+                  style={{ width: `${muted ? 0 : volume * 100}%` }}
+                />
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={muted ? 0 : volume}
+                onChange={handleVolume}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Progress bar — mobile only (extracted for readability) */
+function MobileProgress({
+  currentTime,
+  duration,
+  progress,
+  seek,
+}: {
+  currentTime: number;
+  duration: number;
+  progress: number;
+  seek: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div className="px-6 mb-4">
+      <div className="relative h-5 flex items-center group cursor-pointer">
+        <div className="w-full h-1 rounded-full bg-white/20 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-white"
+            style={{ width: `${progress}%` }}
           />
         </div>
-        <Volume2 size={20} className="text-[#a7a7a7] flex-shrink-0" />
+        <input
+          type="range"
+          min={0}
+          max={duration || 100}
+          value={currentTime}
+          onChange={seek}
+          className="absolute inset-0 opacity-0 cursor-pointer w-full"
+        />
       </div>
-
-      {/* Share */}
-      <div className="flex justify-center mb-6">
-        <button className="flex items-center gap-2 pressable">
-          <Share2 size={16} className="text-[#a7a7a7]" />
-          <span className="text-[#a7a7a7] text-sm">Paylaş</span>
-        </button>
+      <div className="flex justify-between mt-1">
+        <span className="text-white/50 text-[11px] tabular-nums">
+          {fmt(currentTime)}
+        </span>
+        <span className="text-white/50 text-[11px] tabular-nums">
+          {fmt(duration)}
+        </span>
       </div>
     </div>
   );

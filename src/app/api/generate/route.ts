@@ -30,11 +30,20 @@ export async function POST(request: NextRequest) {
 
     const callBackUrl = getCallbackUrl(request);
 
+    // Doğal Türk sesi için kalite işaretçileri ekle
+    const qualitySuffix = instrumental
+      ? ""
+      : ", natural authentic Turkish vocals, real organic instruments, genuine emotional voice, warm tone, not autotuned, not synthetic";
+
+    const finalPrompt = customMode
+      ? prompt || ""
+      : (prompt || "") + qualitySuffix;
+
     const payload = {
       customMode,
       instrumental,
       model: "V4_5ALL",
-      prompt: prompt || "",
+      prompt: finalPrompt,
       callBackUrl,
       ...(customMode && style ? { style } : {}),
       ...(customMode && title ? { title } : {}),

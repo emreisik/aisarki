@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import { Song } from "@/types";
-import BottomNav from "@/components/BottomNav";
 import MusicGenerator from "@/components/MusicGenerator";
 import SongCard from "@/components/SongCard";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -27,29 +26,30 @@ export default function CreatePage() {
     });
   }, []);
 
-  const bottomPadding = currentSong
-    ? "pb-[calc(64px+64px+env(safe-area-inset-bottom,0px)+16px)]"
-    : "pb-[calc(64px+env(safe-area-inset-bottom,0px)+8px)]";
+  const mobilePad = currentSong
+    ? "pb-[calc(144px+env(safe-area-inset-bottom,0px))]"
+    : "pb-[calc(72px+env(safe-area-inset-bottom,0px))]";
 
   return (
-    <div className="h-full flex flex-col bg-[#0a0a0a]">
-      <div className={`scroll-area flex-1 ${bottomPadding}`}>
-        {/* Header */}
-        <div className="px-5 pt-14 pb-6">
-          <h1 className="text-white text-3xl font-black tracking-tight">
-            Oluştur
-          </h1>
-          <p className="text-[#535353] text-sm mt-1">AI ile şarkı yap</p>
-        </div>
+    <div className={`min-h-full bg-[#121212] ${mobilePad} md:pb-0`}>
+      {/* Hero */}
+      <div className="bg-gradient-to-b from-[#1a3a2a] to-[#121212] pt-16 md:pt-20 px-6 pb-6">
+        <h1 className="text-white text-3xl font-black tracking-tight">
+          Oluştur
+        </h1>
+        <p className="text-[#a7a7a7] text-sm mt-1">AI ile özgün şarkılar yap</p>
+      </div>
 
+      {/* Two-column layout on desktop */}
+      <div className="px-6 py-6 flex flex-col md:flex-row gap-8 items-start">
         {/* Generator form */}
-        <div className="px-5 mb-8">
+        <div className="w-full md:max-w-lg md:flex-shrink-0">
           <MusicGenerator onSongsAdded={handleSongsAdded} />
         </div>
 
-        {/* Created songs */}
+        {/* Generated songs — right column on desktop, below on mobile */}
         {songs.length > 0 && (
-          <div className="px-5">
+          <div className="w-full md:flex-1 md:min-w-0">
             <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-3">
               Bu Oturumda
             </p>
@@ -67,8 +67,6 @@ export default function CreatePage() {
           </div>
         )}
       </div>
-
-      <BottomNav active="create" />
     </div>
   );
 }
