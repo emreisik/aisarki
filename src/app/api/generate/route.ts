@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GenerateRequest, SunoApiResponse } from "@/types";
+import { saveProcessingTask } from "@/lib/taskStore";
 
 const SUNO_API_KEY = "7049ff127b2d972a33fef22566de8512";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
@@ -65,10 +66,17 @@ export async function POST(request: NextRequest) {
     console.log("Suno API response:", JSON.stringify(data, null, 2));
 
     if (!response.ok || data.code !== 200) {
-      // Suno bazen HTTP 200 ama code!=200 döndürür — her zaman 400 ver
       return NextResponse.json(
         { error: data.msg || "Müzik oluşturulamadı" },
         { status: 400 },
+      );
+    }
+
+    // taskId'yi DB'ye kaydet — sayfa yenilenince de durum korunur
+    const taskId = data.data?.taskId;
+    if (taskId) {
+      saveProcessingTask(taskId, finalPrompt).catch((e) =>
+        console.error("[db] saveProcessingTask hatası:", e),
       );
     }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTaskSongs, setTaskSongs } from "@/lib/taskStore";
+import { getTaskSongs, setTaskSongs, markTaskComplete } from "@/lib/taskStore";
 import { Song } from "@/types";
 
 const SUNO_API_KEY =
@@ -96,8 +96,8 @@ export async function GET(request: NextRequest) {
   const complete = songs.filter((s) => s.status === "complete");
 
   if (complete.length > 0) {
-    // DB'ye kaydet ve cache'e al (callback gelmese bile)
     setTaskSongs(taskId, songs);
+    markTaskComplete(taskId).catch(() => {});
     return NextResponse.json({ status: "complete", songs: complete });
   }
 

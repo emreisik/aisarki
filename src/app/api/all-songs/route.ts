@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { getAllSongs } from "@/lib/taskStore";
+import { getAllSongs, getProcessingTasks } from "@/lib/taskStore";
 
 export async function GET() {
-  const songs = await getAllSongs();
-  return NextResponse.json({ songs });
+  const [songs, processing] = await Promise.all([
+    getAllSongs(),
+    getProcessingTasks(),
+  ]);
+  return NextResponse.json({ songs, processing });
 }

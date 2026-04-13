@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Play, Pause, Music2 } from "lucide-react";
+import { Play, Pause, Music2, Loader2 } from "lucide-react";
 
 const GENRES = [
   { label: "Türk Pop", color: "#E61E32", emoji: "🎵" },
@@ -20,6 +20,28 @@ const GENRES = [
   { label: "Türk Halk", color: "#C87D3E", emoji: "🪘" },
   { label: "Arabesk", color: "#855D3C", emoji: "🌙" },
 ];
+
+interface ProcessingTask {
+  taskId: string;
+  prompt: string;
+  startedAt: string;
+}
+
+function ProcessingCard() {
+  return (
+    <div className="bg-[#181818] rounded-lg p-4 text-left">
+      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-4">
+        <div className="w-full h-full flex items-center justify-center">
+          <Loader2 size={32} className="text-[#1db954] animate-spin" />
+        </div>
+      </div>
+      <p className="text-sm font-semibold truncate mb-1 text-[#a7a7a7]">
+        Oluşturuluyor...
+      </p>
+      <div className="h-2 w-2/3 rounded-full bg-[#282828] shimmer" />
+    </div>
+  );
+}
 
 function SongCard({
   song,
@@ -97,22 +119,81 @@ export default function DiscoverPage() {
   const { playSong, currentSong } = usePlayer();
   const router = useRouter();
   const [songs, setSongs] = useState<Song[]>([]);
+  const [processing, setProcessing] = useState<ProcessingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string | null>(null);
+  const pollingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
-  const fetchSongs = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     try {
       const res = await fetch("/api/all-songs");
-      const data: { songs: Song[] } = await res.json();
-      setSongs(data.songs);
+      const data: { songs: Song[]; processing: ProcessingTask[] } =
+        await res.json();
+      setSongs(data.songs ?? []);
+      setProcessing(data.processing ?? []);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Processing task için polling başlat
+  const startPolling = useCallback((taskId: string) => {
+    if (pollingRef.current.has(taskId)) return;
+
+    let attempts = 0;
+    const poll = async () => {
+      if (attempts++ >= 40) {
+        pollingRef.current.delete(taskId);
+        // Timeout — task'ı listeden kaldır
+        setProcessing((prev) => prev.filter((t) => t.taskId !== taskId));
+        return;
+      }
+      try {
+        const res = await fetch(`/api/songs?taskId=${taskId}`);
+        const data = await res.json();
+        if (data.status === "complete" && data.songs?.length > 0) {
+          pollingRef.current.delete(taskId);
+          setProcessing((prev) => prev.filter((t) => t.taskId !== taskId));
+          setSongs((prev) => {
+            const ids = new Set(prev.map((s: Song) => s.id));
+            const newSongs = (data.songs as Song[]).filter(
+              (s) => !ids.has(s.id),
+            );
+            return [...newSongs, ...prev];
+          });
+        } else {
+          const timer = setTimeout(poll, 5000);
+          pollingRef.current.set(taskId, timer);
+        }
+      } catch {
+        const timer = setTimeout(poll, 8000);
+        pollingRef.current.set(taskId, timer);
+      }
+    };
+
+    const timer = setTimeout(poll, 5000);
+    pollingRef.current.set(taskId, timer);
+  }, []);
+
   useEffect(() => {
-    fetchSongs();
-  }, [fetchSongs]);
+    fetchAll();
+  }, [fetchAll]);
+
+  // Yeni processing task geldiğinde polling başlat
+  useEffect(() => {
+    processing.forEach((t) => startPolling(t.taskId));
+  }, [processing, startPolling]);
+
+  // Cleanup
+  useEffect(() => {
+    const ref = pollingRef.current;
+    return () => {
+      ref.forEach((timer) => clearTimeout(timer));
+      ref.clear();
+    };
+  }, []);
 
   const filtered = filter
     ? songs.filter((s) => s.style?.toLowerCase().includes(filter.toLowerCase()))
@@ -128,7 +209,9 @@ export default function DiscoverPage() {
       <div className="bg-gradient-to-b from-[#2d2d2d] to-[#121212] pt-16 md:pt-20 px-6 pb-6">
         <h1 className="text-white text-3xl font-black mb-1">Keşfet</h1>
         <p className="text-[#a7a7a7] text-sm">
-          {songs.length > 0 ? `${songs.length} şarkı` : "Yükleniyor..."}
+          {loading
+            ? "Yükleniyor..."
+            : `${songs.length} şarkı${processing.length > 0 ? ` · ${processing.length} oluşturuluyor` : ""}`}
         </p>
       </div>
 
@@ -188,7 +271,7 @@ export default function DiscoverPage() {
                 </div>
               ))}
             </div>
-          ) : filtered.length === 0 ? (
+          ) : filtered.length === 0 && processing.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Music2 size={48} className="text-[#535353] mb-4" />
               <p className="text-white font-bold text-xl mb-2">
@@ -204,6 +287,9 @@ export default function DiscoverPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {/* Processing spinner kartlar — en üstte */}
+              {!filter &&
+                processing.map((t) => <ProcessingCard key={t.taskId} />)}
               {filtered.map((song) => (
                 <SongCard
                   key={song.id}

@@ -1482,12 +1482,34 @@ export default function HomePage() {
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [prompt, setPrompt] = useState("");
+  const activePolls = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/all-songs")
       .then((r) => r.json())
-      .then((d) => setAllSongs(d.songs || []));
-  }, []);
+      .then((d) => {
+        setAllSongs(d.songs || []);
+        // Sayfa yenilenince processing task'ları geri yükle
+        const tasks: Array<{ taskId: string }> = d.processing || [];
+        tasks.forEach(({ taskId }) => {
+          const tempId = `task-resume-${taskId}`;
+          setGeneratedSongs((prev) =>
+            prev.some((s) => s.id === tempId)
+              ? prev
+              : [
+                  {
+                    id: tempId,
+                    title: "Oluşturuluyor...",
+                    status: "processing" as const,
+                    createdAt: new Date().toISOString(),
+                  },
+                  ...prev,
+                ],
+          );
+          pollForSongsFromDB(taskId, tempId);
+        });
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!session?.user) return;
@@ -1514,15 +1536,56 @@ export default function HomePage() {
     });
   }, []);
 
+  // Sayfa yenilenince DB'den gelen processing task'lar için polling
+  function pollForSongsFromDB(taskId: string, tempId: string) {
+    if (activePolls.current.has(taskId)) return;
+    activePolls.current.add(taskId);
+    let attempts = 0;
+    const poll = async () => {
+      if (attempts++ >= 40) {
+        activePolls.current.delete(taskId);
+        setGeneratedSongs((prev) => prev.filter((s) => s.id !== tempId));
+        return;
+      }
+      try {
+        const res = await fetch(`/api/songs?taskId=${taskId}`);
+        const data = await res.json();
+        if (data.status === "complete" && data.songs?.length > 0) {
+          activePolls.current.delete(taskId);
+          setGeneratedSongs((prev) => prev.filter((s) => s.id !== tempId));
+          setAllSongs((prev) => {
+            const ids = new Set(prev.map((s) => s.id));
+            return [
+              ...(data.songs as Song[]).filter((s) => !ids.has(s.id)),
+              ...prev,
+            ];
+          });
+        } else {
+          setTimeout(poll, 5000);
+        }
+      } catch {
+        setTimeout(poll, 8000);
+      }
+    };
+    setTimeout(poll, 5000);
+  }
+
   const pollForSongs = useCallback(
     (taskId: string, tempIds: string[]) => {
+      if (activePolls.current.has(taskId)) return;
+      activePolls.current.add(taskId);
       let attempts = 0;
       const poll = async () => {
-        if (attempts++ >= 40) return;
+        if (attempts++ >= 40) {
+          activePolls.current.delete(taskId);
+          handleSongsAdded([]);
+          return;
+        }
         try {
           const res = await fetch(`/api/songs?taskId=${taskId}`);
           const data = await res.json();
           if (data.status === "complete" && data.songs?.length > 0) {
+            activePolls.current.delete(taskId);
             handleSongsAdded(
               data.songs.map((s: Song, i: number) => ({
                 ...s,
@@ -1532,7 +1595,7 @@ export default function HomePage() {
             setAllSongs((prev) => {
               const ids = new Set(prev.map((s) => s.id));
               return [
-                ...data.songs.filter((s: Song) => !ids.has(s.id)),
+                ...(data.songs as Song[]).filter((s) => !ids.has(s.id)),
                 ...prev,
               ];
             });

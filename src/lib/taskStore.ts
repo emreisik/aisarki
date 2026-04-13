@@ -5,10 +5,77 @@ import sql from "./db";
 declare global {
   // eslint-disable-next-line no-var
   var __taskStore: Map<string, Song[]> | undefined;
+  // eslint-disable-next-line no-var
+  var __tasksTableReady: boolean | undefined;
 }
 
 const taskStore: Map<string, Song[]> =
   global.__taskStore ?? (global.__taskStore = new Map<string, Song[]>());
+
+/* ── tasks tablosu ── */
+
+async function ensureTasksTable() {
+  if (global.__tasksTableReady) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS tasks (
+      task_id   TEXT PRIMARY KEY,
+      prompt    TEXT,
+      status    TEXT NOT NULL DEFAULT 'processing',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  global.__tasksTableReady = true;
+}
+
+export async function saveProcessingTask(
+  taskId: string,
+  prompt: string,
+): Promise<void> {
+  await ensureTasksTable();
+  await sql`
+    INSERT INTO tasks (task_id, prompt)
+    VALUES (${taskId}, ${prompt})
+    ON CONFLICT (task_id) DO NOTHING
+  `;
+}
+
+export async function markTaskComplete(taskId: string): Promise<void> {
+  try {
+    await ensureTasksTable();
+    await sql`UPDATE tasks SET status = 'complete' WHERE task_id = ${taskId}`;
+  } catch {
+    // tasks tablosu yoksa sessizce geç
+  }
+}
+
+export interface ProcessingTask {
+  taskId: string;
+  prompt: string;
+  startedAt: string;
+}
+
+export async function getProcessingTasks(): Promise<ProcessingTask[]> {
+  try {
+    await ensureTasksTable();
+    const rows = await sql`
+      SELECT task_id, prompt, created_at
+      FROM tasks
+      WHERE status = 'processing'
+        AND created_at > NOW() - INTERVAL '2 hours'
+      ORDER BY created_at DESC
+    `;
+    return rows.map((r) => ({
+      taskId: r.task_id as string,
+      prompt: (r.prompt as string) ?? "",
+      startedAt:
+        r.created_at instanceof Date
+          ? r.created_at.toISOString()
+          : (r.created_at as string),
+    }));
+  } catch {
+    return [];
+  }
+}
 
 /* ── DB helpers ── */
 
