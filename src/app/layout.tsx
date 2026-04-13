@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { PlayerProvider } from "@/contexts/PlayerContext";
-import PlayerShell from "@/components/PlayerShell";
 import AppShell from "@/components/AppShell";
 import SessionProvider from "@/components/SessionProvider";
 
@@ -24,7 +23,6 @@ export default function RootLayout({
       <body className="h-full">
         <SessionProvider>
           <PlayerProvider>
-            <PlayerShell />
             <AppShell>{children}</AppShell>
           </PlayerProvider>
         </SessionProvider>

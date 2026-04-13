@@ -179,6 +179,9 @@ export default function DiscoverPage() {
 
   useEffect(() => {
     fetchAll();
+    // 15 saniyede bir yeni şarkıları çek
+    const interval = setInterval(fetchAll, 15000);
+    return () => clearInterval(interval);
   }, [fetchAll]);
 
   // Yeni processing task geldiğinde polling başlat
