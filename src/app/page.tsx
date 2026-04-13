@@ -10,98 +10,268 @@ import {
   Music2,
   Clock3,
   ListMusic,
-  Shuffle,
-  X,
+  ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 
-/* ── Prompt Builder data ── */
-const MOODS = [
-  { label: "Mutlu", emoji: "😄" },
-  { label: "Hüzünlü", emoji: "😢" },
-  { label: "Enerjik", emoji: "⚡" },
-  { label: "Romantik", emoji: "💕" },
-  { label: "Nostaljik", emoji: "🌅" },
-  { label: "Öfkeli", emoji: "🔥" },
-  { label: "Sakin", emoji: "🌊" },
-  { label: "Eğlenceli", emoji: "🎉" },
-];
-
-const GENRES = [
-  { label: "Türk Pop", emoji: "🎵" },
-  { label: "Arabesk", emoji: "🌙" },
-  { label: "Hip-Hop", emoji: "🎤" },
-  { label: "Rock", emoji: "🎸" },
-  { label: "Elektronik", emoji: "🎛️" },
-  { label: "Türk Halk", emoji: "🪘" },
-  { label: "R&B", emoji: "💜" },
-  { label: "Lo-fi", emoji: "📻" },
-  { label: "Jazz", emoji: "🎺" },
-  { label: "Klasik", emoji: "🎻" },
-];
-
-const TOPICS = [
-  { label: "Aşk", emoji: "❤️" },
-  { label: "Ayrılık", emoji: "💔" },
-  { label: "Özlem", emoji: "🥺" },
-  { label: "Arkadaşlık", emoji: "🤝" },
-  { label: "İstanbul", emoji: "🌉" },
-  { label: "Yaz", emoji: "☀️" },
-  { label: "Gece", emoji: "🌃" },
-  { label: "Özgürlük", emoji: "🕊️" },
-  { label: "Memleket", emoji: "🏡" },
-  { label: "Gençlik", emoji: "✨" },
-];
-
-const TEMPOS = [
-  { label: "Yavaş", emoji: "🐢" },
-  { label: "Orta", emoji: "🚶" },
-  { label: "Hızlı", emoji: "🏃" },
-];
-
-function buildPrompt(
-  mood: string,
-  genre: string,
-  topic: string,
-  tempo: string,
-): string {
-  const parts = [];
-  if (mood) parts.push(mood);
-  if (genre) parts.push(genre + " tarzında");
-  if (topic) parts.push(topic + " temalı");
-  if (tempo) parts.push(tempo + " tempolu");
-  if (parts.length === 0) return "";
-  return parts.join(", ") + " bir şarkı";
-}
-
-function randomFrom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-/* ── Chip component ── */
-function Chip({
-  emoji,
-  label,
-  selected,
-  onClick,
-}: {
+/* ── Kategori sistemi ── */
+interface CategoryItem {
   emoji: string;
+  title: string;
+  prompt: string;
+}
+
+interface CategoryGroup {
   label: string;
-  selected: boolean;
-  onClick: () => void;
+  color: string; // gradient başlangıç
+  items: CategoryItem[];
+}
+
+const CATEGORY_GROUPS: CategoryGroup[] = [
+  {
+    label: "Kişiye Özel",
+    color: "#be185d",
+    items: [
+      {
+        emoji: "💕",
+        title: "Sevgiliye",
+        prompt:
+          "Sevgilime özel, romantik ve içten duygular anlatan aşk şarkısı",
+      },
+      {
+        emoji: "🌸",
+        title: "Anneme",
+        prompt: "Anneme sonsuz sevgi ve minnettarlık anlatan duygusal şarkı",
+      },
+      {
+        emoji: "👨",
+        title: "Babama",
+        prompt: "Babama saygı, sevgi ve teşekkür anlatan güçlü bir şarkı",
+      },
+      {
+        emoji: "🤝",
+        title: "Arkadaşıma",
+        prompt: "En iyi arkadaşıma ithaf, neşeli ve samimi dostluk şarkısı",
+      },
+      {
+        emoji: "👶",
+        title: "Bebeğime",
+        prompt: "Bebeğime ninni tarzında yumuşak, sevgi dolu bir şarkı",
+      },
+      {
+        emoji: "👩‍🏫",
+        title: "Öğretmenime",
+        prompt: "Öğretmenime teşekkür ve saygı anlatan içten bir şarkı",
+      },
+      {
+        emoji: "❤️",
+        title: "Kardeşime",
+        prompt: "Kardeşime sevgi, birliktelik ve paylaşımı anlatan şarkı",
+      },
+    ],
+  },
+  {
+    label: "Özel Günler",
+    color: "#b45309",
+    items: [
+      {
+        emoji: "🎂",
+        title: "Doğum Günü",
+        prompt: "Doğum günü için neşeli, enerjik ve kutlama ruhunda şarkı",
+      },
+      {
+        emoji: "💍",
+        title: "Düğün",
+        prompt: "Düğün için romantik, mutlu ve kutlama dolu özel bir şarkı",
+      },
+      {
+        emoji: "🥂",
+        title: "Yıl Dönümü",
+        prompt: "Yıl dönümü için romantik, birlikteliği anlatan özel şarkı",
+      },
+      {
+        emoji: "🎉",
+        title: "Parti Gecesi",
+        prompt: "Parti için dans ettiren, enerjik ve eğlenceli bir şarkı",
+      },
+      {
+        emoji: "🕌",
+        title: "Bayram",
+        prompt: "Bayram için kutlama, sevinç ve birliktelik temalı şarkı",
+      },
+      {
+        emoji: "🎓",
+        title: "Mezuniyet",
+        prompt: "Mezuniyet için gurur verici, coşkulu bir kutlama şarkısı",
+      },
+      {
+        emoji: "🌙",
+        title: "Ramazan",
+        prompt: "Ramazan ayına özel, manevi ve huzur dolu bir şarkı",
+      },
+    ],
+  },
+  {
+    label: "Duygular",
+    color: "#4338ca",
+    items: [
+      {
+        emoji: "💔",
+        title: "Ayrılık Acısı",
+        prompt: "Ayrılık acısı ve yalnızlığı anlatan derin hüzünlü şarkı",
+      },
+      {
+        emoji: "🌅",
+        title: "Özlem",
+        prompt: "Uzakta birine duyulan özlemi anlatan hüzünlü bir şarkı",
+      },
+      {
+        emoji: "⚡",
+        title: "Motivasyon",
+        prompt: "Güçlü ve motive edici, hayata tutunmayı anlatan enerjik şarkı",
+      },
+      {
+        emoji: "✨",
+        title: "Mutlu & Neşeli",
+        prompt: "Hayatın güzelliğini anlatan neşeli ve pozitif bir şarkı",
+      },
+      {
+        emoji: "🌊",
+        title: "Huzur & Sakinlik",
+        prompt: "Sakinleştirici, huzurlu ve rahatlatıcı ambient bir şarkı",
+      },
+      {
+        emoji: "🔥",
+        title: "Öfke & Güç",
+        prompt: "İçten gelen öfkeyi ve gücü anlatan rock tarzı şarkı",
+      },
+      {
+        emoji: "🥺",
+        title: "Nostalji",
+        prompt: "Geçmiş günlere özlem, nostaljik ve duygusal bir şarkı",
+      },
+    ],
+  },
+  {
+    label: "Türk Kültürü",
+    color: "#065f46",
+    items: [
+      {
+        emoji: "🌉",
+        title: "İstanbul'a",
+        prompt: "İstanbul'un ruhunu ve güzelliğini anlatan Türk pop şarkısı",
+      },
+      {
+        emoji: "🏡",
+        title: "Memleket Özlemi",
+        prompt: "Memleketini özleyen birinin hüzünlü Türk şarkısı",
+      },
+      {
+        emoji: "🌙",
+        title: "Arabesk",
+        prompt: "Klasik arabesk tarzında kader ve aşkı anlatan derin şarkı",
+      },
+      {
+        emoji: "🪘",
+        title: "Türk Halk",
+        prompt: "Anadolu halk müziği tarzında kökleri anlatan şarkı",
+      },
+      {
+        emoji: "☀️",
+        title: "Yaz & Sahil",
+        prompt: "Yaz tatili, deniz ve güneş temalı neşeli Türk pop şarkısı",
+      },
+      {
+        emoji: "🎭",
+        title: "Dizi Müziği",
+        prompt: "Türk dizisi için dramatik ve etkileyici fon müziği",
+      },
+      {
+        emoji: "🍵",
+        title: "Çay Saati",
+        prompt: "Sohbet, çay ve sıcak anlara dair sakin ve samimi şarkı",
+      },
+    ],
+  },
+];
+
+/* ── Kategori kartı ── */
+function CategoryCard({
+  item,
+  color,
+  onSelect,
+}: {
+  item: CategoryItem;
+  color: string;
+  onSelect: (prompt: string) => void;
 }) {
   return (
     <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold transition-all pressable ${
-        selected
-          ? "bg-[#1db954] text-black scale-105"
-          : "bg-[#1a1a1a] text-[#a7a7a7] border border-[#2a2a2a] hover:border-[#535353] hover:text-white"
-      }`}
+      onClick={() => onSelect(item.prompt)}
+      className="flex-shrink-0 w-[120px] h-[80px] rounded-xl overflow-hidden relative pressable hover:scale-[1.04] transition-transform"
+      style={{ background: `linear-gradient(135deg, ${color}dd, ${color}88)` }}
     >
-      <span>{emoji}</span>
-      <span>{label}</span>
+      <span className="absolute top-2.5 left-3 text-2xl">{item.emoji}</span>
+      <span className="absolute bottom-2.5 left-3 right-2 text-white text-xs font-bold leading-tight text-left">
+        {item.title}
+      </span>
     </button>
+  );
+}
+
+/* ── Kategori satırı ── */
+function CategoryRow({
+  group,
+  onSelect,
+}: {
+  group: CategoryGroup;
+  onSelect: (prompt: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? group.items : group.items.slice(0, 5);
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2 px-6">
+        <p className="text-white text-xs font-bold uppercase tracking-widest">
+          {group.label}
+        </p>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 text-[#a7a7a7] text-xs pressable hover:text-white transition-colors"
+        >
+          {expanded ? "Gizle" : "Tümünü Gör"}
+          <ChevronRight
+            size={12}
+            className={`transition-transform ${expanded ? "rotate-90" : ""}`}
+          />
+        </button>
+      </div>
+
+      {expanded ? (
+        <div className="px-6 flex flex-wrap gap-2">
+          {group.items.map((item) => (
+            <CategoryCard
+              key={item.title}
+              item={item}
+              color={group.color}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto scroll-area px-6 pb-1">
+          {shown.map((item) => (
+            <CategoryCard
+              key={item.title}
+              item={item}
+              color={group.color}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -130,7 +300,7 @@ function Rail({
   );
 }
 
-/* ── Song card (vertical) ── */
+/* ── Song tile (horizontal rail) ── */
 function SongTile({
   song,
   onPlay,
@@ -143,9 +313,9 @@ function SongTile({
   return (
     <button
       onClick={onPlay}
-      className="flex-shrink-0 w-[180px] bg-[#181818] hover:bg-[#282828] rounded-lg p-4 transition-colors text-left group pressable"
+      className="flex-shrink-0 w-[160px] bg-[#181818] hover:bg-[#282828] rounded-lg p-3 transition-colors text-left group pressable"
     >
-      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-4 shadow-lg">
+      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-3 shadow-lg">
         {song.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -155,36 +325,19 @@ function SongTile({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={40} className="text-[#535353]" />
+            <Music2 size={32} className="text-[#535353]" />
           </div>
         )}
-        <div className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200">
+        <div className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
           {isPlaying ? (
-            <Pause size={18} fill="black" className="text-black" />
+            <Pause size={16} fill="black" className="text-black" />
           ) : (
-            <Play size={18} fill="black" className="text-black ml-0.5" />
+            <Play size={16} fill="black" className="text-black ml-0.5" />
           )}
         </div>
-        {isPlaying && (
-          <div className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl group-hover:hidden">
-            <span className="flex items-end gap-[2px] h-3">
-              {[0, 0.15, 0.3].map((d, i) => (
-                <span
-                  key={i}
-                  className="wave-bar rounded-sm bg-black"
-                  style={{
-                    width: "2px",
-                    height: "100%",
-                    animationDelay: `${d}s`,
-                  }}
-                />
-              ))}
-            </span>
-          </div>
-        )}
       </div>
       <p
-        className={`text-sm font-semibold truncate mb-1 ${isPlaying ? "text-[#1db954]" : "text-white"}`}
+        className={`text-sm font-semibold truncate mb-0.5 ${isPlaying ? "text-[#1db954]" : "text-white"}`}
       >
         {song.title}
       </p>
@@ -195,14 +348,14 @@ function SongTile({
   );
 }
 
-/* ── Playlist card ── */
+/* ── Playlist tile ── */
 function PlaylistTile({ playlist }: { playlist: Playlist }) {
   return (
     <Link
       href={`/playlist/${playlist.id}`}
-      className="flex-shrink-0 w-[180px] bg-[#181818] hover:bg-[#282828] rounded-lg p-4 transition-colors group pressable"
+      className="flex-shrink-0 w-[160px] bg-[#181818] hover:bg-[#282828] rounded-lg p-3 transition-colors group pressable"
     >
-      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-4 shadow-lg">
+      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-3 shadow-lg">
         {playlist.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -212,14 +365,14 @@ function PlaylistTile({ playlist }: { playlist: Playlist }) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#450af5] to-[#c4efd9]">
-            <ListMusic size={40} className="text-white" />
+            <ListMusic size={36} className="text-white" />
           </div>
         )}
-        <div className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200">
-          <Play size={18} fill="black" className="text-black ml-0.5" />
+        <div className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
+          <Play size={16} fill="black" className="text-black ml-0.5" />
         </div>
       </div>
-      <p className="text-white text-sm font-semibold truncate mb-1">
+      <p className="text-white text-sm font-semibold truncate mb-0.5">
         {playlist.title}
       </p>
       <p className="text-[#a7a7a7] text-xs">{playlist.songCount ?? 0} şarkı</p>
@@ -227,8 +380,7 @@ function PlaylistTile({ playlist }: { playlist: Playlist }) {
   );
 }
 
-/* ── Quick resume tile (6 items grid) ── */
-/* ── Track row (for generated songs section) ── */
+/* ── Track row ── */
 function TrackRow({
   song,
   index,
@@ -273,7 +425,6 @@ function TrackRow({
           </>
         )}
       </div>
-
       <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-[#282828]">
         {song.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -288,7 +439,6 @@ function TrackRow({
           </div>
         )}
       </div>
-
       <div className="flex-1 min-w-0">
         <p
           className={`text-sm font-medium truncate ${isPlaying ? "text-[#1db954]" : "text-white"}`}
@@ -299,11 +449,9 @@ function TrackRow({
           {song.style?.split(",")[0] || "AI Müzik"}
         </p>
       </div>
-
       {song.status === "processing" && (
         <span className="w-4 h-4 border-2 border-[#a7a7a7] border-t-transparent rounded-full animate-spin flex-shrink-0" />
       )}
-
       <span className="text-[#a7a7a7] text-xs tabular-nums flex-shrink-0 ml-auto">
         {song.status === "complete" ? fmt(song.duration) : "—"}
       </span>
@@ -311,44 +459,18 @@ function TrackRow({
   );
 }
 
+/* ══════════════════════════════════════════════ */
 export default function HomePage() {
   const { playSong, currentSong } = usePlayer();
   const { data: session } = useSession();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [generatedSongs, setGeneratedSongs] = useState<Song[]>([]);
+  const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const topRef = useRef<HTMLDivElement>(null);
-
-  // Prompt builder state
-  const [selMood, setSelMood] = useState("");
-  const [selGenre, setSelGenre] = useState("");
-  const [selTopic, setSelTopic] = useState("");
-  const [selTempo, setSelTempo] = useState("");
-  const [freeText, setFreeText] = useState("");
-  const [showFree, setShowFree] = useState(false);
-
-  const builtPrompt = buildPrompt(selMood, selGenre, selTopic, selTempo);
-  const finalPrompt = showFree ? freeText : builtPrompt;
-
-  const handleSurprise = () => {
-    setSelMood(randomFrom(MOODS).label);
-    setSelGenre(randomFrom(GENRES).label);
-    setSelTopic(randomFrom(TOPICS).label);
-    setSelTempo(randomFrom(TEMPOS).label);
-    setShowFree(false);
-  };
-
-  const resetBuilder = () => {
-    setSelMood("");
-    setSelGenre("");
-    setSelTopic("");
-    setSelTempo("");
-    setFreeText("");
-    setShowFree(false);
-  };
 
   useEffect(() => {
     fetch("/api/all-songs")
@@ -362,6 +484,12 @@ export default function HomePage() {
       .then((r) => r.json())
       .then((d) => setPlaylists(d.playlists || []));
   }, [session]);
+
+  const handleCategorySelect = (p: string) => {
+    setPrompt(p);
+    // Textarea'ya scroll et
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  };
 
   const handleSongsAdded = useCallback((newSongs: Song[]) => {
     if (newSongs.length === 0) {
@@ -413,9 +541,8 @@ export default function HomePage() {
     [handleSongsAdded],
   );
 
-  const handleGenerate = async (p?: string) => {
-    const prompt = (p ?? finalPrompt).trim();
-    if (!prompt || loading) return;
+  const handleGenerate = async () => {
+    if (!prompt.trim() || loading) return;
     setError("");
     setLoading(true);
 
@@ -432,7 +559,7 @@ export default function HomePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt,
+          prompt: prompt.trim(),
           customMode: false,
           instrumental: false,
         }),
@@ -452,180 +579,68 @@ export default function HomePage() {
       handleSongsAdded([]);
     } finally {
       setLoading(false);
-      resetBuilder();
+      setPrompt("");
     }
   };
 
   const moreSongs = allSongs.slice(0, 18);
-
-  // Mobile padding
   const mobilePad = currentSong
     ? "pb-[calc(144px+env(safe-area-inset-bottom,0px))]"
     : "pb-[calc(72px+env(safe-area-inset-bottom,0px))]";
 
   return (
-    <div className={`min-h-full ${mobilePad} md:pb-0`} ref={topRef}>
-      {/* ── Hero: Prompt Builder ── */}
+    <div className={`min-h-full ${mobilePad} md:pb-0`}>
+      {/* ── Hero ── */}
       <div
-        className="pt-16 md:pt-20 pb-8 px-6"
+        className="pt-16 md:pt-20 pb-6"
         style={{
           background: "linear-gradient(180deg, #0d2b1a 0%, #121212 100%)",
         }}
       >
-        <div className="flex items-start justify-between mb-5">
-          <div>
-            <p className="text-[#1db954] text-xs font-bold uppercase tracking-widest mb-1">
-              Yapay Zeka ile Müzik
-            </p>
-            <h1 className="text-white text-2xl md:text-3xl font-black leading-tight">
-              Kendi şarkını yap
-            </h1>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleSurprise}
-              disabled={loading}
-              title="Sürpriz yap"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] text-[#a7a7a7] text-xs font-semibold pressable hover:border-[#1db954] hover:text-[#1db954] transition-colors disabled:opacity-40"
-            >
-              <Shuffle size={13} />
-              Sürpriz
-            </button>
-            {(selMood || selGenre || selTopic || selTempo || freeText) && (
-              <button
-                onClick={resetBuilder}
-                className="p-2 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] text-[#a7a7a7] pressable hover:text-white transition-colors"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
+        <div className="px-6 mb-5">
+          <p className="text-[#1db954] text-xs font-bold uppercase tracking-widest mb-1">
+            Yapay Zeka ile Müzik
+          </p>
+          <h1 className="text-white text-2xl md:text-3xl font-black leading-tight">
+            Hangi şarkıyı yapalım?
+          </h1>
         </div>
 
-        <div className="max-w-2xl space-y-4">
-          {/* Duygu */}
-          <div>
-            <p className="text-[#535353] text-[11px] font-bold uppercase tracking-widest mb-2">
-              Nasıl hissettirsin?
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {MOODS.map((m) => (
-                <Chip
-                  key={m.label}
-                  emoji={m.emoji}
-                  label={m.label}
-                  selected={selMood === m.label}
-                  onClick={() => setSelMood(selMood === m.label ? "" : m.label)}
-                />
-              ))}
-            </div>
+        {/* Kategori satırları */}
+        {CATEGORY_GROUPS.map((group) => (
+          <CategoryRow
+            key={group.label}
+            group={group}
+            onSelect={handleCategorySelect}
+          />
+        ))}
+
+        {/* Textarea + buton */}
+        <div className="px-6 mt-4">
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleGenerate();
+                }
+              }}
+              placeholder="Bir kategori seç ya da kendin yaz..."
+              rows={2}
+              maxLength={500}
+              className="w-full bg-[#1a1a1a] border-2 border-[#2a2a2a] focus:border-[#1db954] rounded-2xl px-5 py-3.5 text-white text-sm placeholder-[#535353] resize-none focus:outline-none transition-colors"
+            />
           </div>
 
-          {/* Tarz */}
-          <div>
-            <p className="text-[#535353] text-[11px] font-bold uppercase tracking-widest mb-2">
-              Hangi tarzda?
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {GENRES.map((g) => (
-                <Chip
-                  key={g.label}
-                  emoji={g.emoji}
-                  label={g.label}
-                  selected={selGenre === g.label}
-                  onClick={() =>
-                    setSelGenre(selGenre === g.label ? "" : g.label)
-                  }
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Konu */}
-          <div>
-            <p className="text-[#535353] text-[11px] font-bold uppercase tracking-widest mb-2">
-              Ne hakkında?
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {TOPICS.map((t) => (
-                <Chip
-                  key={t.label}
-                  emoji={t.emoji}
-                  label={t.label}
-                  selected={selTopic === t.label}
-                  onClick={() =>
-                    setSelTopic(selTopic === t.label ? "" : t.label)
-                  }
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Tempo */}
-          <div>
-            <p className="text-[#535353] text-[11px] font-bold uppercase tracking-widest mb-2">
-              Tempo
-            </p>
-            <div className="flex gap-2">
-              {TEMPOS.map((t) => (
-                <Chip
-                  key={t.label}
-                  emoji={t.emoji}
-                  label={t.label}
-                  selected={selTempo === t.label}
-                  onClick={() =>
-                    setSelTempo(selTempo === t.label ? "" : t.label)
-                  }
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Oluşan prompt önizlemesi */}
-          {builtPrompt && !showFree && (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[#1db954]/10 border border-[#1db954]/20">
-              <span className="text-[#1db954] text-sm flex-1">
-                &ldquo;{builtPrompt}&rdquo;
-              </span>
-            </div>
-          )}
-
-          {/* Serbest yazma toggle */}
-          <button
-            onClick={() => setShowFree(!showFree)}
-            className="text-[#535353] hover:text-[#a7a7a7] text-xs underline pressable transition-colors"
-          >
-            {showFree ? "← Seçimlere dön" : "Kendin yaz →"}
-          </button>
-
-          {showFree && (
-            <div className="relative">
-              <textarea
-                value={freeText}
-                onChange={(e) => setFreeText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleGenerate();
-                  }
-                }}
-                placeholder="Nasıl bir şarkı istiyorsun? Örn: Yaz akşamı sahilde hüzünlü pop..."
-                rows={3}
-                maxLength={500}
-                className="w-full bg-[#1a1a1a] border-2 border-[#2a2a2a] focus:border-[#1db954] rounded-2xl px-5 py-4 text-white text-sm placeholder-[#535353] resize-none focus:outline-none transition-colors"
-              />
-              <span className="absolute bottom-3 right-4 text-[#535353] text-xs tabular-nums">
-                {freeText.length}/500
-              </span>
-            </div>
-          )}
-
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
 
           <button
-            onClick={() => handleGenerate()}
-            disabled={loading || !finalPrompt.trim()}
-            className="w-full py-4 rounded-2xl font-bold text-base tracking-wide transition-all pressable disabled:opacity-40"
+            onClick={handleGenerate}
+            disabled={loading || !prompt.trim()}
+            className="mt-2.5 w-full py-4 rounded-2xl font-bold text-base tracking-wide transition-all pressable disabled:opacity-40"
             style={{
               background: loading ? "#1a1a1a" : "#1db954",
               color: loading ? "#a7a7a7" : "black",
@@ -636,24 +651,21 @@ export default function HomePage() {
                 <span className="w-4 h-4 border-2 border-[#a7a7a7]/40 border-t-[#a7a7a7] rounded-full animate-spin" />
                 Oluşturuluyor... (~30–60 sn)
               </span>
-            ) : finalPrompt ? (
-              "Şarkı Oluştur"
             ) : (
-              "Seçim yap veya kendin yaz"
+              "Şarkı Oluştur"
             )}
           </button>
         </div>
       </div>
 
       <div className="bg-[#121212] pb-8">
-        {/* ── Generated songs ── */}
+        {/* Oluşturulanlar */}
         {generatedSongs.length > 0 && (
-          <section className="mb-8 px-6">
+          <section className="mb-8 px-6 pt-6">
             <h2 className="text-white text-2xl font-black mb-4">
               Oluşturulanlar
             </h2>
             <div className="flex flex-col">
-              {/* Column header */}
               <div className="flex items-center gap-4 px-4 pb-2 border-b border-[#282828] mb-1">
                 <span className="w-8 text-center text-[#a7a7a7] text-xs">
                   #
@@ -677,7 +689,7 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ── Playlists (giriş yapmışsa) ── */}
+        {/* Playlists */}
         {playlists.length > 0 && (
           <Rail title="Çalma listelerin">
             {playlists.map((pl) => (
@@ -686,9 +698,9 @@ export default function HomePage() {
           </Rail>
         )}
 
-        {/* ── Tüm şarkılar ── */}
+        {/* Tüm şarkılar */}
         {moreSongs.length > 0 && (
-          <Rail title="Tüm Şarkılar">
+          <Rail title="Son Şarkılar">
             {moreSongs.map((song) => (
               <SongTile
                 key={song.id}
@@ -700,16 +712,16 @@ export default function HomePage() {
           </Rail>
         )}
 
-        {/* ── Keşfet yönlendirme ── */}
+        {/* Boş durum */}
         {allSongs.length === 0 && generatedSongs.length === 0 && (
-          <div className="px-6">
+          <div className="px-6 pt-6">
             <div className="rounded-2xl bg-gradient-to-br from-[#1a3a2a] to-[#0a1a10] p-8 text-center">
               <Music2 size={40} className="text-[#1db954] mx-auto mb-4" />
               <p className="text-white text-xl font-bold mb-2">
                 İlk şarkını oluştur
               </p>
               <p className="text-[#a7a7a7] text-sm">
-                Yukarıya bir fikir yaz, AI senin için şarkı üretsin
+                Bir kategori seç ve AI senin için şarkı üretsin
               </p>
             </div>
           </div>
