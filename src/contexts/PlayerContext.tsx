@@ -125,6 +125,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentSong]);
 
+  // ── Media Session API — kilit ekranı / bildirim kontrolleri ──
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !currentSong) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentSong.title || "AI Şarkı",
+      artist: "AI Müzik",
+      album: currentSong.style?.split(",")[0] || "AI Müzik",
+      artwork: currentSong.imageUrl
+        ? [{ src: currentSong.imageUrl, sizes: "512x512", type: "image/jpeg" }]
+        : [],
+    });
+  }, [currentSong]);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+  }, [playing]);
+
   const playSong = useCallback((song: Song, pl: Song[]) => {
     const idx = pl.findIndex((s) => s.id === song.id);
     setPlaylist(pl);
@@ -181,6 +199,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const d = audioRef.current?.duration ?? 0;
     setCurrentTime(t);
     setDuration(d);
+    // Kilit ekranı ilerleme çubuğunu güncelle
+    if ("mediaSession" in navigator && d > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: d,
+          playbackRate: 1,
+          position: t,
+        });
+      } catch {}
+    }
   }, []);
 
   const handleEnded = useCallback(() => {
@@ -196,6 +224,45 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return prev;
     });
   }, []);
+
+  // ── Media Session action handler'ları — playNext/playPrev tanımlandıktan sonra ──
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+
+    navigator.mediaSession.setActionHandler("play", () => {
+      audioRef.current
+        ?.play()
+        .then(() => setPlaying(true))
+        .catch(() => {});
+    });
+    navigator.mediaSession.setActionHandler("pause", () => {
+      audioRef.current?.pause();
+      setPlaying(false);
+    });
+    navigator.mediaSession.setActionHandler("nexttrack", () => playNext());
+    navigator.mediaSession.setActionHandler("previoustrack", () => playPrev());
+    navigator.mediaSession.setActionHandler("seekto", (details) => {
+      if (audioRef.current && details.seekTime !== undefined) {
+        audioRef.current.currentTime = details.seekTime;
+      }
+    });
+    navigator.mediaSession.setActionHandler("seekbackward", (details) => {
+      if (audioRef.current) {
+        audioRef.current.currentTime = Math.max(
+          0,
+          audioRef.current.currentTime - (details.seekOffset ?? 10),
+        );
+      }
+    });
+    navigator.mediaSession.setActionHandler("seekforward", (details) => {
+      if (audioRef.current) {
+        audioRef.current.currentTime = Math.min(
+          audioRef.current.duration || 0,
+          audioRef.current.currentTime + (details.seekOffset ?? 10),
+        );
+      }
+    });
+  }, [playNext, playPrev]);
 
   return (
     <PlayerContext.Provider
@@ -215,11 +282,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {/* Kalıcı audio element — hiç unmount olmaz */}
+      {/* playsInline: iOS Safari'de arka plan oynatma için zorunlu */}
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
         onDurationChange={handleTimeUpdate}
         onEnded={handleEnded}
+        playsInline
+        preload="metadata"
       />
       {children}
     </PlayerContext.Provider>
