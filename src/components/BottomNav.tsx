@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Compass, PlusCircle, User } from "lucide-react";
+import { Home, Compass, Plus, User } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 const tabs = [
   { icon: Home, label: "Ana Sayfa", href: "/" },
   { icon: Compass, label: "Keşfet", href: "/discover" },
-  { icon: PlusCircle, label: "Oluştur", href: "/create" },
+  { href: "/create" }, // merkez buton — özel render
   { icon: User, label: "Profil", href: "/profile" },
 ] as const;
 
@@ -27,6 +27,47 @@ export default function BottomNav() {
       }}
     >
       {tabs.map((tab) => {
+        // ── Merkez "Oluştur" butonu ──
+        if (tab.href === "/create") {
+          const isCreate = pathname === "/create";
+          return (
+            <Link
+              key="/create"
+              href="/create"
+              className="flex-1 flex flex-col items-center justify-center pressable"
+            >
+              <div
+                className="flex items-center justify-center rounded-2xl transition-all"
+                style={{
+                  width: 52,
+                  height: 36,
+                  background: isCreate
+                    ? "#1db954"
+                    : "linear-gradient(135deg, #1db954 0%, #17a045 100%)",
+                  boxShadow: isCreate
+                    ? "0 0 20px rgba(29,185,84,0.5)"
+                    : "0 2px 12px rgba(29,185,84,0.35)",
+                }}
+              >
+                <Plus size={22} strokeWidth={2.8} className="text-black" />
+              </div>
+              <span className="text-[10px] font-bold tracking-tight mt-1 text-[#1db954]">
+                Oluştur
+              </span>
+            </Link>
+          );
+        }
+
+        const icon = (
+          tab as {
+            icon: React.ComponentType<{
+              size: number;
+              strokeWidth: number;
+              className: string;
+            }>;
+          }
+        ).icon;
+        const label = (tab as { label: string }).label;
         const isActive =
           pathname === tab.href ||
           (tab.href === "/profile" && pathname.startsWith("/auth"));
@@ -61,7 +102,8 @@ export default function BottomNav() {
                 style={{ opacity: isActive ? 1 : 0.5 }}
               />
             ) : (
-              <tab.icon
+              // @ts-expect-error icon tipi
+              <icon
                 size={24}
                 strokeWidth={isActive ? 2.5 : 1.8}
                 className={isActive ? "text-white" : "text-[#535353]"}
@@ -72,7 +114,7 @@ export default function BottomNav() {
                 isActive ? "text-white" : "text-[#535353]"
               }`}
             >
-              {tab.label}
+              {label}
             </span>
           </Link>
         );
