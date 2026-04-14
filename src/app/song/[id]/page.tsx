@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Play, Pause, Music2, Clock3, Sparkles } from "lucide-react";
+import { ArrowLeft, Play, Pause, Music2, Heart } from "lucide-react";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 
@@ -18,6 +18,55 @@ function fmtDate(iso: string) {
     month: "long",
     year: "numeric",
   });
+}
+
+function useDominantColor(imageUrl?: string | null) {
+  const [rgb, setRgb] = useState("30,30,40");
+  useEffect(() => {
+    if (!imageUrl) return;
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const size = 80;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, size, size);
+        const d = ctx.getImageData(0, 0, size, size).data;
+        let r = 0,
+          g = 0,
+          b = 0,
+          n = 0;
+        for (let i = 0; i < d.length; i += 8) {
+          const br = (d[i] + d[i + 1] + d[i + 2]) / 3;
+          if (br > 20 && br < 235) {
+            r += d[i];
+            g += d[i + 1];
+            b += d[i + 2];
+            n++;
+          }
+        }
+        if (n > 0 && !cancelled) {
+          const dk = 0.65;
+          setRgb(
+            `${Math.floor((r / n) * dk)},${Math.floor((g / n) * dk)},${Math.floor((b / n) * dk)}`,
+          );
+        }
+      } catch {
+        /* CORS */
+      }
+    };
+    img.src = imageUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl]);
+  return rgb;
 }
 
 export default function SongDetailPage({
@@ -39,14 +88,12 @@ export default function SongDetailPage({
   }, [id]);
 
   const isActive = currentSong?.id === song?.id;
+  const dominantRgb = useDominantColor(song?.imageUrl);
 
   const handlePlay = () => {
     if (!song || song.status !== "complete") return;
-    if (isActive) {
-      togglePlay();
-    } else {
-      playSong(song, [song]);
-    }
+    if (isActive) togglePlay();
+    else playSong(song, [song]);
   };
 
   if (loading) {
@@ -74,26 +121,40 @@ export default function SongDetailPage({
 
   return (
     <div className="min-h-full bg-[#0a0a0a]">
-      {/* Hero */}
+      {/* Hero — album art + dinamik gradient */}
       <div
-        className="relative pt-14 md:pt-10 pb-8"
+        className="relative pb-0 overflow-hidden"
         style={{
-          background: song.imageUrl
-            ? "linear-gradient(180deg, #1a1a2e 0%, #0a0a0a 70%)"
-            : "linear-gradient(180deg, #1c1c1c 0%, #0a0a0a 70%)",
+          background: `linear-gradient(180deg, rgb(${dominantRgb}) 0%, rgba(${dominantRgb},0.6) 50%, #0a0a0a 100%)`,
+          minHeight: 380,
         }}
       >
-        {/* Back button */}
+        {/* Blurred bg */}
+        {song.imageUrl && (
+          <div
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage: `url(${song.imageUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              filter: "blur(40px)",
+              transform: "scale(1.1)",
+            }}
+          />
+        )}
+
+        {/* Back */}
         <button
           onClick={() => router.back()}
-          className="absolute top-4 md:top-6 left-4 md:left-6 z-10 p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors pressable"
+          className="absolute top-4 left-4 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/30 pressable"
         >
           <ArrowLeft size={20} className="text-white" />
         </button>
 
-        <div className="px-6 pt-8 flex flex-col md:flex-row md:items-end gap-6 md:gap-8">
+        {/* Cover + info */}
+        <div className="relative z-10 px-5 pt-14 pb-6 flex flex-col items-center gap-5">
           {/* Cover */}
-          <div className="w-52 h-52 md:w-64 md:h-64 flex-shrink-0 rounded-2xl overflow-hidden shadow-2xl mx-auto md:mx-0">
+          <div className="w-56 h-56 rounded-xl overflow-hidden shadow-2xl flex-shrink-0">
             {song.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -102,75 +163,62 @@ export default function SongDetailPage({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-[#1db954]/30 to-[#0a0a0a] flex items-center justify-center">
-                <Music2 size={72} className="text-white/20" />
+              <div className="w-full h-full bg-[#282828] flex items-center justify-center">
+                <Music2 size={64} className="text-[#535353]" />
               </div>
             )}
           </div>
 
-          {/* Info */}
-          <div className="flex flex-col gap-2 text-center md:text-left">
-            <p className="text-white/60 text-xs font-semibold uppercase tracking-widest">
-              Hubeya
-            </p>
-            <h1 className="text-white text-3xl md:text-5xl font-black leading-tight">
+          {/* Başlık ve sanatçı */}
+          <div className="w-full">
+            <h1 className="text-white text-2xl font-black leading-tight truncate">
               {song.title}
             </h1>
             {song.creator && (
               <Link
                 href={`/profile/${song.creator.username}`}
-                className="text-white font-semibold text-sm hover:underline transition-colors self-center md:self-start"
+                className="text-white/70 text-sm font-semibold mt-1 inline-block hover:text-white transition-colors"
               >
                 {song.creator.name}
               </Link>
             )}
-            {song.style && (
-              <p className="text-[#a7a7a7] text-sm">{song.style}</p>
-            )}
-            <div className="flex items-center justify-center md:justify-start gap-3 text-[#a7a7a7] text-xs mt-1">
-              {song.duration && (
-                <span className="flex items-center gap-1">
-                  <Clock3 size={12} />
-                  {fmt(song.duration)}
-                </span>
-              )}
-              <span>{fmtDate(song.createdAt)}</span>
-            </div>
           </div>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="px-6 py-6 flex items-center gap-5">
+      <div className="px-5 py-4 flex items-center justify-between">
+        {/* Kalp (placeholder) */}
+        <button className="w-10 h-10 flex items-center justify-center pressable">
+          <Heart size={24} className="text-[#a7a7a7]" />
+        </button>
+
+        {/* Play butonu — büyük ve belirgin */}
         <button
           onClick={handlePlay}
           disabled={song.status !== "complete"}
-          className="w-14 h-14 rounded-full bg-[#1db954] flex items-center justify-center pressable hover:scale-105 transition-transform shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-16 h-16 rounded-full bg-[#1db954] flex items-center justify-center pressable hover:scale-105 transition-transform shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isActive && playing ? (
-            <Pause size={26} fill="black" className="text-black" />
+            <Pause size={30} fill="black" className="text-black" />
           ) : (
-            <Play size={26} fill="black" className="text-black ml-1" />
+            <Play size={30} fill="black" className="text-black ml-1" />
           )}
         </button>
+
+        {/* Süre */}
+        <div className="w-10 h-10 flex items-center justify-center">
+          <span className="text-[#a7a7a7] text-xs">
+            {fmt(song.duration) ?? ""}
+          </span>
+        </div>
       </div>
 
-      {/* Prompt */}
-      {song.prompt && (
-        <div className="px-6 pb-8">
-          <div className="bg-[#111] rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles size={14} className="text-[#1db954]" />
-              <p className="text-[#a7a7a7] text-xs font-semibold uppercase tracking-widest">
-                Prompt
-              </p>
-            </div>
-            <p className="text-white/80 text-sm leading-relaxed whitespace-pre-wrap">
-              {song.prompt}
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Meta */}
+      <div className="px-5 pt-2 pb-10 border-t border-white/5">
+        <p className="text-[#a7a7a7] text-xs mt-4">{fmtDate(song.createdAt)}</p>
+        <p className="text-[#535353] text-xs mt-1">Hubeya ile oluşturuldu</p>
+      </div>
     </div>
   );
 }
