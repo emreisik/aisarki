@@ -1326,11 +1326,17 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
         {/* Generate */}
         <button
           onClick={handleGenerate}
-          disabled={loading}
-          className="w-full py-4 rounded-full font-bold text-base tracking-wide transition-all pressable disabled:opacity-50"
+          disabled={loading || (!prompt.trim() && !lyrics.trim())}
+          className="w-full py-4 rounded-full font-bold text-base tracking-wide transition-all pressable disabled:opacity-40 disabled:cursor-not-allowed"
           style={{
-            background: loading ? "#1a1a1a" : "#1db954",
-            color: loading ? "#a7a7a7" : "black",
+            background:
+              loading || (!prompt.trim() && !lyrics.trim())
+                ? "#1a1a1a"
+                : "#1db954",
+            color:
+              loading || (!prompt.trim() && !lyrics.trim())
+                ? "#535353"
+                : "black",
           }}
         >
           {loading ? (
