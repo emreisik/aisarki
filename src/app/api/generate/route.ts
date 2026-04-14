@@ -16,6 +16,14 @@ function getCallbackUrl(request: NextRequest): string {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: "Şarkı oluşturmak için giriş yapman gerekiyor" },
+      { status: 401 },
+    );
+  }
+
   try {
     const body: GenerateRequest = await request.json();
     const {

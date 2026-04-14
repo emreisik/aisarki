@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Song } from "@/types";
 import MusicGenerator from "@/components/MusicGenerator";
 import SongCard from "@/components/SongCard";
@@ -185,6 +186,14 @@ function CompletedSection({
 export default function CreatePage() {
   const { playSong, currentSong } = usePlayer();
   const router = useRouter();
+  const { status } = useSession();
+
+  // Giriş yapılmamışsa signin'e yönlendir
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/auth/signin");
+    }
+  }, [status, router]);
 
   const [processingTasks, setProcessingTasks] = useState<ProcessingTask[]>([]);
   const [completedSongs, setCompletedSongs] = useState<Song[]>([]);
