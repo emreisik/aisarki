@@ -3,11 +3,16 @@ import { neon } from "@neondatabase/serverless";
 
 const sql = neon(process.env.DATABASE_URL!);
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-);
+let vapidReady = false;
+function ensureVapid() {
+  if (vapidReady) return;
+  const email = process.env.VAPID_EMAIL;
+  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  if (!email || !pub || !priv) return;
+  webpush.setVapidDetails(email, pub, priv);
+  vapidReady = true;
+}
 
 export interface PushPayload {
   title: string;
@@ -19,6 +24,8 @@ export interface PushPayload {
 }
 
 export async function sendPushToUser(userId: string, payload: PushPayload) {
+  ensureVapid();
+  if (!vapidReady) return;
   let rows: { endpoint: string; p256dh: string; auth: string }[] = [];
   try {
     const result = await sql`
