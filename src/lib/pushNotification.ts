@@ -21,11 +21,12 @@ export interface PushPayload {
 export async function sendPushToUser(userId: string, payload: PushPayload) {
   let rows: { endpoint: string; p256dh: string; auth: string }[] = [];
   try {
-    rows = await sql`
+    const result = await sql`
       SELECT endpoint, p256dh, auth
       FROM push_subscriptions
       WHERE user_id = ${userId}
     `;
+    rows = result as { endpoint: string; p256dh: string; auth: string }[];
   } catch {
     return;
   }
