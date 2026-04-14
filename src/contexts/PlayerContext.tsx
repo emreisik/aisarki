@@ -268,14 +268,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setCurrentTime(t);
     setDuration(d);
 
-    // 30 saniyelik önizleme — giriş yapmamış kullanıcılar
-    if (t >= 30 && !session?.user && !gateTriggeredRef.current) {
-      gateTriggeredRef.current = true;
-      audioRef.current?.pause();
-      setPlaying(false);
-      setShowGate(true);
-    }
-
     // Kilit ekranı ilerleme çubuğunu güncelle
     if ("mediaSession" in navigator && d > 0) {
       try {
