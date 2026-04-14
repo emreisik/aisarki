@@ -4,12 +4,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
-  Search,
+  Compass,
   Library,
   Plus,
   Music2,
   ListMusic,
   LogIn,
+  Sparkles,
+  User,
+  Disc3,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
@@ -74,35 +77,40 @@ export default function DesktopSidebar() {
         </div>
 
         <nav className="flex flex-col gap-0.5">
-          <Link
-            href="/"
-            className={`flex items-center gap-4 px-3 py-2.5 rounded-md text-[15px] font-semibold transition-colors pressable ${
-              pathname === "/"
-                ? "text-white"
-                : "text-[#b3b3b3] hover:text-white"
-            }`}
-          >
-            <Home
-              size={24}
-              fill={pathname === "/" ? "white" : "none"}
-              strokeWidth={pathname === "/" ? 0 : 2}
-            />
-            Ana Sayfa
-          </Link>
-          <Link
-            href="/discover"
-            className={`flex items-center gap-4 px-3 py-2.5 rounded-md text-[15px] font-semibold transition-colors pressable ${
-              pathname === "/discover"
-                ? "text-white"
-                : "text-[#b3b3b3] hover:text-white"
-            }`}
-          >
-            <Search
-              size={24}
-              strokeWidth={pathname === "/discover" ? 2.5 : 2}
-            />
-            Keşfet
-          </Link>
+          {[
+            { href: "/", label: "Ana Sayfa", icon: Home },
+            { href: "/discover", label: "Keşfet", icon: Compass },
+            { href: "/create", label: "Oluştur", icon: Sparkles },
+            { href: "/playlists", label: "Listeler", icon: Disc3 },
+            {
+              href: session?.user ? "/profile" : "/auth/signin",
+              label: "Profil",
+              icon: User,
+              match: "/profile",
+            },
+          ].map(({ href, label, icon: Icon, match }) => {
+            const isActive = pathname === (match ?? href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-4 px-3 py-2.5 rounded-md text-[15px] font-semibold transition-colors pressable ${
+                  isActive ? "text-white" : "text-[#b3b3b3] hover:text-white"
+                }`}
+              >
+                <Icon
+                  size={24}
+                  fill={
+                    isActive && (label === "Ana Sayfa" || label === "Profil")
+                      ? "white"
+                      : "none"
+                  }
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
+                {label}
+              </Link>
+            );
+          })}
         </nav>
       </div>
 
@@ -175,40 +183,55 @@ export default function DesktopSidebar() {
           )}
 
           {/* Playlists */}
-          {playlists.map((pl) => (
-            <Link
-              key={pl.id}
-              href={`/playlist/${pl.id}`}
-              className={`flex items-center gap-3 px-2 py-2 rounded-md transition-colors pressable ${
-                pathname === `/playlist/${pl.id}`
-                  ? "bg-[#2a2a2a]"
-                  : "hover:bg-[#1a1a1a]"
-              }`}
-            >
-              <div className="w-10 h-10 rounded flex-shrink-0 bg-[#282828] overflow-hidden">
-                {pl.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={pl.coverUrl}
-                    alt={pl.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-[#282828]">
-                    <ListMusic size={18} className="text-[#535353]" />
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="text-white text-sm font-medium truncate">
-                  {pl.title}
-                </p>
-                <p className="text-[#a7a7a7] text-xs truncate">
-                  Çalma listesi · {pl.songCount ?? 0} şarkı
-                </p>
-              </div>
-            </Link>
-          ))}
+          {playlists.map((pl) => {
+            const isAlbum = pl.type === "album";
+            return (
+              <Link
+                key={pl.id}
+                href={`/playlist/${pl.id}`}
+                className={`flex items-center gap-3 px-2 py-2 rounded-md transition-colors pressable ${
+                  pathname === `/playlist/${pl.id}`
+                    ? "bg-[#2a2a2a]"
+                    : "hover:bg-[#1a1a1a]"
+                }`}
+              >
+                <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden">
+                  {pl.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={pl.coverUrl}
+                      alt={pl.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="w-full h-full flex items-center justify-center"
+                      style={{
+                        background: isAlbum
+                          ? "linear-gradient(135deg,#0a3d1e,#1db954)"
+                          : "linear-gradient(135deg,#450af5,#c4efd9)",
+                      }}
+                    >
+                      {isAlbum ? (
+                        <Disc3 size={16} className="text-white/80" />
+                      ) : (
+                        <ListMusic size={16} className="text-white/80" />
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-white text-sm font-medium truncate">
+                    {pl.title}
+                  </p>
+                  <p className="text-[#a7a7a7] text-xs truncate">
+                    {isAlbum ? "Albüm" : "Çalma listesi"} · {pl.songCount ?? 0}{" "}
+                    şarkı
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
 
           {/* Divider */}
           {playlists.length > 0 && songs.length > 0 && (

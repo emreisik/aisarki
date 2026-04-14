@@ -1,12 +1,14 @@
 "use client";
 
-import { Play, Music2, Loader2, MoreHorizontal } from "lucide-react";
+import Link from "next/link";
+import { Play, Music2, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 import { Song } from "@/types";
 
 interface SongCardProps {
   song: Song;
   onPlay: (song: Song) => void;
   onDetail?: (song: Song) => void;
+  onDelete?: (song: Song) => void;
   isPlaying?: boolean;
   variant?: "grid" | "row";
 }
@@ -49,6 +51,7 @@ export default function SongCard({
   song,
   onPlay,
   onDetail,
+  onDelete,
   isPlaying,
   variant = "grid",
 }: SongCardProps) {
@@ -94,11 +97,23 @@ export default function SongCard({
           >
             {song.title || "İsimsiz Şarkı"}
           </p>
-          <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-            {song.status === "processing"
-              ? "Oluşturuluyor..."
-              : song.style?.split(",")[0] || "AI Müzik"}
-          </p>
+          {song.status === "processing" ? (
+            <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
+              Oluşturuluyor...
+            </p>
+          ) : song.creator ? (
+            <Link
+              href={`/profile/${song.creator.username}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[#a7a7a7] text-xs truncate mt-0.5 hover:text-white hover:underline transition-colors block"
+            >
+              {song.creator.name}
+            </Link>
+          ) : (
+            <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
+              {song.style?.split(",")[0] || "AI Müzik"}
+            </p>
+          )}
         </div>
 
         {/* Right */}
@@ -108,12 +123,24 @@ export default function SongCard({
               {fmtDur(song.duration)}
             </span>
           )}
-          <button
-            onClick={(e) => e.stopPropagation()}
-            className="p-1 pressable"
-          >
-            <MoreHorizontal size={18} className="text-[#535353]" />
-          </button>
+          {onDelete ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(song);
+              }}
+              className="p-1 pressable text-[#535353] hover:text-red-400 transition-colors"
+            >
+              <Trash2 size={16} />
+            </button>
+          ) : (
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="p-1 pressable"
+            >
+              <MoreHorizontal size={18} className="text-[#535353]" />
+            </button>
+          )}
         </div>
       </div>
     );
@@ -174,11 +201,23 @@ export default function SongCard({
         >
           {song.title || "İsimsiz"}
         </p>
-        <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-          {song.status === "processing"
-            ? "Oluşturuluyor..."
-            : song.style?.split(",")[0] || "AI Müzik"}
-        </p>
+        {song.status === "processing" ? (
+          <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
+            Oluşturuluyor...
+          </p>
+        ) : song.creator ? (
+          <Link
+            href={`/profile/${song.creator.username}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-[#a7a7a7] text-xs truncate mt-0.5 hover:text-white hover:underline transition-colors block"
+          >
+            {song.creator.name}
+          </Link>
+        ) : (
+          <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
+            {song.style?.split(",")[0] || "AI Müzik"}
+          </p>
+        )}
       </div>
     </div>
   );

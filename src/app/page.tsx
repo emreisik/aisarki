@@ -1084,7 +1084,7 @@ function PromptModal({
     setValues((v) => ({ ...v, [key]: v[key] === val ? "" : val }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0 md:items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -1541,10 +1541,21 @@ export default function HomePage() {
     if (activePolls.current.has(taskId)) return;
     activePolls.current.add(taskId);
     let attempts = 0;
+    const MAX_ATTEMPTS = 60; // 5 dakika
     const poll = async () => {
-      if (attempts++ >= 40) {
+      if (attempts++ >= MAX_ATTEMPTS) {
         activePolls.current.delete(taskId);
-        setGeneratedSongs((prev) => prev.filter((s) => s.id !== tempId));
+        setGeneratedSongs((prev) =>
+          prev.map((s) =>
+            s.id === tempId
+              ? {
+                  ...s,
+                  title: "Zaman aşımı — tekrar dene",
+                  status: "processing" as const,
+                }
+              : s,
+          ),
+        );
         return;
       }
       try {
@@ -1570,46 +1581,56 @@ export default function HomePage() {
     setTimeout(poll, 5000);
   }
 
-  const pollForSongs = useCallback(
-    (taskId: string, tempIds: string[]) => {
-      if (activePolls.current.has(taskId)) return;
-      activePolls.current.add(taskId);
-      let attempts = 0;
-      const poll = async () => {
-        if (attempts++ >= 40) {
+  const pollForSongs = useCallback((taskId: string, tempIds: string[]) => {
+    if (activePolls.current.has(taskId)) return;
+    activePolls.current.add(taskId);
+    let attempts = 0;
+    const MAX_ATTEMPTS = 60; // 5 dakika
+    const poll = async () => {
+      if (attempts++ >= MAX_ATTEMPTS) {
+        activePolls.current.delete(taskId);
+        // Timeout — temp şarkıları "zaman aşımı" olarak işaretle
+        setGeneratedSongs((prev) =>
+          prev.map((s) =>
+            tempIds.includes(s.id)
+              ? {
+                  ...s,
+                  title: "Zaman aşımı — tekrar dene",
+                  status: "processing" as const,
+                }
+              : s,
+          ),
+        );
+        return;
+      }
+      try {
+        const res = await fetch(`/api/songs?taskId=${taskId}`);
+        const data = await res.json();
+        if (data.status === "complete" && data.songs?.length > 0) {
           activePolls.current.delete(taskId);
-          handleSongsAdded([]);
-          return;
+          // Tüm temp girişleri kaldır, gerçek şarkıları başa ekle
+          setGeneratedSongs((prev) => {
+            const withoutTemps = prev.filter((s) => !tempIds.includes(s.id));
+            const ids = new Set(withoutTemps.map((s) => s.id));
+            const fresh = (data.songs as Song[]).filter((s) => !ids.has(s.id));
+            return [...fresh, ...withoutTemps];
+          });
+          setAllSongs((prev) => {
+            const ids = new Set(prev.map((s) => s.id));
+            return [
+              ...(data.songs as Song[]).filter((s) => !ids.has(s.id)),
+              ...prev,
+            ];
+          });
+        } else {
+          setTimeout(poll, 5000);
         }
-        try {
-          const res = await fetch(`/api/songs?taskId=${taskId}`);
-          const data = await res.json();
-          if (data.status === "complete" && data.songs?.length > 0) {
-            activePolls.current.delete(taskId);
-            handleSongsAdded(
-              data.songs.map((s: Song, i: number) => ({
-                ...s,
-                id: tempIds[i] || s.id,
-              })),
-            );
-            setAllSongs((prev) => {
-              const ids = new Set(prev.map((s) => s.id));
-              return [
-                ...(data.songs as Song[]).filter((s) => !ids.has(s.id)),
-                ...prev,
-              ];
-            });
-          } else {
-            setTimeout(poll, 5000);
-          }
-        } catch {
-          setTimeout(poll, 8000);
-        }
-      };
-      setTimeout(poll, 10000);
-    },
-    [handleSongsAdded],
-  );
+      } catch {
+        setTimeout(poll, 8000);
+      }
+    };
+    setTimeout(poll, 5000);
+  }, []);
 
   const handleGenerate = async (p: string) => {
     const trimmed = p.trim();
@@ -1654,12 +1675,8 @@ export default function HomePage() {
   };
 
   const moreSongs = allSongs.slice(0, 18);
-  const mobilePad = currentSong
-    ? "pb-[calc(144px+env(safe-area-inset-bottom,0px))]"
-    : "pb-[calc(72px+env(safe-area-inset-bottom,0px))]";
-
   return (
-    <div className={`min-h-full ${mobilePad} md:pb-0`}>
+    <div className="min-h-full">
       {/* Modal */}
       {activeItem && (
         <PromptModal

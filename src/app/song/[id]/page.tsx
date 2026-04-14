@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Play, Pause, Music2, Clock3, Sparkles } from "lucide-react";
 import { Song } from "@/types";
@@ -115,6 +116,14 @@ export default function SongDetailPage({
             <h1 className="text-white text-3xl md:text-5xl font-black leading-tight">
               {song.title}
             </h1>
+            {song.creator && (
+              <Link
+                href={`/profile/${song.creator.username}`}
+                className="text-white font-semibold text-sm hover:underline transition-colors self-center md:self-start"
+              >
+                {song.creator.name}
+              </Link>
+            )}
             {song.style && (
               <p className="text-[#a7a7a7] text-sm">{song.style}</p>
             )}

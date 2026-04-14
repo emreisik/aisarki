@@ -13,6 +13,19 @@ const providers = [
     async authorize(credentials) {
       if (!credentials?.email || !credentials?.password) return null;
 
+      // Tablo yoksa oluştur
+      await sql`
+        CREATE TABLE IF NOT EXISTS users (
+          id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+          email         TEXT UNIQUE NOT NULL,
+          password_hash TEXT,
+          username      TEXT UNIQUE NOT NULL,
+          display_name  TEXT NOT NULL,
+          avatar_url    TEXT,
+          created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `;
+
       const rows = await sql`
         SELECT id, email, username, display_name, avatar_url, password_hash
         FROM users

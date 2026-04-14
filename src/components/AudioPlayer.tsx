@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Play,
   Pause,
@@ -130,9 +131,19 @@ export default function AudioPlayer() {
             <p className="text-white text-xl font-bold truncate">
               {currentSong.title || "İsimsiz"}
             </p>
-            <p className="text-white/60 text-sm truncate mt-0.5">
-              {currentSong.style?.split(",")[0] || "AI Müzik"}
-            </p>
+            {currentSong.creator ? (
+              <Link
+                href={`/profile/${currentSong.creator.username}`}
+                onClick={() => setPlayerOpen(false)}
+                className="text-white/60 text-sm truncate mt-0.5 hover:text-white hover:underline transition-colors block"
+              >
+                {currentSong.creator.name}
+              </Link>
+            ) : (
+              <p className="text-white/60 text-sm truncate mt-0.5">
+                {currentSong.style?.split(",")[0] || "AI Müzik"}
+              </p>
+            )}
           </div>
           <button
             onClick={() => setLiked(!liked)}
@@ -235,9 +246,19 @@ export default function AudioPlayer() {
             <h1 className="text-white text-3xl lg:text-4xl font-black leading-tight">
               {currentSong.title || "İsimsiz"}
             </h1>
-            <p className="text-white/60 text-base mt-2">
-              {currentSong.style?.split(",")[0] || "AI Müzik"}
-            </p>
+            {currentSong.creator ? (
+              <Link
+                href={`/profile/${currentSong.creator.username}`}
+                onClick={() => setPlayerOpen(false)}
+                className="text-white/60 text-base mt-2 hover:text-white hover:underline transition-colors block"
+              >
+                {currentSong.creator.name}
+              </Link>
+            ) : (
+              <p className="text-white/60 text-base mt-2">
+                {currentSong.style?.split(",")[0] || "AI Müzik"}
+              </p>
+            )}
           </div>
 
           {/* Like + share */}

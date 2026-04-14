@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Play,
   Pause,
@@ -89,9 +90,18 @@ export default function DesktopPlayerBar() {
               >
                 {currentSong.title}
               </p>
-              <p className="text-[#b3b3b3] text-xs truncate mt-0.5">
-                {currentSong.style?.split(",")[0] || "AI Müzik"}
-              </p>
+              {currentSong.creator ? (
+                <Link
+                  href={`/profile/${currentSong.creator.username}`}
+                  className="text-[#b3b3b3] text-xs truncate mt-0.5 hover:text-white hover:underline transition-colors block"
+                >
+                  {currentSong.creator.name}
+                </Link>
+              ) : (
+                <p className="text-[#b3b3b3] text-xs truncate mt-0.5">
+                  {currentSong.style?.split(",")[0] || "AI Müzik"}
+                </p>
+              )}
             </div>
 
             <button

@@ -5,6 +5,26 @@ import BottomNav from "./BottomNav";
 import TopBar from "./TopBar";
 import PlayerShell from "./PlayerShell";
 import { usePathname } from "next/navigation";
+import { usePlayer } from "@/contexts/PlayerContext";
+
+function BottomSpacer() {
+  const { currentSong } = usePlayer();
+  return (
+    <>
+      {/* Mobile: navbar (64px) + mini player (~72px) + gap */}
+      <div
+        className="md:hidden flex-shrink-0"
+        style={{
+          height: currentSong
+            ? "calc(144px + env(safe-area-inset-bottom, 0px))"
+            : "calc(72px + env(safe-area-inset-bottom, 0px))",
+        }}
+      />
+      {/* Desktop: player bar (90px) */}
+      <div className="hidden md:block flex-shrink-0" style={{ height: 90 }} />
+    </>
+  );
+}
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -21,12 +41,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Content area — ml-[280px] on desktop, relative container */}
       <div className="h-full md:ml-[280px] relative">
         {/* Scroll area — full height */}
-        <div
-          id="main-scroll"
-          className="h-full overflow-y-auto scroll-area"
-          style={{ paddingBottom: "90px" }}
-        >
+        <div id="main-scroll" className="h-full overflow-y-auto scroll-area">
           {children}
+          <BottomSpacer />
         </div>
 
         {/* TopBar floats on top of scroll content */}

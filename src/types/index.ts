@@ -1,3 +1,10 @@
+export interface SongCreator {
+  id: string;
+  name: string;
+  username: string;
+  image?: string;
+}
+
 export interface Song {
   id: string;
   title: string;
@@ -9,6 +16,7 @@ export interface Song {
   duration?: number;
   status: "pending" | "processing" | "complete" | "error";
   createdAt: string;
+  creator?: SongCreator;
 }
 
 export interface Playlist {
@@ -18,6 +26,7 @@ export interface Playlist {
   description?: string;
   coverUrl?: string;
   isPublic: boolean;
+  type: "playlist" | "album";
   songCount?: number;
   songs?: Song[];
   createdAt: string;

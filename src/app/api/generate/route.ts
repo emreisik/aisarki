@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GenerateRequest, SunoApiResponse } from "@/types";
 import { saveProcessingTask } from "@/lib/taskStore";
+import { auth } from "@/auth";
 
 const SUNO_API_KEY = "7049ff127b2d972a33fef22566de8512";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
@@ -75,7 +76,9 @@ export async function POST(request: NextRequest) {
     // taskId'yi DB'ye kaydet — sayfa yenilenince de durum korunur
     const taskId = data.data?.taskId;
     if (taskId) {
-      saveProcessingTask(taskId, finalPrompt).catch((e) =>
+      const session = await auth();
+      const userId = session?.user?.id ?? undefined;
+      saveProcessingTask(taskId, finalPrompt, userId).catch((e) =>
         console.error("[db] saveProcessingTask hatası:", e),
       );
     }

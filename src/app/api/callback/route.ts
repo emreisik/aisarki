@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setTaskSongs } from "@/lib/taskStore";
+import { setTaskSongs, markTaskComplete } from "@/lib/taskStore";
 import { Song } from "@/types";
 
 interface RawSong {
@@ -7,24 +7,40 @@ interface RawSong {
   title?: string;
   tags?: string;
   prompt?: string;
+  // snake_case
   audio_url?: string;
   source_audio_url?: string;
   stream_audio_url?: string;
   source_stream_audio_url?: string;
   image_url?: string;
   source_image_url?: string;
-  duration?: number;
   created_at?: string;
+  // camelCase (yeni API formatı)
+  audioUrl?: string;
+  streamAudioUrl?: string;
+  imageUrl?: string;
+  duration?: number;
   createTime?: number;
   status?: string;
 }
 
-// body içindeki ilk array'i bul (songs listesi her formatta farklı yerde olabilir)
+// body içindeki şarkı array'ini bul — nested path dahil
 function findSongsArray(body: Record<string, unknown>): RawSong[] {
-  // 1) body.data doğrudan array mı?
+  // 1) Gerçek format: body.data.response.sunoData
+  const response = (body.data as Record<string, unknown> | undefined)
+    ?.response as Record<string, unknown> | undefined;
+  if (
+    Array.isArray(response?.sunoData) &&
+    (response.sunoData as unknown[]).length > 0
+  ) {
+    console.log("songs found in data.response.sunoData");
+    return response.sunoData as RawSong[];
+  }
+
+  // 2) body.data doğrudan array mı?
   if (Array.isArray(body.data)) return body.data as RawSong[];
 
-  // 2) body.data bir object ise, içindeki her field'a bak
+  // 3) body.data bir object ise, içindeki her field'a bak
   if (body.data && typeof body.data === "object") {
     const dataObj = body.data as Record<string, unknown>;
     console.log("data object keys:", Object.keys(dataObj));
@@ -39,7 +55,7 @@ function findSongsArray(body: Record<string, unknown>): RawSong[] {
     }
   }
 
-  // 3) body'deki diğer array field'lar
+  // 4) body'deki diğer array field'lar
   for (const key of ["sunoData", "songs", "items", "results"]) {
     if (Array.isArray(body[key])) return body[key] as RawSong[];
   }
@@ -81,26 +97,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const songs: Song[] = rawSongs.map((s: RawSong) => ({
-      id: s.id,
-      title: s.title || "İsimsiz Şarkı",
-      style: s.tags,
-      prompt: s.prompt,
-      audioUrl: s.source_audio_url || s.audio_url,
-      streamUrl: s.source_stream_audio_url || s.stream_audio_url,
-      imageUrl: s.source_image_url || s.image_url,
-      duration: s.duration,
-      status: !!(s.source_audio_url || s.audio_url) ? "complete" : "processing",
-      createdAt:
-        s.created_at ||
-        (s.createTime
-          ? new Date(s.createTime).toISOString()
-          : new Date().toISOString()),
-    }));
+    const songs: Song[] = rawSongs.map((s: RawSong) => {
+      const audioUrl = s.source_audio_url || s.audio_url || s.audioUrl;
+      const streamUrl =
+        s.source_stream_audio_url || s.stream_audio_url || s.streamAudioUrl;
+      const imageUrl = s.source_image_url || s.image_url || s.imageUrl;
+      return {
+        id: s.id,
+        title: s.title || "İsimsiz Şarkı",
+        style: s.tags,
+        prompt: s.prompt,
+        audioUrl,
+        streamUrl,
+        imageUrl,
+        duration: s.duration,
+        status: audioUrl ? ("complete" as const) : ("processing" as const),
+        createdAt:
+          s.created_at ||
+          (s.createTime
+            ? new Date(s.createTime).toISOString()
+            : new Date().toISOString()),
+      };
+    });
 
     setTaskSongs(taskId, songs);
+
+    // Tüm şarkılar tamamlandıysa DB'de task'ı complete olarak işaretle
+    const allComplete =
+      songs.length > 0 && songs.every((s) => s.status === "complete");
+    if (allComplete) {
+      markTaskComplete(taskId).catch(() => {});
+    }
+
     console.log(
-      `OK: ${songs.length} şarkı kaydedildi — ${songs.map((s) => s.title).join(", ")}`,
+      `OK: ${songs.length} şarkı kaydedildi (allComplete=${allComplete}) — ${songs.map((s) => s.title).join(", ")}`,
     );
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -36,6 +36,7 @@ export async function GET(
       description: p.description ?? undefined,
       coverUrl: p.cover_url ?? undefined,
       isPublic: p.is_public,
+      type: (p.type as "playlist" | "album") ?? "playlist",
       owner: { username: p.username, displayName: p.display_name },
       songCount: songRows.length,
       songs: songRows.map((s) => ({

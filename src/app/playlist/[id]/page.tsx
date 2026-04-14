@@ -13,6 +13,10 @@ import {
   MoreHorizontal,
   Trash2,
   Plus,
+  Disc3,
+  Pencil,
+  X,
+  Check,
 } from "lucide-react";
 
 function fmt(s?: number) {
@@ -42,6 +46,10 @@ export default function PlaylistPage({
   const [menuSong, setMenuSong] = useState<string | null>(null);
   const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const isOwner = session?.user?.id && playlist?.userId === session.user.id;
 
@@ -91,6 +99,39 @@ export default function PlaylistPage({
     setMenuSong(null);
   };
 
+  const openEdit = () => {
+    setEditTitle(playlist?.title ?? "");
+    setEditDesc(playlist?.description ?? "");
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editTitle.trim() || !playlist) return;
+    setSaving(true);
+    try {
+      await fetch(`/api/playlists/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDesc.trim(),
+        }),
+      });
+      setPlaylist((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: editTitle.trim(),
+              description: editDesc.trim() || undefined,
+            }
+          : prev,
+      );
+      setEditOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const addSong = async (song: Song) => {
     await fetch(`/api/playlists/${id}/songs`, {
       method: "POST",
@@ -127,8 +168,10 @@ export default function PlaylistPage({
     );
   }
 
-  // Hero gradient — cover renginden ya da default
-  const heroGradient = "linear-gradient(180deg, #5038a0 0%, #121212 50%)";
+  const isAlbum = playlist.type === "album";
+  const heroGradient = isAlbum
+    ? "linear-gradient(180deg, #0d3320 0%, #121212 50%)"
+    : "linear-gradient(180deg, #5038a0 0%, #121212 50%)";
 
   return (
     <div className="min-h-full pb-8">
@@ -145,20 +188,45 @@ export default function PlaylistPage({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-[#450af5] to-[#c4efd9] flex items-center justify-center">
-                <Music2 size={64} className="text-white/80" />
+              <div
+                className="w-full h-full flex items-center justify-center"
+                style={{
+                  background: isAlbum
+                    ? "linear-gradient(135deg,#0a3d1e,#1db954)"
+                    : "linear-gradient(135deg,#450af5,#c4efd9)",
+                }}
+              >
+                {isAlbum ? (
+                  <Disc3 size={64} className="text-white/80" />
+                ) : (
+                  <Music2 size={64} className="text-white/80" />
+                )}
               </div>
             )}
           </div>
 
           {/* Info */}
           <div className="flex flex-col gap-2 text-center md:text-left">
-            <p className="text-white/70 text-xs font-semibold uppercase tracking-widest">
-              Çalma listesi
+            <p
+              className="text-xs font-semibold uppercase tracking-widest"
+              style={{ color: isAlbum ? "#1db954" : "rgba(255,255,255,0.7)" }}
+            >
+              {isAlbum ? "Albüm" : "Çalma listesi"}
             </p>
-            <h1 className="text-white text-4xl md:text-6xl font-black leading-none">
-              {playlist.title}
-            </h1>
+            <div className="flex items-center gap-3 justify-center md:justify-start">
+              <h1 className="text-white text-4xl md:text-6xl font-black leading-none">
+                {playlist.title}
+              </h1>
+              {isOwner && (
+                <button
+                  onClick={openEdit}
+                  className="flex-shrink-0 p-2 rounded-full text-[#a7a7a7] hover:text-white hover:bg-white/10 transition-colors pressable mt-1"
+                  title="Düzenle"
+                >
+                  <Pencil size={18} />
+                </button>
+              )}
+            </div>
             {playlist.description && (
               <p className="text-[#a7a7a7] text-sm">{playlist.description}</p>
             )}
@@ -241,6 +309,82 @@ export default function PlaylistPage({
                   />
                 </button>
               ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit modal ── */}
+      {editOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end pb-[calc(64px+env(safe-area-inset-bottom,0px))] sm:pb-0 sm:items-center justify-center"
+          onClick={() => setEditOpen(false)}
+        >
+          <div className="absolute inset-0 bg-black/70" />
+          <div
+            className="relative z-10 w-full sm:max-w-md bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-white text-lg font-bold">
+                {isAlbum ? "Albümü Düzenle" : "Listeyi Düzenle"}
+              </h2>
+              <button
+                onClick={() => setEditOpen(false)}
+                className="text-[#a7a7a7] hover:text-white pressable"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[#a7a7a7] text-xs font-semibold uppercase tracking-widest block mb-1.5">
+                  {isAlbum ? "Albüm adı" : "Liste adı"}
+                </label>
+                <input
+                  autoFocus
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && saveEdit()}
+                  maxLength={80}
+                  className="w-full bg-[#282828] text-white placeholder-[#535353] rounded-md px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-[#1db954]"
+                />
+              </div>
+              <div>
+                <label className="text-[#a7a7a7] text-xs font-semibold uppercase tracking-widest block mb-1.5">
+                  Açıklama
+                </label>
+                <textarea
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  maxLength={200}
+                  rows={3}
+                  placeholder="İsteğe bağlı"
+                  className="w-full bg-[#282828] text-white placeholder-[#535353] rounded-md px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-[#1db954] resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setEditOpen(false)}
+                className="flex-1 border border-[#535353] text-white font-semibold rounded-full py-3 text-sm hover:border-white transition-colors pressable"
+              >
+                İptal
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={saving || !editTitle.trim()}
+                className="flex-1 bg-[#1db954] text-black font-bold rounded-full py-3 text-sm hover:bg-[#1ed760] transition-colors pressable disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Check size={16} />
+                )}
+                Kaydet
+              </button>
+            </div>
           </div>
         </div>
       )}

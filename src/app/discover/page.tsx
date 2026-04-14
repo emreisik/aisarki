@@ -2,24 +2,21 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Play, Pause, Music2, Loader2 } from "lucide-react";
-
-const GENRES = [
-  { label: "Türk Pop", color: "#E61E32", emoji: "🎵" },
-  { label: "Hip-Hop", color: "#BA5D07", emoji: "🎤" },
-  { label: "R&B", color: "#477D95", emoji: "🎸" },
-  { label: "Electronic", color: "#7D4193", emoji: "🎛️" },
-  { label: "Rock", color: "#537AA1", emoji: "🎸" },
-  { label: "Jazz", color: "#1E3264", emoji: "🎺" },
-  { label: "Classical", color: "#8D67AB", emoji: "🎻" },
-  { label: "Lo-fi", color: "#148A08", emoji: "📻" },
-  { label: "Acoustic", color: "#A56752", emoji: "🎵" },
-  { label: "Synthwave", color: "#6A3A8B", emoji: "🌆" },
-  { label: "Türk Halk", color: "#C87D3E", emoji: "🪘" },
-  { label: "Arabesk", color: "#855D3C", emoji: "🌙" },
-];
+import Link from "next/link";
+import {
+  Play,
+  Pause,
+  Music2,
+  Clock3,
+  Shuffle,
+  Loader2,
+  MoreHorizontal,
+  ListPlus,
+  Trash2,
+} from "lucide-react";
 
 interface ProcessingTask {
   taskId: string;
@@ -27,101 +24,28 @@ interface ProcessingTask {
   startedAt: string;
 }
 
-function ProcessingCard() {
-  return (
-    <div className="bg-[#181818] rounded-lg p-4 text-left">
-      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-4">
-        <div className="w-full h-full flex items-center justify-center">
-          <Loader2 size={32} className="text-[#1db954] animate-spin" />
-        </div>
-      </div>
-      <p className="text-sm font-semibold truncate mb-1 text-[#a7a7a7]">
-        Oluşturuluyor...
-      </p>
-      <div className="h-2 w-2/3 rounded-full bg-[#282828] shimmer" />
-    </div>
-  );
+function fmt(s?: number) {
+  if (!s || isNaN(s)) return "--:--";
+  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
-function SongCard({
-  song,
-  onPlay,
-  onDetail,
-  isPlaying,
-}: {
-  song: Song;
-  onPlay: () => void;
-  onDetail: () => void;
-  isPlaying: boolean;
-}) {
-  return (
-    <button
-      onClick={onDetail}
-      className="bg-[#181818] hover:bg-[#282828] rounded-lg p-4 transition-colors text-left group pressable"
-    >
-      <div className="relative w-full aspect-square rounded-md overflow-hidden bg-[#282828] mb-4 shadow-lg">
-        {song.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={song.imageUrl}
-            alt={song.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={40} className="text-[#535353]" />
-          </div>
-        )}
-        <div
-          onClick={(e) => {
-            e.stopPropagation();
-            onPlay();
-          }}
-          className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200"
-        >
-          {isPlaying ? (
-            <Pause size={18} fill="black" className="text-black" />
-          ) : (
-            <Play size={18} fill="black" className="text-black ml-0.5" />
-          )}
-        </div>
-        {isPlaying && (
-          <div className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl group-hover:hidden">
-            <span className="flex items-end gap-[2px] h-3">
-              {[0, 0.15, 0.3].map((d, i) => (
-                <span
-                  key={i}
-                  className="wave-bar rounded-sm bg-black"
-                  style={{
-                    width: "2px",
-                    height: "100%",
-                    animationDelay: `${d}s`,
-                  }}
-                />
-              ))}
-            </span>
-          </div>
-        )}
-      </div>
-      <p
-        className={`text-sm font-semibold truncate mb-1 ${isPlaying ? "text-[#1db954]" : "text-white"}`}
-      >
-        {song.title}
-      </p>
-      <p className="text-[#a7a7a7] text-xs truncate">
-        {song.style?.split(",")[0] || "AI Müzik"}
-      </p>
-    </button>
-  );
+function totalDuration(songs: Song[]) {
+  const secs = songs.reduce((a, s) => a + (s.duration ?? 0), 0);
+  if (secs === 0) return "";
+  const m = Math.floor(secs / 60);
+  if (m < 60) return `yaklaşık ${m} dakika`;
+  return `yaklaşık ${Math.floor(m / 60)} saat ${m % 60} dakika`;
 }
 
 export default function DiscoverPage() {
-  const { playSong, currentSong } = usePlayer();
+  const { playSong, currentSong, playing, togglePlay } = usePlayer();
+  const { data: session } = useSession();
   const router = useRouter();
+
   const [songs, setSongs] = useState<Song[]>([]);
   const [processing, setProcessing] = useState<ProcessingTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string | null>(null);
+  const [menuSong, setMenuSong] = useState<string | null>(null);
   const pollingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -138,15 +62,12 @@ export default function DiscoverPage() {
     }
   }, []);
 
-  // Processing task için polling başlat
   const startPolling = useCallback((taskId: string) => {
     if (pollingRef.current.has(taskId)) return;
-
     let attempts = 0;
     const poll = async () => {
-      if (attempts++ >= 40) {
+      if (attempts++ >= 60) {
         pollingRef.current.delete(taskId);
-        // Timeout — task'ı listeden kaldır
         setProcessing((prev) => prev.filter((t) => t.taskId !== taskId));
         return;
       }
@@ -158,153 +79,372 @@ export default function DiscoverPage() {
           setProcessing((prev) => prev.filter((t) => t.taskId !== taskId));
           setSongs((prev) => {
             const ids = new Set(prev.map((s: Song) => s.id));
-            const newSongs = (data.songs as Song[]).filter(
-              (s) => !ids.has(s.id),
-            );
-            return [...newSongs, ...prev];
+            return [
+              ...(data.songs as Song[]).filter((s) => !ids.has(s.id)),
+              ...prev,
+            ];
           });
         } else {
-          const timer = setTimeout(poll, 5000);
-          pollingRef.current.set(taskId, timer);
+          pollingRef.current.set(taskId, setTimeout(poll, 5000));
         }
       } catch {
-        const timer = setTimeout(poll, 8000);
-        pollingRef.current.set(taskId, timer);
+        pollingRef.current.set(taskId, setTimeout(poll, 8000));
       }
     };
-
-    const timer = setTimeout(poll, 5000);
-    pollingRef.current.set(taskId, timer);
+    pollingRef.current.set(taskId, setTimeout(poll, 5000));
   }, []);
 
   useEffect(() => {
     fetchAll();
-    // 15 saniyede bir yeni şarkıları çek
-    const interval = setInterval(fetchAll, 15000);
+    const interval = setInterval(fetchAll, 30000);
     return () => clearInterval(interval);
   }, [fetchAll]);
 
-  // Yeni processing task geldiğinde polling başlat
   useEffect(() => {
     processing.forEach((t) => startPolling(t.taskId));
   }, [processing, startPolling]);
 
-  // Cleanup
   useEffect(() => {
     const ref = pollingRef.current;
     return () => {
-      ref.forEach((timer) => clearTimeout(timer));
+      ref.forEach((t) => clearTimeout(t));
       ref.clear();
     };
   }, []);
 
-  const filtered = filter
-    ? songs.filter((s) => s.style?.toLowerCase().includes(filter.toLowerCase()))
-    : songs;
+  const deleteSong = async (songId: string) => {
+    await fetch(`/api/song/${songId}`, { method: "DELETE" });
+    setSongs((prev) => prev.filter((s) => s.id !== songId));
+    setMenuSong(null);
+  };
 
-  const mobilePad = currentSong
-    ? "pb-[calc(144px+env(safe-area-inset-bottom,0px))]"
-    : "pb-[calc(72px+env(safe-area-inset-bottom,0px))]";
+  const isLibraryPlaying =
+    currentSong && songs.some((s) => s.id === currentSong.id);
+
+  const handlePlayAll = () => {
+    if (songs.length === 0) return;
+    if (isLibraryPlaying) {
+      togglePlay();
+    } else {
+      playSong(songs[0], songs);
+    }
+  };
+
+  // Hero gradient — şu an çalınan şarkının rengine göre
+  const heroGradient = "linear-gradient(180deg, #1a1a2e 0%, #121212 60%)";
 
   return (
-    <div className={`min-h-full bg-[#121212] ${mobilePad} md:pb-0`}>
-      {/* Hero */}
-      <div className="bg-gradient-to-b from-[#2d2d2d] to-[#121212] pt-16 md:pt-20 px-6 pb-6">
-        <h1 className="text-white text-3xl font-black mb-1">Keşfet</h1>
-        <p className="text-[#a7a7a7] text-sm">
-          {loading
-            ? "Yükleniyor..."
-            : `${songs.length} şarkı${processing.length > 0 ? ` · ${processing.length} oluşturuluyor` : ""}`}
-        </p>
-      </div>
-
-      <div className="px-6">
-        {/* Genre pills */}
-        <section className="mb-8">
-          <h2 className="text-white text-2xl font-black mb-4">Türe göre ara</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {GENRES.map((g) => (
-              <button
-                key={g.label}
-                onClick={() => setFilter(filter === g.label ? null : g.label)}
-                className={`relative h-20 rounded-lg overflow-hidden text-left px-4 py-3 pressable transition-transform hover:scale-[1.02] ${
-                  filter === g.label ? "ring-2 ring-white" : ""
-                }`}
-                style={{ background: g.color }}
+    <div className="min-h-full pb-8">
+      {/* ── Hero ── */}
+      <div style={{ background: heroGradient }} className="pt-16 md:pt-20">
+        <div className="px-6 pb-6 flex flex-col md:flex-row md:items-end gap-6">
+          {/* Cover mosaic */}
+          <div className="w-48 h-48 md:w-56 md:h-56 flex-shrink-0 rounded-md overflow-hidden shadow-2xl mx-auto md:mx-0">
+            {songs.length >= 4 ? (
+              <div className="w-full h-full grid grid-cols-2">
+                {songs.slice(0, 4).map((s) =>
+                  s.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={s.id}
+                      src={s.imageUrl}
+                      alt={s.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      key={s.id}
+                      className="w-full h-full bg-[#282828] flex items-center justify-center"
+                    >
+                      <Music2 size={18} className="text-[#535353]" />
+                    </div>
+                  ),
+                )}
+              </div>
+            ) : songs.length === 1 && songs[0].imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={songs[0].imageUrl}
+                alt={songs[0].title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #450af5 0%, #c4efd9 100%)",
+                }}
               >
-                <span className="text-white text-sm font-black leading-tight block">
-                  {g.label}
-                </span>
-                <span className="absolute -bottom-1 -right-2 text-4xl rotate-12 opacity-80">
-                  {g.emoji}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Songs grid */}
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-white text-2xl font-black">
-              {filter ? `"${filter}" şarkıları` : "Tüm Şarkılar"}
-            </h2>
-            {filter && (
-              <button
-                onClick={() => setFilter(null)}
-                className="text-[#a7a7a7] hover:text-white text-sm pressable"
-              >
-                Temizle ✕
-              </button>
+                <Music2 size={64} className="text-white/80" />
+              </div>
             )}
           </div>
 
-          {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {Array.from({ length: 12 }).map((_, i) => (
+          {/* Info */}
+          <div className="flex flex-col gap-2 text-center md:text-left">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#a7a7a7]">
+              Çalma Listesi
+            </p>
+            <h1 className="text-white text-4xl md:text-6xl font-black leading-none">
+              Tüm Şarkılar
+            </h1>
+            <p className="text-[#a7a7a7] text-sm mt-1">
+              {loading
+                ? "Yükleniyor..."
+                : `${songs.length} şarkı${songs.length > 0 ? ` · ${totalDuration(songs)}` : ""}`}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Controls ── */}
+      <div className="px-6 py-6 bg-[#121212] flex items-center gap-6">
+        {songs.length > 0 && (
+          <button
+            onClick={handlePlayAll}
+            className="w-14 h-14 rounded-full bg-[#1db954] flex items-center justify-center pressable hover:scale-105 transition-transform shadow-xl"
+          >
+            {isLibraryPlaying && playing ? (
+              <Pause size={26} fill="black" className="text-black" />
+            ) : (
+              <Play size={26} fill="black" className="text-black ml-1" />
+            )}
+          </button>
+        )}
+        <button className="text-[#a7a7a7] hover:text-white transition-colors pressable">
+          <Shuffle size={24} />
+        </button>
+      </div>
+
+      {/* ── Processing banner ── */}
+      {processing.length > 0 && (
+        <div className="mx-6 mb-4 rounded-2xl overflow-hidden border border-[#1db954]/20 bg-[#0d1f14]">
+          <div
+            className="h-1 w-full"
+            style={{
+              background:
+                "linear-gradient(90deg,#1db954 0%,#17a349 50%,#1db954 100%)",
+              backgroundSize: "200% 100%",
+              animation: "shimmer 2s linear infinite",
+            }}
+          />
+          <div className="px-4 py-3 flex items-center gap-3">
+            <Loader2
+              size={16}
+              className="text-[#1db954] animate-spin flex-shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="text-white text-sm font-bold">
+                {processing.length === 1
+                  ? "Şarkı oluşturuluyor"
+                  : `${processing.length} şarkı oluşturuluyor`}
+              </p>
+              <p className="text-[#1db954]/60 text-xs truncate">
+                {processing.map((t) => t.prompt?.slice(0, 40)).join(" · ")}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Track list ── */}
+      <div className="px-6 bg-[#121212]">
+        {loading ? (
+          <div className="flex flex-col gap-2 py-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-2">
+                <div className="w-8 h-4 rounded shimmer flex-shrink-0" />
+                <div className="w-10 h-10 rounded shimmer flex-shrink-0" />
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <div className="h-3 w-1/3 rounded-full shimmer" />
+                  <div className="h-2.5 w-1/4 rounded-full shimmer" />
+                </div>
+                <div className="w-10 h-3 rounded-full shimmer" />
+              </div>
+            ))}
+          </div>
+        ) : songs.length === 0 ? (
+          <div className="py-20 text-center">
+            <Music2 size={48} className="text-[#535353] mx-auto mb-4" />
+            <p className="text-white font-bold text-xl mb-2">Henüz şarkı yok</p>
+            <p className="text-[#535353] text-sm">
+              Oluştur sayfasından ilk şarkını üret
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Column headers */}
+            <div className="flex items-center gap-4 px-4 pb-2 border-b border-[#282828] mb-1 text-[#a7a7a7] text-xs uppercase tracking-widest">
+              <span className="w-8 text-center">#</span>
+              <span className="w-10 flex-shrink-0" />
+              <span className="flex-1">Başlık</span>
+              <span className="hidden md:block w-36 truncate">Oluşturan</span>
+              <span className="hidden lg:block w-32 truncate">Stil</span>
+              <Clock3 size={14} className="flex-shrink-0" />
+              <span className="w-8" />
+            </div>
+
+            {songs.map((song, i) => {
+              const isActive = currentSong?.id === song.id;
+              return (
                 <div
-                  key={i}
-                  className="rounded-lg overflow-hidden bg-[#181818]"
+                  key={song.id}
+                  className={`flex items-center gap-4 px-4 py-2 rounded-md transition-colors group ${
+                    isActive ? "bg-[#ffffff12]" : "hover:bg-[#ffffff0d]"
+                  }`}
                 >
-                  <div className="aspect-square shimmer" />
-                  <div className="p-4 space-y-2">
-                    <div className="h-3 rounded-full shimmer w-3/4" />
-                    <div className="h-2.5 rounded-full shimmer w-1/2" />
+                  {/* Index / wave */}
+                  <div className="w-8 text-center flex-shrink-0">
+                    {isActive ? (
+                      <span className="flex items-end justify-center gap-[2px] h-4">
+                        {[0, 0.15, 0.3].map((d, k) => (
+                          <span
+                            key={k}
+                            className="wave-bar rounded-sm"
+                            style={{
+                              width: "2px",
+                              height: "100%",
+                              animationDelay: `${d}s`,
+                            }}
+                          />
+                        ))}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-[#a7a7a7] text-sm group-hover:hidden">
+                          {i + 1}
+                        </span>
+                        <button
+                          onClick={() => playSong(song, songs)}
+                          className="hidden group-hover:flex items-center justify-center w-full pressable"
+                        >
+                          <Play size={14} fill="white" className="text-white" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Cover */}
+                  <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-[#282828]">
+                    {song.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={song.imageUrl}
+                        alt={song.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Music2 size={14} className="text-[#535353]" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Title */}
+                  <div className="flex-1 min-w-0">
+                    <button
+                      onClick={() => playSong(song, songs)}
+                      className="w-full text-left pressable"
+                    >
+                      <p
+                        className={`text-sm font-medium truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+                      >
+                        {song.title}
+                      </p>
+                    </button>
+                    <div className="flex items-center gap-1 min-w-0">
+                      {song.creator ? (
+                        <Link
+                          href={`/profile/${song.creator.username}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[#a7a7a7] text-xs truncate hover:text-white hover:underline transition-colors"
+                        >
+                          {song.creator.name}
+                        </Link>
+                      ) : (
+                        <span className="text-[#a7a7a7] text-xs truncate md:hidden">
+                          {song.style?.split(",")[0] || "AI Müzik"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Creator — sadece md+ */}
+                  <div className="hidden md:block w-36 flex-shrink-0">
+                    {song.creator ? (
+                      <Link
+                        href={`/profile/${song.creator.username}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[#a7a7a7] text-sm truncate hover:text-white hover:underline transition-colors block"
+                      >
+                        {song.creator.name}
+                      </Link>
+                    ) : (
+                      <span className="text-[#a7a7a7] text-sm truncate">—</span>
+                    )}
+                  </div>
+
+                  {/* Style — sadece lg+ */}
+                  <p className="hidden lg:block text-[#a7a7a7] text-sm truncate w-32 flex-shrink-0">
+                    {song.style?.split(",")[0] || "AI Müzik"}
+                  </p>
+
+                  {/* Duration */}
+                  <span className="text-[#a7a7a7] text-sm tabular-nums flex-shrink-0">
+                    {fmt(song.duration)}
+                  </span>
+
+                  {/* Menu */}
+                  <div className="relative w-8 flex-shrink-0">
+                    <button
+                      onClick={() =>
+                        setMenuSong(menuSong === song.id ? null : song.id)
+                      }
+                      className="w-8 h-8 flex items-center justify-center text-[#a7a7a7] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity pressable"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {menuSong === song.id && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-[#282828] rounded-md shadow-2xl z-10 overflow-hidden">
+                        <button
+                          onClick={() => {
+                            router.push(`/song/${song.id}`);
+                            setMenuSong(null);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-[#3e3e3e] transition-colors text-left"
+                        >
+                          <Music2 size={15} />
+                          Şarkı detayı
+                        </button>
+                        <button
+                          onClick={() => {
+                            router.push(`/playlists?addSong=${song.id}`);
+                            setMenuSong(null);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-white hover:bg-[#3e3e3e] transition-colors text-left"
+                        >
+                          <ListPlus size={15} />
+                          Listeye ekle
+                        </button>
+                        {session?.user?.id &&
+                          song.creator?.id === session.user.id && (
+                            <button
+                              onClick={() => deleteSong(song.id)}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-[#3e3e3e] transition-colors text-left"
+                            >
+                              <Trash2 size={15} />
+                              Sil
+                            </button>
+                          )}
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : filtered.length === 0 && processing.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <Music2 size={48} className="text-[#535353] mb-4" />
-              <p className="text-white font-bold text-xl mb-2">
-                {filter
-                  ? `"${filter}" türünde şarkı bulunamadı`
-                  : "Henüz şarkı yok"}
-              </p>
-              <p className="text-[#535353] text-sm">
-                {filter
-                  ? "Başka bir tür dene"
-                  : "Oluştur sayfasından şarkı üret"}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {/* Processing spinner kartlar — en üstte */}
-              {!filter &&
-                processing.map((t) => <ProcessingCard key={t.taskId} />)}
-              {filtered.map((song) => (
-                <SongCard
-                  key={song.id}
-                  song={song}
-                  onPlay={() => playSong(song, filtered)}
-                  onDetail={() => router.push(`/song/${song.id}`)}
-                  isPlaying={currentSong?.id === song.id}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+              );
+            })}
+          </>
+        )}
       </div>
     </div>
   );

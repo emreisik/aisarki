@@ -2,7 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import sql from "@/lib/db";
 
+async function ensureUsersTable() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      email         TEXT UNIQUE NOT NULL,
+      password_hash TEXT,
+      username      TEXT UNIQUE NOT NULL,
+      display_name  TEXT NOT NULL,
+      avatar_url    TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+}
+
 export async function POST(req: NextRequest) {
+  await ensureUsersTable();
   const { email, password, username, displayName } = await req.json();
 
   if (!email || !password || !username) {

@@ -22,13 +22,25 @@ export default function ProfilePage() {
   }, [status, router]);
 
   useEffect(() => {
-    if (status === "authenticated") {
-      fetch("/api/all-songs")
-        .then((r) => r.json())
-        .then((d) => setSongs(d.songs || []))
-        .finally(() => setLoading(false));
-    }
-  }, [status]);
+    if (status !== "authenticated") return;
+    const username = (session?.user as { username?: string })?.username;
+
+    // Önce sahipsiz şarkıları bu kullanıcıya bağla, sonra listele
+    fetch("/api/admin/migrate-songs", { method: "POST" })
+      .catch(() => {})
+      .finally(() => {
+        fetch("/api/all-songs")
+          .then((r) => r.json())
+          .then((d) => {
+            const all: Song[] = d.songs || [];
+            const mine = username
+              ? all.filter((s) => s.creator?.username === username)
+              : all;
+            setSongs(mine);
+          })
+          .finally(() => setLoading(false));
+      });
+  }, [status, session]);
 
   if (status === "loading" || status === "unauthenticated") {
     return (
@@ -96,10 +108,10 @@ export default function ProfilePage() {
       <div className="px-6 pb-8">
         <h2 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
           <Music2 size={18} className="text-[#1db954]" />
-          Tüm Şarkılar
-          {!loading && (
+          Şarkılarım
+          {!loading && songs.length > 0 && (
             <span className="text-white/40 font-normal text-sm">
-              {songs.length}
+              {songs.length} şarkı
             </span>
           )}
         </h2>
@@ -121,6 +133,10 @@ export default function ProfilePage() {
                 song={song}
                 isPlaying={currentSong?.id === song.id}
                 onPlay={() => playSong(song, songs)}
+                onDelete={async (s) => {
+                  await fetch(`/api/song/${s.id}`, { method: "DELETE" });
+                  setSongs((prev) => prev.filter((x) => x.id !== s.id));
+                }}
                 variant="row"
               />
             ))}
