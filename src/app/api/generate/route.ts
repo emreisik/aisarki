@@ -69,9 +69,10 @@ export async function POST(request: NextRequest) {
     if (!response.ok || data.code !== 200) {
       console.log("Suno reject:", JSON.stringify(data));
       // Suno bazen hatayı farklı field'larda döndürüyor
+      const rawData = data as unknown as Record<string, unknown>;
       const rawMsg: string =
-        ((data as Record<string, unknown>).message as string) ||
-        ((data as Record<string, unknown>).error as string) ||
+        (rawData.message as string) ||
+        (rawData.error as string) ||
         data.msg ||
         "Müzik oluşturulamadı";
       // Artist name hatası için Türkçe açıklama ekle
