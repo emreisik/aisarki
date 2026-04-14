@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setTaskSongs, markTaskComplete } from "@/lib/taskStore";
+import {
+  setTaskSongs,
+  markTaskComplete,
+  getTaskCreatedBy,
+} from "@/lib/taskStore";
+import { sendPushToUser } from "@/lib/pushNotification";
 import { Song } from "@/types";
 
 interface RawSong {
@@ -127,6 +132,21 @@ export async function POST(request: NextRequest) {
       songs.length > 0 && songs.every((s) => s.status === "complete");
     if (allComplete) {
       markTaskComplete(taskId).catch(() => {});
+
+      // Oluşturan kullanıcıya push bildirimi gönder
+      getTaskCreatedBy(taskId)
+        .then((userId) => {
+          if (!userId) return;
+          const first = songs[0];
+          return sendPushToUser(userId, {
+            title: "Şarkın hazır!",
+            body: `"${first.title}" dinlemeye hazır`,
+            icon: first.imageUrl || "/icon-192.png",
+            url: `/song/${first.id}`,
+            tag: `song-ready-${taskId}`,
+          });
+        })
+        .catch(() => {});
     }
 
     console.log(

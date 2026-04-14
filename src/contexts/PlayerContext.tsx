@@ -10,6 +10,7 @@ import {
   RefObject,
 } from "react";
 import { Song } from "@/types";
+import { saveRecentSong } from "@/lib/idb";
 
 interface PlayerCtx {
   currentSong: Song | null;
@@ -125,6 +126,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentSong]);
 
+  // ── Badge API — çalıyor göstergesi ──
+  useEffect(() => {
+    if (!("setAppBadge" in navigator)) return;
+    if (playing && currentSong) {
+      (navigator as Navigator & { setAppBadge: (n?: number) => Promise<void> })
+        .setAppBadge()
+        .catch(() => {});
+    } else {
+      (navigator as Navigator & { clearAppBadge: () => Promise<void> })
+        .clearAppBadge?.()
+        .catch(() => {});
+    }
+  }, [playing, currentSong]);
+
   // ── Media Session API — kilit ekranı / bildirim kontrolleri ──
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentSong) return;
@@ -148,6 +163,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setPlaylist(pl);
     setCurrentIndex(idx >= 0 ? idx : 0);
     setCurrentSong(song);
+    // IDB'ye kaydet (offline erişim)
+    saveRecentSong(song).catch(() => {});
+    // Kısa titreşim (Android)
+    if ("vibrate" in navigator) navigator.vibrate(30);
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -155,10 +174,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (playing) {
       audioRef.current.pause();
       setPlaying(false);
+      if ("vibrate" in navigator) navigator.vibrate(15);
     } else {
       audioRef.current
         .play()
-        .then(() => setPlaying(true))
+        .then(() => {
+          setPlaying(true);
+          if ("vibrate" in navigator) navigator.vibrate(15);
+        })
         .catch(() => {});
     }
   }, [playing]);

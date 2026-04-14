@@ -90,6 +90,17 @@ export async function markTaskComplete(taskId: string): Promise<void> {
   }
 }
 
+export async function getTaskCreatedBy(taskId: string): Promise<string | null> {
+  try {
+    await ensureSchema();
+    const rows =
+      await sql`SELECT created_by FROM tasks WHERE task_id = ${taskId} LIMIT 1`;
+    return (rows[0]?.created_by as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export interface ProcessingTask {
   taskId: string;
   prompt: string;

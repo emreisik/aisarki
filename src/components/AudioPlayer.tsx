@@ -40,6 +40,24 @@ export default function AudioPlayer() {
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
 
+  const handleShare = async () => {
+    if (!currentSong) return;
+    const shareData = {
+      title: currentSong.title || "AI Şarkı",
+      text: `"${currentSong.title}" — AI Şarkı ile oluşturuldu`,
+      url: `${window.location.origin}/song/${currentSong.id}`,
+    };
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // kullanıcı iptal etti
+      }
+    } else {
+      await navigator.clipboard.writeText(shareData.url);
+    }
+  };
+
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const seek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,7 +227,10 @@ export default function AudioPlayer() {
         </div>
 
         <div className="flex justify-center mb-6">
-          <button className="flex items-center gap-2 pressable">
+          <button
+            onClick={() => handleShare()}
+            className="flex items-center gap-2 pressable"
+          >
             <Share2 size={15} className="text-white/50" />
             <span className="text-white/50 text-sm">Paylaş</span>
           </button>
@@ -280,7 +301,10 @@ export default function AudioPlayer() {
                 {liked ? "Beğenildi" : "Beğen"}
               </span>
             </button>
-            <button className="pressable flex items-center gap-2">
+            <button
+              onClick={() => handleShare()}
+              className="pressable flex items-center gap-2"
+            >
               <Share2 size={18} className="text-white/50 hover:text-white" />
               <span className="text-white/50 text-sm hover:text-white">
                 Paylaş
