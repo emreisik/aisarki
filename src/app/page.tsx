@@ -1078,6 +1078,11 @@ function PromptModal({
   const [values, setValues] = useState<Record<string, string>>({});
   const preview = item.buildPrompt(values);
 
+  // En az bir text alanı doldurulmuş olmalı
+  const textFields = item.fields.filter((f) => f.type === "text");
+  const hasInput =
+    textFields.length === 0 || textFields.some((f) => values[f.key]?.trim());
+
   const set = (key: string, val: string) =>
     setValues((v) => ({ ...v, [key]: val }));
   const toggle = (key: string, val: string) =>
@@ -1187,14 +1192,14 @@ function PromptModal({
               const full = style ? `[${style}] ${preview}` : preview;
               onGenerate(full);
             }}
-            disabled={!preview}
+            disabled={!preview || !hasInput}
             className="w-full py-4 rounded-2xl font-black text-sm tracking-wide transition-all pressable disabled:opacity-30"
             style={{
-              background: preview ? color : "#1a1a1a",
-              color: preview ? "black" : "#535353",
+              background: preview && hasInput ? color : "#1a1a1a",
+              color: preview && hasInput ? "black" : "#535353",
             }}
           >
-            {preview ? "Şarkıyı Oluştur" : "Bilgileri doldurun"}
+            {hasInput ? "Şarkıyı Oluştur" : "Bilgileri doldurun"}
           </button>
         </div>
       </div>
