@@ -1468,7 +1468,7 @@ function TrackRow({
    Ana sayfa
 ══════════════════════════════════════════════ */
 export default function HomePage() {
-  const { playSong, currentSong } = usePlayer();
+  const { playSong, currentSong, setShowGate } = usePlayer();
   const { data: session } = useSession();
 
   const [allSongs, setAllSongs] = useState<Song[]>([]);
@@ -1635,6 +1635,10 @@ export default function HomePage() {
   const handleGenerate = async (p: string) => {
     const trimmed = p.trim();
     if (!trimmed || loading) return;
+    if (!session?.user) {
+      setShowGate(true);
+      return;
+    }
     setActiveItem(null);
     setError("");
     setLoading(true);
