@@ -4,6 +4,8 @@ import DesktopSidebar from "./DesktopSidebar";
 import BottomNav from "./BottomNav";
 import TopBar from "./TopBar";
 import PlayerShell from "./PlayerShell";
+import AppLogo from "./AppLogo";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePlayer } from "@/contexts/PlayerContext";
 
@@ -16,8 +18,8 @@ function BottomSpacer() {
         className="md:hidden flex-shrink-0"
         style={{
           height: currentSong
-            ? "calc(144px + env(safe-area-inset-bottom, 0px))"
-            : "calc(72px + env(safe-area-inset-bottom, 0px))",
+            ? "calc(136px + env(safe-area-inset-bottom, 0px))"
+            : "calc(64px + env(safe-area-inset-bottom, 0px))",
         }}
       />
       {/* Desktop: player bar (90px) */}
@@ -41,7 +43,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Content area — ml-[280px] on desktop, relative container */}
       <div className="h-full md:ml-[280px] relative">
         {/* Scroll area — full height */}
-        <div id="main-scroll" className="h-full overflow-y-auto scroll-area">
+        <div
+          id="main-scroll"
+          className="h-full overflow-y-auto scroll-area pt-12 md:pt-0"
+        >
           {children}
           <BottomSpacer />
         </div>
@@ -52,6 +57,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <TopBar />
           </div>
         </div>
+      </div>
+
+      {/* Mobile header — logo ortada */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-20 flex items-center justify-center h-12 bg-[#121212]/80 backdrop-blur-md border-b border-white/5 pointer-events-none">
+        <Link href="/" className="pointer-events-auto">
+          <AppLogo size="sm" showText />
+        </Link>
       </div>
 
       <BottomNav />

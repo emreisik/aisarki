@@ -13,12 +13,14 @@ interface LyricsRequest {
   vocal?: string;
   // Serbest notlar
   customNotes?: string;
+  // Çocuk modu
+  childMode?: boolean;
 }
 
 export async function POST(request: NextRequest) {
   if (!ANTHROPIC_API_KEY) {
     return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY tanımlı değil" },
+      { error: "ANTHROPIC_API_KEY eksik — Railway Variables kontrol et" },
       { status: 500 },
     );
   }
@@ -42,11 +44,24 @@ export async function POST(request: NextRequest) {
       ? `\nMüzikal bağlam:\n${contextLines.join("\n")}`
       : "";
 
-  const systemPrompt = `Sen profesyonel bir Türk müzik sözü yazarısın. Verilen bağlama ve müzikal stile uygun, gerçek duygusal derinliği olan şarkı sözleri yazarsın.
+  const systemPrompt = body.childMode
+    ? `Sen yaratıcı bir Türk çocuk şarkısı yazarısın. Çocukların seveceği, eğlenceli, öğretici ve neşeli şarkı sözleri yazarsın.
 
 Kurallar:
 - Sözler tamamen Türkçe olmalı
-- Suno AI formatında yaz: [Verse 1], [Chorus], [Verse 2], [Bridge] gibi bölüm etiketleri kullan
+- Şarkı formatında yaz: [Verse 1], [Chorus], [Verse 2] gibi bölüm etiketleri kullan
+- Her bölüm 4-6 satır olsun
+- Basit, akılda kalıcı kafiyeler kullan — 3-8 yaş çocuklar için uygun
+- Tekrar eden nakarat olsun (çocuklar ezberlemeyi sever)
+- Cümleler kısa ve anlaşılır olsun
+- Hayvanlar, renkler, sayılar, doğa, arkadaşlık, aile gibi temaları kullana bilirsin
+- Neşeli, umut dolu, pozitif bir ton
+- Sadece sözleri yaz, açıklama ekleme`
+    : `Sen profesyonel bir Türk müzik sözü yazarısın. Verilen bağlama ve müzikal stile uygun, gerçek duygusal derinliği olan şarkı sözleri yazarsın.
+
+Kurallar:
+- Sözler tamamen Türkçe olmalı
+- Şarkı formatında yaz: [Verse 1], [Chorus], [Verse 2], [Bridge] gibi bölüm etiketleri kullan
 - Her bölüm 4-6 satır olsun
 - Kafiye ve ritim önemli — şarkı söylenebilir olmalı
 - Yöre ve dönem belirtildiyse o dile, ağza, duygu dünyasına uy (Karadeniz ağzı, arabesk dili vs.)
@@ -76,11 +91,13 @@ Kurallar:
 
     if (!res.ok) {
       const err = await res.text();
-      console.error("[lyrics] Anthropic error:", err);
-      return NextResponse.json(
-        { error: "Sözler oluşturulamadı" },
-        { status: 500 },
-      );
+      console.error("[lyrics] Anthropic error:", res.status, err);
+      let msg = "Sözler oluşturulamadı";
+      try {
+        const parsed = JSON.parse(err);
+        if (parsed?.error?.message) msg = parsed.error.message;
+      } catch {}
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
 
     const data = await res.json();

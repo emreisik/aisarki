@@ -1,4 +1,4 @@
-const CACHE = "aisarki-v2";
+const CACHE = "hubeya-v1";
 const PRECACHE = ["/", "/discover", "/create", "/playlists", "/manifest.json"];
 
 // ── Install ───────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ self.addEventListener("fetch", (e) => {
 
 // ── Push Notification ─────────────────────────────────────────────
 self.addEventListener("push", (e) => {
-  let data = { title: "AI Şarkı", body: "Yeni bir bildirim var!", url: "/" };
+  let data = { title: "Hubeya", body: "Yeni bir bildirim var!", url: "/" };
   try {
     data = { ...data, ...e.data.json() };
   } catch {
@@ -75,7 +75,7 @@ self.addEventListener("push", (e) => {
       body: data.body,
       icon: "/icon-192.png",
       badge: "/icon-192.png",
-      tag: data.tag || "aisarki-notification",
+      tag: data.tag || "hubeya-notification",
       renotify: true,
       data: { url: data.url || "/" },
       actions: [
@@ -151,7 +151,7 @@ async function flushGenerateQueue() {
 // ── IndexedDB helpers (SW context) ───────────────────────────────
 function openIDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("aisarki", 1);
+    const req = indexedDB.open("hubeya", 1);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains("recentSongs")) {

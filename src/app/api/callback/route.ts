@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       (dataObj?.taskId as string) ||
       "";
 
-    const rawSongs = findSongsArray(body);
+    const rawSongs = findSongsArray(body).slice(0, 1);
 
     console.log(`taskId="${taskId}" | songs=${rawSongs.length}`);
 

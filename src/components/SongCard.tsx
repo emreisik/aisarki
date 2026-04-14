@@ -111,7 +111,7 @@ export default function SongCard({
             </Link>
           ) : (
             <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-              {song.style?.split(",")[0] || "AI Müzik"}
+              {song.style?.split(",")[0] || "Hubeya"}
             </p>
           )}
         </div>
@@ -215,7 +215,7 @@ export default function SongCard({
           </Link>
         ) : (
           <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-            {song.style?.split(",")[0] || "AI Müzik"}
+            {song.style?.split(",")[0] || "Hubeya"}
           </p>
         )}
       </div>

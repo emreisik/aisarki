@@ -4,6 +4,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 import AudioPlayer from "./AudioPlayer";
 import MiniPlayer from "./MiniPlayer";
 import DesktopPlayerBar from "./DesktopPlayerBar";
+import GateModal from "./GateModal";
 
 export default function PlayerShell() {
   const { playerOpen, currentSong } = usePlayer();
@@ -20,6 +21,9 @@ export default function PlayerShell() {
 
       {/* Desktop bottom player bar — hidden on mobile */}
       <DesktopPlayerBar />
+
+      {/* Üyelik gate modal */}
+      <GateModal />
     </>
   );
 }

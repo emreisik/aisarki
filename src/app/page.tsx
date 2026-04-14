@@ -1349,7 +1349,7 @@ function SongTile({
         {song.title}
       </p>
       <p className="text-[#535353] text-[11px] truncate">
-        {song.style?.split(",")[0] || "AI Müzik"}
+        {song.style?.split(",")[0] || "Hubeya"}
       </p>
     </button>
   );
@@ -1451,7 +1451,7 @@ function TrackRow({
           {song.title}
         </p>
         <p className="text-[#535353] text-xs truncate">
-          {song.style?.split(",")[0] || "AI Müzik"}
+          {song.style?.split(",")[0] || "Hubeya"}
         </p>
       </div>
       {song.status === "processing" && (
@@ -1675,6 +1675,49 @@ export default function HomePage() {
   };
 
   const moreSongs = allSongs.slice(0, 18);
+
+  // ── Discover verisi ──
+  const [discoverSongs, setDiscoverSongs] = useState<Song[]>([]);
+  useEffect(() => {
+    fetch("/api/discover-songs")
+      .then((r) => r.json())
+      .then((d) => setDiscoverSongs(d.songs || []))
+      .catch(() => {});
+  }, []);
+
+  // Saatlik selamlama
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 6) return "İyi geceler";
+    if (h < 12) return "Günaydın";
+    if (h < 17) return "İyi günler";
+    if (h < 21) return "İyi akşamlar";
+    return "İyi geceler";
+  })();
+
+  // Discover şarkılarını sanatçıya göre grupla
+  const artistGroups = (() => {
+    const map = new Map<
+      string,
+      { name: string; username: string; songs: Song[] }
+    >();
+    discoverSongs.forEach((s) => {
+      if (!s.creator) return;
+      const key = s.creator.id;
+      if (!map.has(key)) {
+        map.set(key, {
+          name: s.creator.name,
+          username: s.creator.username,
+          songs: [],
+        });
+      }
+      map.get(key)!.songs.push(s);
+    });
+    return Array.from(map.values())
+      .filter((g) => g.songs.length >= 2)
+      .slice(0, 4);
+  })();
+
   return (
     <div className="min-h-full">
       {/* Modal */}
@@ -1808,6 +1851,201 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* ══════════════════════════════════════════════
+          Spotify-tarzı keşif bölümleri
+      ══════════════════════════════════════════════ */}
+      {discoverSongs.length > 0 && (
+        <div className="bg-[#121212] pb-10">
+          {/* Selamlama + hızlı erişim */}
+          <DiscoverGreeting
+            greeting={greeting}
+            songs={discoverSongs.slice(0, 6)}
+            onPlay={(s) => playSong(s, discoverSongs)}
+            currentSong={currentSong}
+          />
+
+          {/* Sanatçı grupları */}
+          {artistGroups.map((group) => (
+            <DiscoverRail
+              key={group.username}
+              title={`${group.name} Şarkıları`}
+              songs={group.songs}
+              onPlay={(s) => playSong(s, discoverSongs)}
+              currentSong={currentSong}
+              artistUsername={group.username}
+            />
+          ))}
+
+          {/* Bugün için önerilenler */}
+          <DiscoverRail
+            title="Bugün için önerilenler"
+            songs={discoverSongs.slice(0, 12)}
+            onPlay={(s) => playSong(s, discoverSongs)}
+            currentSong={currentSong}
+          />
+
+          {/* Yeni çıkanlar */}
+          <DiscoverRail
+            title="Yeni çıkanlar"
+            songs={[...discoverSongs].reverse().slice(0, 12)}
+            onPlay={(s) => playSong(s, discoverSongs)}
+            currentSong={currentSong}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   Selamlama + hızlı erişim grid'i
+══════════════════════════════════════════════ */
+function DiscoverGreeting({
+  greeting,
+  songs,
+  onPlay,
+  currentSong,
+}: {
+  greeting: string;
+  songs: Song[];
+  onPlay: (s: Song) => void;
+  currentSong: Song | null;
+}) {
+  return (
+    <div className="px-4 pt-8 pb-4">
+      <h2 className="text-white text-2xl font-black mb-4 px-2">{greeting}</h2>
+      <div className="grid grid-cols-2 gap-2">
+        {songs.map((song) => (
+          <button
+            key={song.id}
+            onClick={() => onPlay(song)}
+            className={`flex items-center gap-3 rounded-md overflow-hidden pressable transition-colors ${
+              currentSong?.id === song.id
+                ? "bg-[#ffffff20]"
+                : "bg-[#ffffff12] hover:bg-[#ffffff1e]"
+            }`}
+          >
+            {/* Cover */}
+            <div className="w-14 h-14 flex-shrink-0 overflow-hidden bg-[#282828]">
+              {song.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={song.imageUrl}
+                  alt={song.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Music2 size={20} className="text-[#535353]" />
+                </div>
+              )}
+            </div>
+            <span
+              className={`text-sm font-bold truncate pr-2 text-left ${
+                currentSong?.id === song.id ? "text-[#1db954]" : "text-white"
+              }`}
+            >
+              {song.title}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   Yatay scroll rail
+══════════════════════════════════════════════ */
+function DiscoverRail({
+  title,
+  songs,
+  onPlay,
+  currentSong,
+  artistUsername,
+}: {
+  title: string;
+  songs: Song[];
+  onPlay: (s: Song) => void;
+  currentSong: Song | null;
+  artistUsername?: string;
+}) {
+  return (
+    <section className="py-6">
+      <div className="flex items-center justify-between px-6 mb-3">
+        <h2 className="text-white text-xl font-black">{title}</h2>
+        {artistUsername && (
+          <Link
+            href={`/profile/${artistUsername}`}
+            className="text-[#a7a7a7] text-sm font-semibold hover:text-white transition-colors pressable"
+          >
+            Tümünü gör
+          </Link>
+        )}
+      </div>
+      <div className="flex gap-4 overflow-x-auto scroll-area px-6 pb-1">
+        {songs.map((song) => (
+          <DiscoverCard
+            key={song.id}
+            song={song}
+            onPlay={() => onPlay(song)}
+            isActive={currentSong?.id === song.id}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   Kart — yatay scroll içinde
+══════════════════════════════════════════════ */
+function DiscoverCard({
+  song,
+  onPlay,
+  isActive,
+}: {
+  song: Song;
+  onPlay: () => void;
+  isActive: boolean;
+}) {
+  return (
+    <button
+      onClick={onPlay}
+      className="flex-shrink-0 w-36 pressable group text-left"
+    >
+      {/* Cover */}
+      <div className="w-36 h-36 rounded-md overflow-hidden bg-[#282828] mb-3 relative">
+        {song.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={song.imageUrl}
+            alt={song.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Music2 size={32} className="text-[#535353]" />
+          </div>
+        )}
+        {/* Play overlay */}
+        <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform">
+            <Play size={18} fill="black" className="text-black ml-0.5" />
+          </div>
+        </div>
+      </div>
+      <p
+        className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+      >
+        {song.title}
+      </p>
+      {song.creator && (
+        <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
+          {song.creator.name}
+        </p>
+      )}
+    </button>
   );
 }

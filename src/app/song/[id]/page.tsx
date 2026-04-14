@@ -111,7 +111,7 @@ export default function SongDetailPage({
           {/* Info */}
           <div className="flex flex-col gap-2 text-center md:text-left">
             <p className="text-white/60 text-xs font-semibold uppercase tracking-widest">
-              AI Şarkı
+              Hubeya
             </p>
             <h1 className="text-white text-3xl md:text-5xl font-black leading-tight">
               {song.title}

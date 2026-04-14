@@ -20,7 +20,7 @@ export default function Sidebar({ activePage = "home" }: SidebarProps) {
         <div className="flex items-center gap-2">
           <Music2 size={32} className="text-white" />
           <span className="text-white font-bold text-xl tracking-tight">
-            AI Müzik
+            Hubeya
           </span>
         </div>
       </div>

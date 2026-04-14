@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download, Share, X, Bell } from "lucide-react";
+import { usePlayer } from "@/contexts/PlayerContext";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -17,6 +18,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 }
 
 export default function PWAManager() {
+  const { currentSong } = usePlayer();
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [isIOS, setIsIOS] = useState(false);
@@ -134,10 +136,18 @@ export default function PWAManager() {
     }
   };
 
+  // mini player varken bannerı onun üstüne konumlandır
+  const bannerBottom = currentSong
+    ? "calc(144px + env(safe-area-inset-bottom, 0px))"
+    : "calc(64px + env(safe-area-inset-bottom, 0px))";
+
   // ── Bildirim izin banner'ı (standalone modda, izin verilmemişse) ──
   if (showNotifBanner && notifPermission === "default") {
     return (
-      <div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px))] md:bottom-[calc(90px+8px)] left-3 right-3 md:left-auto md:right-4 md:w-80 z-50 bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-slide-up">
+      <div
+        className="fixed left-3 right-3 md:left-auto md:right-4 md:w-80 z-50 bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-slide-up"
+        style={{ bottom: bannerBottom }}
+      >
         <div className="w-10 h-10 rounded-xl bg-[#1db954] flex items-center justify-center flex-shrink-0">
           <Bell size={20} className="text-black" />
         </div>
@@ -173,7 +183,10 @@ export default function PWAManager() {
     <>
       {/* ── Install Banner ── */}
       {!showIOSGuide && (
-        <div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px))] md:bottom-[calc(90px+8px)] left-3 right-3 md:left-auto md:right-4 md:w-80 z-50 bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-slide-up">
+        <div
+          className="fixed left-3 right-3 md:left-auto md:right-4 md:w-80 z-50 bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl p-4 flex items-center gap-3 animate-slide-up"
+          style={{ bottom: bannerBottom }}
+        >
           <div className="w-10 h-10 rounded-xl bg-[#1db954] flex items-center justify-center flex-shrink-0">
             <Download size={20} className="text-black" />
           </div>

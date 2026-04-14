@@ -51,6 +51,14 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS follows (
+      follower_id  TEXT NOT NULL,
+      following_id TEXT NOT NULL,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (follower_id, following_id)
+    )
+  `;
   // Eski tablolara eksik kolonları ekle (idempotent)
   for (const stmt of [
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS task_id TEXT`,
@@ -107,16 +115,27 @@ export interface ProcessingTask {
   startedAt: string;
 }
 
-export async function getProcessingTasks(): Promise<ProcessingTask[]> {
+export async function getProcessingTasks(
+  userId?: string,
+): Promise<ProcessingTask[]> {
   try {
     await ensureSchema();
-    const rows = await sql`
-      SELECT task_id, prompt, created_at
-      FROM tasks
-      WHERE status = 'processing'
-        AND created_at > NOW() - INTERVAL '2 hours'
-      ORDER BY created_at DESC
-    `;
+    const rows = userId
+      ? await sql`
+          SELECT task_id, prompt, created_at
+          FROM tasks
+          WHERE status = 'processing'
+            AND created_at > NOW() - INTERVAL '2 hours'
+            AND created_by = ${userId}
+          ORDER BY created_at DESC
+        `
+      : await sql`
+          SELECT task_id, prompt, created_at
+          FROM tasks
+          WHERE status = 'processing'
+            AND created_at > NOW() - INTERVAL '2 hours'
+          ORDER BY created_at DESC
+        `;
     return rows.map((r) => ({
       taskId: r.task_id as string,
       prompt: (r.prompt as string) ?? "",
@@ -201,20 +220,34 @@ export async function getSongsByTaskId(taskId: string): Promise<Song[]> {
   return rows.map(rowToSong);
 }
 
-export async function getAllSongs(): Promise<Song[]> {
+export async function getAllSongs(userId?: string): Promise<Song[]> {
   await ensureSchema();
-  const rows = await sql`
-    SELECT
-      s.*,
-      u.id           AS creator_id,
-      u.display_name AS creator_name,
-      u.username     AS creator_username,
-      u.avatar_url   AS creator_image
-    FROM songs s
-    LEFT JOIN users u ON u.id::text = s.created_by
-    WHERE s.status = 'complete'
-    ORDER BY s.created_at DESC
-  `;
+  const rows = userId
+    ? await sql`
+        SELECT
+          s.*,
+          u.id           AS creator_id,
+          u.display_name AS creator_name,
+          u.username     AS creator_username,
+          u.avatar_url   AS creator_image
+        FROM songs s
+        LEFT JOIN users u ON u.id::text = s.created_by
+        WHERE s.status = 'complete'
+          AND s.created_by = ${userId}
+        ORDER BY s.created_at DESC
+      `
+    : await sql`
+        SELECT
+          s.*,
+          u.id           AS creator_id,
+          u.display_name AS creator_name,
+          u.username     AS creator_username,
+          u.avatar_url   AS creator_image
+        FROM songs s
+        LEFT JOIN users u ON u.id::text = s.created_by
+        WHERE s.status = 'complete'
+        ORDER BY s.created_at DESC
+      `;
   return rows.map(rowToSong);
 }
 
@@ -284,4 +317,110 @@ export function getTaskSongs(taskId: string): Song[] | undefined {
 
 export function deleteTask(taskId: string): void {
   taskStore.delete(taskId);
+}
+
+/* ── Kullanıcı profil yardımcıları ── */
+
+export interface PublicUser {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl?: string;
+  createdAt: string;
+}
+
+export async function getUserByUsername(
+  username: string,
+): Promise<PublicUser | null> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT id, username, display_name, avatar_url, created_at
+    FROM users
+    WHERE username = ${username}
+    LIMIT 1
+  `;
+  if (rows.length === 0) return null;
+  const r = rows[0];
+  return {
+    id: r.id as string,
+    username: r.username as string,
+    displayName: r.display_name as string,
+    avatarUrl: (r.avatar_url as string | null) ?? undefined,
+    createdAt:
+      r.created_at instanceof Date
+        ? r.created_at.toISOString()
+        : (r.created_at as string),
+  };
+}
+
+export async function getUserSongs(userId: string): Promise<Song[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT
+      s.*,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image
+    FROM songs s
+    LEFT JOIN users u ON u.id::text = s.created_by
+    WHERE s.status = 'complete' AND s.created_by = ${userId}
+    ORDER BY s.created_at DESC
+  `;
+  return rows.map(rowToSong);
+}
+
+/* ── Follow sistemi ── */
+
+export async function toggleFollow(
+  followerId: string,
+  followingId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  const existing = await sql`
+    SELECT 1 FROM follows
+    WHERE follower_id = ${followerId} AND following_id = ${followingId}
+    LIMIT 1
+  `;
+  if (existing.length > 0) {
+    await sql`
+      DELETE FROM follows
+      WHERE follower_id = ${followerId} AND following_id = ${followingId}
+    `;
+    return false; // artık takip etmiyor
+  } else {
+    await sql`
+      INSERT INTO follows (follower_id, following_id)
+      VALUES (${followerId}, ${followingId})
+      ON CONFLICT DO NOTHING
+    `;
+    return true; // artık takip ediyor
+  }
+}
+
+export async function isFollowing(
+  followerId: string,
+  followingId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT 1 FROM follows
+    WHERE follower_id = ${followerId} AND following_id = ${followingId}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+export async function getFollowerCount(userId: string): Promise<number> {
+  await ensureSchema();
+  const rows =
+    await sql`SELECT COUNT(*)::int AS n FROM follows WHERE following_id = ${userId}`;
+  return (rows[0]?.n as number) ?? 0;
+}
+
+export async function getFollowingCount(userId: string): Promise<number> {
+  await ensureSchema();
+  const rows =
+    await sql`SELECT COUNT(*)::int AS n FROM follows WHERE follower_id = ${userId}`;
+  return (rows[0]?.n as number) ?? 0;
 }

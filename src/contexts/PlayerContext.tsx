@@ -11,6 +11,9 @@ import {
 } from "react";
 import { Song } from "@/types";
 import { saveRecentSong } from "@/lib/idb";
+import { useSession } from "next-auth/react";
+
+type RepeatMode = "none" | "all" | "one";
 
 interface PlayerCtx {
   currentSong: Song | null;
@@ -25,11 +28,17 @@ interface PlayerCtx {
   playPrev: () => void;
   setPlaying: (v: boolean) => void;
   setPlayerOpen: (v: boolean) => void;
+  showGate: boolean;
+  setShowGate: (v: boolean) => void;
+  shuffle: boolean;
+  toggleShuffle: () => void;
+  repeat: RepeatMode;
+  toggleRepeat: () => void;
 }
 
 const PlayerContext = createContext<PlayerCtx | null>(null);
 
-const STORAGE_KEY = "aisarki_player";
+const STORAGE_KEY = "hubeya_player";
 
 function saveState(song: Song, pl: Song[], idx: number, time: number) {
   try {
@@ -41,6 +50,7 @@ function saveState(song: Song, pl: Song[], idx: number, time: number) {
 }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
+  const { data: session } = useSession();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [playlist, setPlaylist] = useState<Song[]>([]);
@@ -49,6 +59,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [playerOpen, setPlayerOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [showGate, setShowGate] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState<RepeatMode>("none");
+  const gateTriggeredRef = useRef(false); // şarkı başına bir kez göster
+  const shuffleRef = useRef(false);
+  const repeatRef = useRef<RepeatMode>("none");
+  shuffleRef.current = shuffle;
+  repeatRef.current = repeat;
 
   // Sayfa yenilendiğinde çalındığı yerden geri yüklemek için
   const restoreTimeRef = useRef(0);
@@ -144,9 +162,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentSong) return;
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentSong.title || "AI Şarkı",
-      artist: "AI Müzik",
-      album: currentSong.style?.split(",")[0] || "AI Müzik",
+      title: currentSong.title || "Hubeya",
+      artist: "Hubeya",
+      album: currentSong.style?.split(",")[0] || "Hubeya",
       artwork: currentSong.imageUrl
         ? [{ src: currentSong.imageUrl, sizes: "512x512", type: "image/jpeg" }]
         : [],
@@ -163,9 +181,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setPlaylist(pl);
     setCurrentIndex(idx >= 0 ? idx : 0);
     setCurrentSong(song);
-    // IDB'ye kaydet (offline erişim)
+    gateTriggeredRef.current = false; // yeni şarkıda gate sıfırla
+    setShowGate(false);
     saveRecentSong(song).catch(() => {});
-    // Kısa titreşim (Android)
     if ("vibrate" in navigator) navigator.vibrate(30);
   }, []);
 
@@ -186,11 +204,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [playing]);
 
+  const toggleShuffle = useCallback(() => setShuffle((v) => !v), []);
+  const toggleRepeat = useCallback(
+    () =>
+      setRepeat((v) => (v === "none" ? "all" : v === "all" ? "one" : "none")),
+    [],
+  );
+
   const playNext = useCallback(() => {
+    const pl = playlistRef.current;
+    if (pl.length === 0) return;
     setCurrentIndex((prev) => {
+      if (shuffleRef.current) {
+        // Mevcut hariç rastgele
+        const candidates = pl
+          .map((s, i) => ({ s, i }))
+          .filter(({ s, i }) => i !== prev && s.status === "complete");
+        if (candidates.length === 0) return prev;
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        setCurrentSong(pick.s);
+        return pick.i;
+      }
       const next = prev + 1;
-      if (next >= playlistRef.current.length) return prev;
-      const s = playlistRef.current[next];
+      if (next >= pl.length) {
+        // Repeat all: başa dön
+        if (repeatRef.current === "all") {
+          const first = pl.find((s) => s.status === "complete");
+          if (first) setCurrentSong(first);
+          return pl.findIndex((s) => s.status === "complete");
+        }
+        return prev;
+      }
+      const s = pl[next];
       if (s?.status === "complete") {
         setCurrentSong(s);
         return next;
@@ -222,6 +267,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const d = audioRef.current?.duration ?? 0;
     setCurrentTime(t);
     setDuration(d);
+
+    // 30 saniyelik önizleme — giriş yapmamış kullanıcılar
+    if (t >= 30 && !session?.user && !gateTriggeredRef.current) {
+      gateTriggeredRef.current = true;
+      audioRef.current?.pause();
+      setPlaying(false);
+      setShowGate(true);
+    }
+
     // Kilit ekranı ilerleme çubuğunu güncelle
     if ("mediaSession" in navigator && d > 0) {
       try {
@@ -232,14 +286,40 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         });
       } catch {}
     }
-  }, []);
+  }, [session?.user]);
 
   const handleEnded = useCallback(() => {
+    // Repeat one: aynı şarkıyı baştan çal
+    if (repeatRef.current === "one" && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => setPlaying(false));
+      return;
+    }
     setPlaying(false);
+    const pl = playlistRef.current;
     setCurrentIndex((prev) => {
+      if (shuffleRef.current) {
+        const candidates = pl
+          .map((s, i) => ({ s, i }))
+          .filter(({ s, i }) => i !== prev && s.status === "complete");
+        if (candidates.length === 0) return prev;
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        setCurrentSong(pick.s);
+        return pick.i;
+      }
       const next = prev + 1;
-      if (next >= playlistRef.current.length) return prev;
-      const s = playlistRef.current[next];
+      if (next >= pl.length) {
+        if (repeatRef.current === "all") {
+          const firstIdx = pl.findIndex((s) => s.status === "complete");
+          if (firstIdx >= 0) setCurrentSong(pl[firstIdx]);
+          return firstIdx >= 0 ? firstIdx : prev;
+        }
+        return prev;
+      }
+      const s = pl[next];
       if (s?.status === "complete") {
         setCurrentSong(s);
         return next;
@@ -302,6 +382,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         playPrev,
         setPlaying,
         setPlayerOpen,
+        showGate,
+        setShowGate,
+        shuffle,
+        toggleShuffle,
+        repeat,
+        toggleRepeat,
       }}
     >
       {/* Kalıcı audio element — hiç unmount olmaz */}

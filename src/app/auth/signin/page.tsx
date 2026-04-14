@@ -4,7 +4,8 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Music2, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import AppLogo from "@/components/AppLogo";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -41,14 +42,20 @@ export default function SignInPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-4">
+      <button
+        onClick={() => router.back()}
+        className="absolute top-6 left-6 flex items-center gap-2 text-white/50 hover:text-white transition-colors pressable"
+      >
+        <ArrowLeft size={20} />
+      </button>
       <div className="w-full max-w-[400px]">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 bg-[#1db954] rounded-full flex items-center justify-center mb-4">
-            <Music2 size={24} className="text-black" />
+          <div className="mb-4">
+            <AppLogo size="lg" />
           </div>
           <h1 className="text-white text-2xl font-black">
-            AI Şarkı&apos;ya giriş yap
+            Hubeya&apos;ya giriş yap
           </h1>
         </div>
 

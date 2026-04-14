@@ -8,11 +8,26 @@ import SongCard from "@/components/SongCard";
 import { Song } from "@/types";
 import { LogOut, Music2, User, Settings } from "lucide-react";
 
+interface Stats {
+  followerCount: number;
+  followingCount: number;
+}
+
+function fmtCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)} B`;
+  return String(n);
+}
+
 export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { playSong, currentSong } = usePlayer();
   const [songs, setSongs] = useState<Song[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    followerCount: 0,
+    followingCount: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,21 +40,23 @@ export default function ProfilePage() {
     if (status !== "authenticated") return;
     const username = (session?.user as { username?: string })?.username;
 
-    // Önce sahipsiz şarkıları bu kullanıcıya bağla, sonra listele
-    fetch("/api/admin/migrate-songs", { method: "POST" })
-      .catch(() => {})
-      .finally(() => {
-        fetch("/api/all-songs")
-          .then((r) => r.json())
-          .then((d) => {
-            const all: Song[] = d.songs || [];
-            const mine = username
-              ? all.filter((s) => s.creator?.username === username)
-              : all;
-            setSongs(mine);
-          })
-          .finally(() => setLoading(false));
-      });
+    Promise.all([
+      fetch("/api/all-songs")
+        .then((r) => r.json())
+        .then((d) => setSongs(d.songs || [])),
+      username
+        ? fetch(`/api/profile/${username}`)
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.followerCount !== undefined) {
+                setStats({
+                  followerCount: d.followerCount,
+                  followingCount: d.followingCount,
+                });
+              }
+            })
+        : Promise.resolve(),
+    ]).finally(() => setLoading(false));
   }, [status, session]);
 
   if (status === "loading" || status === "unauthenticated") {
@@ -84,6 +101,27 @@ export default function ProfilePage() {
             </h1>
             {username && (
               <p className="text-white/50 text-sm mt-1">@{username}</p>
+            )}
+            {/* Stats */}
+            {!loading && (
+              <div className="flex items-center gap-4 mt-2 text-sm text-white/60">
+                <span>
+                  <span className="text-white font-bold">
+                    {fmtCount(stats.followerCount)}
+                  </span>{" "}
+                  takipçi
+                </span>
+                <span>
+                  <span className="text-white font-bold">
+                    {fmtCount(stats.followingCount)}
+                  </span>{" "}
+                  takip
+                </span>
+                <span>
+                  <span className="text-white font-bold">{songs.length}</span>{" "}
+                  şarkı
+                </span>
+              </div>
             )}
           </div>
         </div>

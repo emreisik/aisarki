@@ -58,7 +58,7 @@ export default function MiniPlayer() {
             {currentSong.title}
           </p>
           <p className="text-[#a7a7a7] text-xs truncate">
-            {currentSong.style?.split(",")[0] || "AI Müzik"}
+            {currentSong.style?.split(",")[0] || "Hubeya"}
           </p>
         </div>
 

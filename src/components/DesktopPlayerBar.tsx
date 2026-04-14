@@ -99,7 +99,7 @@ export default function DesktopPlayerBar() {
                 </Link>
               ) : (
                 <p className="text-[#b3b3b3] text-xs truncate mt-0.5">
-                  {currentSong.style?.split(",")[0] || "AI Müzik"}
+                  {currentSong.style?.split(",")[0] || "Hubeya"}
                 </p>
               )}
             </div>

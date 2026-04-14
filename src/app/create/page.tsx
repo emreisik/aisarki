@@ -113,12 +113,12 @@ function ProcessingBanner({
               </p>
               <div className="flex items-center gap-3 flex-shrink-0">
                 <a
-                  href={`/api/debug-suno?taskId=${t.taskId}`}
+                  href={`/api/debug-task?taskId=${t.taskId}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[#a7a7a7] hover:text-white text-xs underline"
                 >
-                  API yanıtı
+                  Detay
                 </a>
                 <button
                   onClick={() => onDismissFailed(t.taskId)}

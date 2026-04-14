@@ -1,7 +1,7 @@
 // IndexedDB yardımcısı — recently played + generate queue
 import { Song } from "@/types";
 
-const DB_NAME = "aisarki";
+const DB_NAME = "hubeya";
 const DB_VERSION = 1;
 
 function openDB(): Promise<IDBDatabase> {

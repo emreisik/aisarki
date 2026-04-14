@@ -76,41 +76,43 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 flex items-stretch border-t z-50"
+      className="md:hidden fixed bottom-0 left-0 right-0 border-t z-50"
       style={{
         background: "#111111",
         borderColor: "#2a2a2a",
-        height: "calc(64px + env(safe-area-inset-bottom, 0px))",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      {left.map(renderTab)}
+      {/* Sabit 64px içerik alanı — safe area'nın üstünde */}
+      <div className="flex items-stretch h-16">
+        {left.map(renderTab)}
 
-      {/* Merkez Oluştur */}
-      <Link
-        href="/create"
-        className="flex-1 flex flex-col items-center justify-center pressable"
-      >
-        <div
-          className="flex items-center justify-center rounded-2xl transition-all duration-200"
-          style={{
-            width: 52,
-            height: 34,
-            background: "#1db954",
-            boxShadow: isCreate
-              ? "0 0 24px rgba(29,185,84,0.6)"
-              : "0 2px 14px rgba(29,185,84,0.4)",
-            transform: isCreate ? "scale(1.05)" : "scale(1)",
-          }}
+        {/* Merkez Oluştur */}
+        <Link
+          href="/create"
+          className="flex-1 flex flex-col items-center justify-center pressable"
         >
-          <Plus size={22} strokeWidth={2.8} className="text-black" />
-        </div>
-        <span className="text-[10px] font-bold tracking-tight mt-1 text-[#1db954]">
-          Oluştur
-        </span>
-      </Link>
+          <div
+            className="flex items-center justify-center rounded-2xl transition-all duration-200"
+            style={{
+              width: 52,
+              height: 34,
+              background: "#1db954",
+              boxShadow: isCreate
+                ? "0 0 24px rgba(29,185,84,0.6)"
+                : "0 2px 14px rgba(29,185,84,0.4)",
+              transform: isCreate ? "scale(1.05)" : "scale(1)",
+            }}
+          >
+            <Plus size={22} strokeWidth={2.8} className="text-black" />
+          </div>
+          <span className="text-[10px] font-bold tracking-tight mt-1 text-[#1db954]">
+            Oluştur
+          </span>
+        </Link>
 
-      {right.map(renderTab)}
+        {right.map(renderTab)}
+      </div>
     </nav>
   );
 }

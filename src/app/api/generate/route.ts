@@ -67,10 +67,18 @@ export async function POST(request: NextRequest) {
     console.log("Suno API response:", JSON.stringify(data, null, 2));
 
     if (!response.ok || data.code !== 200) {
-      return NextResponse.json(
-        { error: data.msg || "Müzik oluşturulamadı" },
-        { status: 400 },
-      );
+      console.log("Suno reject:", JSON.stringify(data));
+      // Suno bazen hatayı farklı field'larda döndürüyor
+      const rawMsg: string =
+        ((data as Record<string, unknown>).message as string) ||
+        ((data as Record<string, unknown>).error as string) ||
+        data.msg ||
+        "Müzik oluşturulamadı";
+      // Artist name hatası için Türkçe açıklama ekle
+      const userMsg = rawMsg.toLowerCase().includes("artist name")
+        ? `Prompt'ta sanatçı adı tespit edildi. Lütfen şu kelimeyi değiştir: "${rawMsg.match(/artist name (\w+)/i)?.[1] ?? ""}". Farklı bir ifade kullan.`
+        : rawMsg;
+      return NextResponse.json({ error: userMsg }, { status: 400 });
     }
 
     // taskId'yi DB'ye kaydet — sayfa yenilenince de durum korunur

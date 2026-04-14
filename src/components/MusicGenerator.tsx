@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  Star,
 } from "lucide-react";
 import { GenerateRequest, SunoApiResponse } from "@/types";
 
@@ -627,10 +628,15 @@ function OptionRow<T extends { id: string; label: string; tag: string }>({
 
 /* ── Ana component ── */
 
+const CHILD_STYLE =
+  "Turkish children's song, playful, simple joyful melody, kid-friendly, cheerful, upbeat, innocent, fun, educational, age-appropriate";
+
 export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
   const [prompt, setPrompt] = useState("");
   const [title, setTitle] = useState("");
-  const [customMode, setCustomMode] = useState(false);
+  const [mode, setMode] = useState<"idea" | "lyrics" | "child">("idea");
+  const customMode = mode === "lyrics";
+  const childMode = mode === "child";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -696,7 +702,11 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
     makam,
   });
 
-  const styleString = [autoStyle, customNotes.trim()]
+  const styleString = [
+    childMode ? CHILD_STYLE : "",
+    autoStyle,
+    customNotes.trim(),
+  ]
     .filter(Boolean)
     .join(", ");
 
@@ -733,6 +743,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             .join(", "),
           vocal: VOCALS.find((v) => v.id === vocal)?.label,
           customNotes: customNotes.trim() || undefined,
+          childMode: childMode || undefined,
         }),
       });
       const data = await res.json();
@@ -813,26 +824,45 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
       {/* Mode tabs */}
       <div className="flex bg-[#1a1a1a] p-1 gap-1 border-b border-[#2a2a2a]">
         <button
-          onClick={() => setCustomMode(false)}
+          onClick={() => setMode("idea")}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-            !customMode ? "bg-[#2a2a2a] text-white" : "text-[#a7a7a7]"
+            mode === "idea" ? "bg-[#2a2a2a] text-white" : "text-[#a7a7a7]"
           }`}
         >
           <Sparkles size={14} />
           Fikir
         </button>
         <button
-          onClick={() => setCustomMode(true)}
+          onClick={() => setMode("lyrics")}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-            customMode ? "bg-[#2a2a2a] text-white" : "text-[#a7a7a7]"
+            mode === "lyrics" ? "bg-[#2a2a2a] text-white" : "text-[#a7a7a7]"
           }`}
         >
           <Music2 size={14} />
           Sözlü
         </button>
+        <button
+          onClick={() => setMode("child")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+            mode === "child" ? "bg-[#fff8e1] text-[#f59e0b]" : "text-[#a7a7a7]"
+          }`}
+        >
+          <Star size={14} />
+          Çocuk
+        </button>
       </div>
 
       <div className="p-4 flex flex-col gap-4">
+        {/* Çocuk modu banner */}
+        {childMode && (
+          <div className="flex items-center gap-2 bg-[#1a1400] border border-[#f59e0b]/20 rounded-xl px-3 py-2.5">
+            <Star size={14} className="text-[#f59e0b] flex-shrink-0" />
+            <p className="text-[#f59e0b]/80 text-xs">
+              Çocuklara uygun, neşeli ve eğitici şarkılar üretilecek
+            </p>
+          </div>
+        )}
+
         {/* Prompt */}
         <div className="relative">
           <textarea
@@ -841,7 +871,9 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             placeholder={
               customMode
                 ? "[Nakarat]\nŞarkı sözlerini buraya yaz..."
-                : "Sahilde özgür hissettiren bir şarkı, rüzgarın sesi..."
+                : childMode
+                  ? "Hayvanlar, renkler, sayılar, arkadaşlık... konuyu yaz"
+                  : "Sahilde özgür hissettiren bir şarkı, rüzgarın sesi..."
             }
             rows={customMode ? 7 : 3}
             maxLength={customMode ? 5000 : 500}
@@ -852,16 +884,24 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
           </span>
         </div>
 
-        {/* AI Lyrics butonu — simple modda göster */}
+        {/* AI Lyrics butonu — simple ve çocuk modunda göster */}
         {!customMode && vocal !== "none" && (
           <button
             onClick={handleGenerateLyrics}
             disabled={lyricsLoading || !prompt.trim()}
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold transition-all pressable border border-[#2a2a2a] disabled:opacity-40"
             style={{
-              background: lyricsLoading ? "#0d0d0d" : "#0d1f14",
-              color: lyricsLoading ? "#535353" : "#1db954",
-              borderColor: lyricsLoading ? "#2a2a2a" : "#1db954/30",
+              background: lyricsLoading
+                ? "#0d0d0d"
+                : childMode
+                  ? "#1a1400"
+                  : "#0d1f14",
+              color: lyricsLoading
+                ? "#535353"
+                : childMode
+                  ? "#f59e0b"
+                  : "#1db954",
+              borderColor: lyricsLoading ? "#2a2a2a" : "transparent",
             }}
           >
             {lyricsLoading ? (
@@ -1248,7 +1288,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
           <div className="bg-[#0d0d0d] rounded-xl px-3 py-2.5 border border-[#2a2a2a]">
             <div className="flex items-center justify-between mb-1">
               <p className="text-[#535353] text-[10px] uppercase tracking-widest">
-                Suno&apos;ya gidecek stil
+                Oluşturulan stil
               </p>
               {styleString && (
                 <button

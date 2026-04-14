@@ -14,6 +14,7 @@ import {
   User,
   Disc3,
 } from "lucide-react";
+import AppLogo from "./AppLogo";
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { Song, Playlist } from "@/types";
@@ -69,11 +70,8 @@ export default function DesktopSidebar() {
       {/* ── Nav card ── */}
       <div className="bg-[#121212] rounded-lg px-3 py-4 flex-shrink-0">
         {/* Logo */}
-        <div className="flex items-center gap-2.5 px-3 pb-5">
-          <Music2 size={28} className="text-[#1db954]" fill="#1db954" />
-          <span className="text-white font-black text-xl tracking-tight">
-            AI Şarkı
-          </span>
+        <div className="px-3 pb-5">
+          <AppLogo size="md" showText />
         </div>
 
         <nav className="flex flex-col gap-0.5">
@@ -287,7 +285,7 @@ export default function DesktopSidebar() {
                     {song.title}
                   </p>
                   <p className="text-[#a7a7a7] text-xs truncate">
-                    {song.style?.split(",")[0] || "AI Müzik"}
+                    {song.style?.split(",")[0] || "Hubeya"}
                   </p>
                 </div>
               </button>

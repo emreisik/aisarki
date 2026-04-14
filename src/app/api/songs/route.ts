@@ -131,7 +131,7 @@ async function fetchFromSunoApi(taskId: string): Promise<Song[] | null> {
       return null;
     }
 
-    const mapped = rawArr.map(rawToSong);
+    const mapped = rawArr.slice(0, 1).map(rawToSong);
     console.log(
       `[songs] Parsed ${mapped.length} songs, complete=${mapped.filter((s) => s.status === "complete").length}`,
     );

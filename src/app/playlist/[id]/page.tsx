@@ -300,7 +300,7 @@ export default function PlaylistPage({
                       {song.title}
                     </p>
                     <p className="text-[#a7a7a7] text-xs truncate">
-                      {song.style?.split(",")[0] || "AI Müzik"}
+                      {song.style?.split(",")[0] || "Hubeya"}
                     </p>
                   </div>
                   <Plus
@@ -475,7 +475,7 @@ export default function PlaylistPage({
                       {song.title}
                     </p>
                     <p className="text-[#a7a7a7] text-xs truncate">
-                      {song.style?.split(",")[0] || "AI Müzik"}
+                      {song.style?.split(",")[0] || "Hubeya"}
                     </p>
                   </button>
 
