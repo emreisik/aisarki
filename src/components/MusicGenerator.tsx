@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession } from "next-auth/react";
+import { usePlayer } from "@/contexts/PlayerContext";
 import {
   Sparkles,
   Music2,
@@ -632,6 +634,8 @@ const CHILD_STYLE =
   "Turkish children's song, playful, simple joyful melody, kid-friendly, cheerful, upbeat, innocent, fun, educational, age-appropriate";
 
 export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
+  const { data: session } = useSession();
+  const { setShowGate } = usePlayer();
   const [prompt, setPrompt] = useState("");
   const [title, setTitle] = useState("");
   const [mode, setMode] = useState<"idea" | "lyrics" | "child">("idea");
@@ -760,6 +764,11 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
   };
 
   const handleGenerate = async () => {
+    if (!session?.user) {
+      setShowGate(true);
+      return;
+    }
+
     // Lyrics varsa onu kullan (customMode), yoksa normal prompt
     const finalPrompt = lyrics.trim() || prompt.trim();
     const isLyrics = !!lyrics.trim();
