@@ -3,7 +3,15 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Play, Pause, Music2, Heart } from "lucide-react";
+import {
+  ArrowLeft,
+  Play,
+  Pause,
+  Music2,
+  Heart,
+  Share2,
+  Check,
+} from "lucide-react";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 
@@ -79,6 +87,7 @@ export default function SongDetailPage({
   const { playSong, currentSong, playing, togglePlay } = usePlayer();
   const [song, setSong] = useState<Song | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetch(`/api/song/${id}`)
@@ -89,6 +98,17 @@ export default function SongDetailPage({
 
   const isActive = currentSong?.id === song?.id;
   const dominantRgb = useDominantColor(song?.imageUrl);
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/song/${id}`;
+    if (navigator.share) {
+      await navigator.share({ title: song?.title ?? "Hubeya", url });
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const handlePlay = () => {
     if (!song || song.status !== "complete") return;
@@ -206,12 +226,17 @@ export default function SongDetailPage({
           )}
         </button>
 
-        {/* Süre */}
-        <div className="w-10 h-10 flex items-center justify-center">
-          <span className="text-[#a7a7a7] text-xs">
-            {fmt(song.duration) ?? ""}
-          </span>
-        </div>
+        {/* Paylaş */}
+        <button
+          onClick={handleShare}
+          className="w-10 h-10 flex items-center justify-center pressable"
+        >
+          {copied ? (
+            <Check size={22} className="text-[#1db954]" />
+          ) : (
+            <Share2 size={22} className="text-[#a7a7a7]" />
+          )}
+        </button>
       </div>
 
       {/* Meta */}
