@@ -2,19 +2,77 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Compass, Plus, User } from "lucide-react";
+import { Home, Compass, Plus, ListMusic, User } from "lucide-react";
 import { useSession } from "next-auth/react";
 
-const tabs = [
+const SIDE_TABS = [
   { icon: Home, label: "Ana Sayfa", href: "/" },
   { icon: Compass, label: "Keşfet", href: "/discover" },
-  { href: "/create" }, // merkez buton — özel render
+  { icon: ListMusic, label: "Listeler", href: "/playlists" },
   { icon: User, label: "Profil", href: "/profile" },
 ] as const;
 
 export default function BottomNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const isCreate = pathname === "/create";
+
+  // Sol 2 tab + merkez + sağ 2 tab
+  const left = SIDE_TABS.slice(0, 2);
+  const right = SIDE_TABS.slice(2);
+
+  const renderTab = (tab: (typeof SIDE_TABS)[number]) => {
+    const Icon = tab.icon;
+    const isActive =
+      pathname === tab.href ||
+      (tab.href === "/profile" && pathname.startsWith("/auth"));
+    const href =
+      tab.href === "/profile"
+        ? session?.user
+          ? "/profile"
+          : "/auth/signin"
+        : tab.href;
+
+    return (
+      <Link
+        key={tab.href}
+        href={href}
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 pressable relative"
+      >
+        <span
+          className="absolute top-0 left-1/2 -translate-x-1/2 rounded-full transition-all duration-200"
+          style={{
+            width: isActive ? 20 : 0,
+            height: 2,
+            background: "#1db954",
+            opacity: isActive ? 1 : 0,
+          }}
+        />
+        {tab.href === "/profile" && session?.user?.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={session.user.image}
+            alt=""
+            className="w-6 h-6 rounded-full object-cover"
+            style={{ opacity: isActive ? 1 : 0.6 }}
+          />
+        ) : (
+          <Icon
+            size={22}
+            strokeWidth={isActive ? 2.5 : 1.8}
+            className={isActive ? "text-white" : "text-[#888]"}
+          />
+        )}
+        <span
+          className={`text-[10px] font-semibold tracking-tight transition-colors ${
+            isActive ? "text-white" : "text-[#888]"
+          }`}
+        >
+          {tab.label}
+        </span>
+      </Link>
+    );
+  };
 
   return (
     <nav
@@ -26,99 +84,33 @@ export default function BottomNav() {
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      {tabs.map((tab) => {
-        // ── Merkez "Oluştur" butonu ──
-        if (tab.href === "/create") {
-          const isCreate = pathname === "/create";
-          return (
-            <Link
-              key="/create"
-              href="/create"
-              className="flex-1 flex flex-col items-center justify-center pressable"
-            >
-              <div
-                className="flex items-center justify-center rounded-2xl transition-all"
-                style={{
-                  width: 52,
-                  height: 36,
-                  background: isCreate
-                    ? "#1db954"
-                    : "linear-gradient(135deg, #1db954 0%, #17a045 100%)",
-                  boxShadow: isCreate
-                    ? "0 0 20px rgba(29,185,84,0.5)"
-                    : "0 2px 12px rgba(29,185,84,0.35)",
-                }}
-              >
-                <Plus size={22} strokeWidth={2.8} className="text-black" />
-              </div>
-              <span className="text-[10px] font-bold tracking-tight mt-1 text-[#1db954]">
-                Oluştur
-              </span>
-            </Link>
-          );
-        }
+      {left.map(renderTab)}
 
-        const icon = (
-          tab as {
-            icon: React.ComponentType<{
-              size: number;
-              strokeWidth: number;
-              className: string;
-            }>;
-          }
-        ).icon;
-        const label = (tab as { label: string }).label;
-        const isActive =
-          pathname === tab.href ||
-          (tab.href === "/profile" && pathname.startsWith("/auth"));
-        const href =
-          tab.href === "/profile"
-            ? session?.user
-              ? "/profile"
-              : "/auth/signin"
-            : tab.href;
+      {/* Merkez Oluştur */}
+      <Link
+        href="/create"
+        className="flex-1 flex flex-col items-center justify-center pressable"
+      >
+        <div
+          className="flex items-center justify-center rounded-2xl transition-all duration-200"
+          style={{
+            width: 52,
+            height: 34,
+            background: "#1db954",
+            boxShadow: isCreate
+              ? "0 0 24px rgba(29,185,84,0.6)"
+              : "0 2px 14px rgba(29,185,84,0.4)",
+            transform: isCreate ? "scale(1.05)" : "scale(1)",
+          }}
+        >
+          <Plus size={22} strokeWidth={2.8} className="text-black" />
+        </div>
+        <span className="text-[10px] font-bold tracking-tight mt-1 text-[#1db954]">
+          Oluştur
+        </span>
+      </Link>
 
-        return (
-          <Link
-            key={tab.href}
-            href={href}
-            className="flex-1 flex flex-col items-center justify-center gap-1 pressable relative"
-          >
-            <span
-              className="absolute top-0 left-1/2 -translate-x-1/2 rounded-full transition-all"
-              style={{
-                width: isActive ? "24px" : "0px",
-                height: "2px",
-                background: "#1db954",
-                opacity: isActive ? 1 : 0,
-              }}
-            />
-            {tab.href === "/profile" && session?.user?.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={session.user.image}
-                alt=""
-                className="w-6 h-6 rounded-full object-cover"
-                style={{ opacity: isActive ? 1 : 0.5 }}
-              />
-            ) : (
-              // @ts-expect-error icon tipi
-              <icon
-                size={24}
-                strokeWidth={isActive ? 2.5 : 1.8}
-                className={isActive ? "text-white" : "text-[#535353]"}
-              />
-            )}
-            <span
-              className={`text-[10px] font-semibold tracking-tight transition-colors ${
-                isActive ? "text-white" : "text-[#535353]"
-              }`}
-            >
-              {label}
-            </span>
-          </Link>
-        );
-      })}
+      {right.map(renderTab)}
     </nav>
   );
 }
