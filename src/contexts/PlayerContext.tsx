@@ -202,7 +202,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setCurrentSong(song);
     gateTriggeredRef.current = false; // yeni şarkıda gate sıfırla
     setShowGate(false);
-    saveRecentSong(song).catch(() => {});
+    saveRecentSong(song).catch((e) => {
+      console.error("[player] saveRecentSong error:", e);
+    });
     if ("vibrate" in navigator) navigator.vibrate(30);
   }, []);
 
