@@ -1740,12 +1740,9 @@ export default function HomePage() {
       )}
 
       {/* ── Hero ── */}
-      <div className="pt-16 md:pt-20 pb-6 bg-[#0a0a0a]">
-        <div className="px-6 mb-5">
-          <h1 className="text-white text-2xl font-black">Şarkını Yap</h1>
-          <p className="text-[#3a3a3a] text-sm mt-0.5">
-            Kategori seç, kişiselleştir, oluştur
-          </p>
+      <div className="pt-10 pb-4 bg-[#0a0a0a]">
+        <div className="px-6 mb-3">
+          <h1 className="text-white text-lg font-black">Şarkını Yap</h1>
         </div>
 
         {CATEGORY_GROUPS.map((group) => (
@@ -1757,7 +1754,7 @@ export default function HomePage() {
         ))}
 
         {/* Manuel yazma */}
-        <div className="px-6 mt-5">
+        <div className="px-6 mt-3">
           <textarea
             ref={textareaRef}
             value={prompt}
@@ -1769,27 +1766,27 @@ export default function HomePage() {
               }
             }}
             placeholder="Ya da kendin yaz..."
-            rows={2}
+            rows={1}
             maxLength={500}
-            className="w-full bg-[#141414] border border-[#1e1e1e] focus:border-[#2a2a2a] rounded-2xl px-4 py-3.5 text-white text-sm placeholder-[#2a2a2a] resize-none focus:outline-none transition-colors"
+            className="w-full bg-[#141414] border border-[#1e1e1e] focus:border-[#2a2a2a] rounded-xl px-3 py-2 text-white text-xs placeholder-[#2a2a2a] resize-none focus:outline-none transition-colors"
           />
-          {error && <p className="text-red-400 text-xs mt-1.5">{error}</p>}
+          {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
           <button
             onClick={() => handleGenerate(prompt)}
             disabled={loading || !prompt.trim()}
-            className="mt-2 w-full py-3.5 rounded-2xl font-bold text-sm tracking-wide transition-all pressable disabled:opacity-30"
+            className="mt-1.5 w-full py-2 rounded-lg font-bold text-xs tracking-wide transition-all pressable disabled:opacity-30"
             style={{
               background: loading ? "#141414" : "#1db954",
               color: loading ? "#535353" : "black",
             }}
           >
             {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="w-3.5 h-3.5 border-2 border-[#535353]/40 border-t-[#535353] rounded-full animate-spin" />
+              <span className="flex items-center justify-center gap-1.5">
+                <span className="w-3 h-3 border-2 border-[#535353]/40 border-t-[#535353] rounded-full animate-spin" />
                 Oluşturuluyor...
               </span>
             ) : (
-              "Şarkı Oluştur"
+              "Oluştur"
             )}
           </button>
         </div>
