@@ -40,11 +40,17 @@ const PlayerContext = createContext<PlayerCtx | null>(null);
 
 const STORAGE_KEY = "hubeya_player";
 
-function saveState(song: Song, pl: Song[], idx: number, time: number) {
+function saveState(
+  song: Song,
+  pl: Song[],
+  idx: number,
+  time: number,
+  isOpen: boolean,
+) {
   try {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ song, playlist: pl, index: idx, time }),
+      JSON.stringify({ song, playlist: pl, index: idx, time, isOpen }),
     );
   } catch {}
 }
@@ -65,8 +71,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const gateTriggeredRef = useRef(false); // şarkı başına bir kez göster
   const shuffleRef = useRef(false);
   const repeatRef = useRef<RepeatMode>("none");
+  const playerOpenRef = useRef(false); // playerOpen state'i saveState'de kullanmak için
   shuffleRef.current = shuffle;
   repeatRef.current = repeat;
+  playerOpenRef.current = playerOpen;
 
   // Sayfa yenilendiğinde çalındığı yerden geri yüklemek için
   const restoreTimeRef = useRef(0);
@@ -81,7 +89,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
-      const { song, playlist: pl, index, time } = JSON.parse(raw);
+      const { song, playlist: pl, index, time, isOpen } = JSON.parse(raw);
       // audioUrl veya streamUrl varsa oynatabilir
       if (!song?.audioUrl && !song?.streamUrl) return;
 
@@ -89,7 +97,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setCurrentSong(song);
       setPlaylist(pl || [song]);
       setCurrentIndex(index ?? 0);
-      setPlayerOpen(true); // mini player görünsün
+      setPlayerOpen(isOpen ?? true); // Kaydedilmiş durumu geri yükle
       // playing = false kalır (autoplay politikası)
     } catch {}
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -131,7 +139,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (!currentSong) return;
     const id = setInterval(() => {
       const t = audioRef.current?.currentTime ?? 0;
-      saveState(currentSong, playlistRef.current, currentIndexRef.current, t);
+      saveState(
+        currentSong,
+        playlistRef.current,
+        currentIndexRef.current,
+        t,
+        playerOpenRef.current,
+      );
     }, 5000);
     return () => clearInterval(id);
   }, [currentSong]);
@@ -144,6 +158,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         playlistRef.current,
         currentIndexRef.current,
         audioRef.current?.currentTime ?? 0,
+        playerOpenRef.current,
       );
     }
   }, [currentSong]);
