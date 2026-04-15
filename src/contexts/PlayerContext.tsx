@@ -82,7 +82,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const { song, playlist: pl, index, time } = JSON.parse(raw);
-      if (!song?.audioUrl) return;
+      // audioUrl veya streamUrl varsa oynatabilir
+      if (!song?.audioUrl && !song?.streamUrl) return;
 
       restoreTimeRef.current = time ?? 0;
       setCurrentSong(song);
@@ -95,12 +96,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   // ── Şarkı değişince yükle ──
   useEffect(() => {
-    if (!audioRef.current || !currentSong?.audioUrl) return;
+    if (!audioRef.current) return;
+    // audioUrl veya streamUrl varsa kullan
+    const playableUrl = currentSong?.audioUrl || currentSong?.streamUrl;
+    if (!playableUrl) return;
 
     const savedTime = restoreTimeRef.current;
     restoreTimeRef.current = 0; // bir sonraki normal çalma etkilenmesin
 
-    audioRef.current.src = currentSong.audioUrl;
+    audioRef.current.src = playableUrl;
     audioRef.current.load();
 
     if (savedTime > 1) {

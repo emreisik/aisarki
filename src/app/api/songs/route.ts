@@ -38,6 +38,8 @@ function rawToSong(s: RawSunoSong): Song {
   const streamUrl =
     s.source_stream_audio_url || s.stream_audio_url || s.streamAudioUrl;
   const imageUrl = s.source_image_url || s.image_url || s.imageUrl;
+  // streamUrl varsa dinlenmeye hazır, audioUrl varsa tam yüklü
+  const isPlayable = audioUrl || streamUrl;
   return {
     id: s.id,
     title: s.title || "İsimsiz Şarkı",
@@ -47,7 +49,7 @@ function rawToSong(s: RawSunoSong): Song {
     streamUrl,
     imageUrl,
     duration: s.duration,
-    status: audioUrl ? "complete" : "processing",
+    status: isPlayable ? "complete" : "processing",
     createdAt:
       s.created_at ||
       (s.createTime

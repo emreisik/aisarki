@@ -107,6 +107,8 @@ export async function POST(request: NextRequest) {
       const streamUrl =
         s.source_stream_audio_url || s.stream_audio_url || s.streamAudioUrl;
       const imageUrl = s.source_image_url || s.image_url || s.imageUrl;
+      // streamUrl varsa dinlenmeye hazır, audioUrl varsa tam yüklü
+      const isPlayable = audioUrl || streamUrl;
       return {
         id: s.id,
         title: s.title || "İsimsiz Şarkı",
@@ -116,7 +118,7 @@ export async function POST(request: NextRequest) {
         streamUrl,
         imageUrl,
         duration: s.duration,
-        status: audioUrl ? ("complete" as const) : ("processing" as const),
+        status: isPlayable ? ("complete" as const) : ("processing" as const),
         createdAt:
           s.created_at ||
           (s.createTime
