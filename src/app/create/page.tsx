@@ -321,6 +321,7 @@ export default function CreatePage() {
       songId?: string,
     ) => {
       // Streaming URL hemen geldi ise, hemen completed songs'a ekle
+      // Bu durumda polling başlamayacak (processingTasks'e eklenmeyecek)
       if (streamUrl && songId) {
         const instantSong: Song = {
           id: songId,
@@ -334,8 +335,11 @@ export default function CreatePage() {
           const exists = prev.some((s) => s.id === songId);
           return exists ? prev : [instantSong, ...prev];
         });
+        // Streaming URL varsa, processingTasks'e ekleme — kullanıcı zaten dinleyebilir
+        return;
       }
 
+      // Streaming URL yok → polling başlatmak için processingTasks'e ekle
       const newTask: ProcessingTask = {
         taskId,
         title: title || prompt.slice(0, 50),
