@@ -6,7 +6,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 
 function useDominantColor(imageUrl?: string) {
   const [gradient, setGradient] = useState(
-    "radial-gradient(ellipse at 30% 30%, rgb(40,40,50), rgba(20,20,30,0.15))",
+    "radial-gradient(ellipse at 30% 30%, rgb(40,40,50), rgb(20,20,30))",
   );
 
   useEffect(() => {
@@ -36,7 +36,7 @@ function useDominantColor(imageUrl?: string) {
         const darkG = Math.floor(g * 0.35 + 15);
         const darkB = Math.floor(b * 0.35 + 25);
         setGradient(
-          `radial-gradient(ellipse at 30% 30%, rgb(${lightR},${lightG},${lightB}), rgba(${darkR},${darkG},${darkB},0.15))`,
+          `radial-gradient(ellipse at 30% 30%, rgb(${lightR},${lightG},${lightB}), rgb(${darkR},${darkG},${darkB}))`,
         );
       }
     };

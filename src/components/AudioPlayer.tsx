@@ -239,7 +239,7 @@ export default function AudioPlayer() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: `linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 100%)`,
+          background: `linear-gradient(to bottom, rgb(20,20,30) 0%, rgb(0,0,0) 100%)`,
         }}
       />
 
