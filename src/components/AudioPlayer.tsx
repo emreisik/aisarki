@@ -26,17 +26,13 @@ function fmt(s: number) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
-/* ── Albüm görselinden dominant renk çıkar ── */
+/* ── Albüm görselinden dominant renk çıkar (RGBA tuple) ── */
 function useDominantColor(imageUrl?: string) {
-  const [gradient, setGradient] = useState(
-    "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
-  );
+  const [rgb, setRgb] = useState("20,20,30");
 
   useEffect(() => {
     if (!imageUrl) {
-      setGradient(
-        "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
-      );
+      setRgb("20,20,30");
       return;
     }
     let cancelled = false;
@@ -67,26 +63,18 @@ function useDominantColor(imageUrl?: string) {
           }
         }
         if (n > 0 && !cancelled) {
-          // Neon gradient: açık merkez → koyu kenarlar
-          const lightR = Math.floor((r / n) * 0.65 + 35);
-          const lightG = Math.floor((g / n) * 0.65 + 35);
-          const lightB = Math.floor((b / n) * 0.65 + 40);
-          const darkR = Math.floor((r / n) * 0.35 + 15);
-          const darkG = Math.floor((g / n) * 0.35 + 15);
-          const darkB = Math.floor((b / n) * 0.35 + 25);
-          setGradient(
-            `radial-gradient(ellipse at 30% 30%, rgba(${lightR},${lightG},${lightB},0.5), rgba(${darkR},${darkG},${darkB},0.2))`,
-          );
+          // Neon renkler: açık ton
+          const neonR = Math.floor((r / n) * 0.65 + 35);
+          const neonG = Math.floor((g / n) * 0.65 + 35);
+          const neonB = Math.floor((b / n) * 0.65 + 40);
+          setRgb(`${neonR},${neonG},${neonB}`);
         }
       } catch {
         /* CORS — fallback renk kullan */
       }
     };
     img.onerror = () => {
-      if (!cancelled)
-        setGradient(
-          "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
-        );
+      if (!cancelled) setRgb("20,20,30");
     };
     img.src = imageUrl;
     return () => {
@@ -94,7 +82,7 @@ function useDominantColor(imageUrl?: string) {
     };
   }, [imageUrl]);
 
-  return gradient;
+  return rgb;
 }
 
 /* ── Progress bar ── */
@@ -194,6 +182,8 @@ export default function AudioPlayer() {
   const rgb = useDominantColor(currentSong?.imageUrl);
   const router = useRouter();
 
+  if (!currentSong) return null;
+
   const handleLike = useCallback(() => {
     if (!session?.user) {
       setShowGate(true);
@@ -219,8 +209,6 @@ export default function AudioPlayer() {
       await navigator.clipboard.writeText(url);
     }
   };
-
-  if (!currentSong) return null;
 
   return (
     <div

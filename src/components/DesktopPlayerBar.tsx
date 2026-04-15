@@ -83,7 +83,7 @@ export default function DesktopPlayerBar() {
   const [liked, setLiked] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
-  const rgb = useDominantColor(currentSong?.imageUrl);
+  const gradient = useDominantColor(currentSong?.imageUrl);
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -109,7 +109,7 @@ export default function DesktopPlayerBar() {
     <div
       className="hidden md:flex fixed bottom-0 left-0 right-0 h-[90px] border-t border-[#282828] items-center px-4 z-40 gap-2"
       style={{
-        background: `rgb(${rgb})`,
+        background: gradient,
       }}
     >
       {/* Left: Song info */}

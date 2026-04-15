@@ -60,17 +60,18 @@ export default function MiniPlayer() {
     setPlayerOpen,
   } = usePlayer();
 
+  const gradient = useDominantColor(currentSong?.imageUrl);
+
   if (!currentSong) return null;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const rgb = useDominantColor(currentSong?.imageUrl);
 
   return (
     <div
       className="fixed left-2 right-2 z-40 rounded-xl overflow-hidden pressable"
       style={{
         bottom: "calc(64px + env(safe-area-inset-bottom, 0px) + 8px)",
-        background: `rgb(${rgb})`,
+        background: gradient,
       }}
       onClick={() => setPlayerOpen(true)}
     >
