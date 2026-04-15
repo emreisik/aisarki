@@ -80,6 +80,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const restoreTimeRef = useRef(0);
   const playlistRef = useRef<Song[]>([]);
   const currentIndexRef = useRef(-1);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   playlistRef.current = playlist;
   currentIndexRef.current = currentIndex;
@@ -112,6 +114,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const savedTime = restoreTimeRef.current;
     restoreTimeRef.current = 0; // bir sonraki normal çalma etkilenmesin
 
+    // Yeni şarkı — retry sayacını sıfırla
+    retryCountRef.current = 0;
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+
     audioRef.current.src = playableUrl;
     audioRef.current.load();
 
@@ -133,6 +142,52 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         .catch(() => setPlaying(false));
     }
   }, [currentSong?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Audio error handler: stream henüz hazır değilse retry ──
+  const handleAudioError = useCallback(() => {
+    const song = currentSong;
+    if (!song) return;
+    const url = song.audioUrl || song.streamUrl;
+    if (!url) return;
+
+    const MAX_RETRIES = 4;
+    if (retryCountRef.current >= MAX_RETRIES) {
+      console.warn("[player] Max retry aşıldı, şarkı oynatılamıyor:", song.id);
+      setPlaying(false);
+      return;
+    }
+
+    retryCountRef.current += 1;
+    const delay = 1500 * retryCountRef.current; // 1.5s, 3s, 4.5s, 6s
+    console.log(
+      `[player] Audio hata, ${delay}ms sonra retry #${retryCountRef.current}`,
+    );
+
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    retryTimerRef.current = setTimeout(async () => {
+      if (!audioRef.current) return;
+      // Önce API'den taze URL'i çek (audioUrl gelmişse)
+      try {
+        const res = await fetch(`/api/song/${song.id}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          const fresh = data?.song?.audioUrl || data?.song?.streamUrl;
+          if (fresh && fresh !== audioRef.current.src) {
+            audioRef.current.src = fresh;
+          }
+        }
+      } catch {
+        /* yoksa eski src ile devam */
+      }
+      audioRef.current.load();
+      audioRef.current
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => {
+          /* onError tekrar tetiklenir */
+        });
+    }, delay);
+  }, [currentSong]);
 
   // ── 5 saniyede bir pozisyonu localStorage'a kaydet ──
   useEffect(() => {
@@ -410,6 +465,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         onTimeUpdate={handleTimeUpdate}
         onDurationChange={handleTimeUpdate}
         onEnded={handleEnded}
+        onError={handleAudioError}
         playsInline
         preload="metadata"
       />
