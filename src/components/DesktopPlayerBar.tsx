@@ -42,7 +42,11 @@ function useDominantColor(imageUrl?: string) {
       if (ctx) {
         ctx.drawImage(img, 0, 0, 1, 1);
         const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-        setRgb(`${r},${g},${b}`);
+        // Darker neon tarzı: RGB'yi 40% oranında al (darkness) + softer
+        const darkR = Math.floor(r * 0.4 + 20);
+        const darkG = Math.floor(g * 0.4 + 20);
+        const darkB = Math.floor(b * 0.4 + 30);
+        setRgb(`${darkR},${darkG},${darkB}`);
       }
     };
     img.onerror = () => setRgb("20,20,30");

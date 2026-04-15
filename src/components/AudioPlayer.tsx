@@ -63,10 +63,11 @@ function useDominantColor(imageUrl?: string) {
           }
         }
         if (n > 0 && !cancelled) {
-          const darken = 0.45;
-          setRgb(
-            `${Math.floor((r / n) * darken)},${Math.floor((g / n) * darken)},${Math.floor((b / n) * darken)}`,
-          );
+          // Darker neon tarzı: RGB'yi 40% oranında al (darkness) + softer
+          const darkR = Math.floor((r / n) * 0.4 + 20);
+          const darkG = Math.floor((g / n) * 0.4 + 20);
+          const darkB = Math.floor((b / n) * 0.4 + 30);
+          setRgb(`${darkR},${darkG},${darkB}`);
         }
       } catch {
         /* CORS — fallback renk kullan */
