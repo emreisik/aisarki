@@ -1,7 +1,37 @@
 "use client";
 
 import { Play, Pause, SkipForward, Music2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
+
+function useDominantColor(imageUrl?: string) {
+  const [rgb, setRgb] = useState("34,34,34");
+
+  useEffect(() => {
+    if (!imageUrl) {
+      setRgb("34,34,34");
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = imageUrl;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, 1, 1);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        setRgb(`${r},${g},${b}`);
+      }
+    };
+    img.onerror = () => setRgb("34,34,34");
+  }, [imageUrl]);
+
+  return rgb;
+}
 
 export default function MiniPlayer() {
   const {
@@ -17,13 +47,14 @@ export default function MiniPlayer() {
   if (!currentSong) return null;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const rgb = useDominantColor(currentSong?.imageUrl);
 
   return (
     <div
       className="fixed left-2 right-2 z-40 rounded-xl overflow-hidden pressable"
       style={{
         bottom: "calc(64px + env(safe-area-inset-bottom, 0px) + 8px)",
-        background: "#222222",
+        background: `rgb(${rgb})`,
       }}
       onClick={() => setPlayerOpen(true)}
     >

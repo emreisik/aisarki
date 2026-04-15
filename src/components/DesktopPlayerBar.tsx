@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Play,
@@ -22,6 +22,35 @@ function fmt(s: number) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
+function useDominantColor(imageUrl?: string) {
+  const [rgb, setRgb] = useState("20,20,30");
+
+  useEffect(() => {
+    if (!imageUrl) {
+      setRgb("20,20,30");
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = imageUrl;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, 1, 1);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        setRgb(`${r},${g},${b}`);
+      }
+    };
+    img.onerror = () => setRgb("20,20,30");
+  }, [imageUrl]);
+
+  return rgb;
+}
+
 export default function DesktopPlayerBar() {
   const {
     currentSong,
@@ -38,6 +67,7 @@ export default function DesktopPlayerBar() {
   const [liked, setLiked] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
+  const rgb = useDominantColor(currentSong?.imageUrl);
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -60,7 +90,12 @@ export default function DesktopPlayerBar() {
   };
 
   return (
-    <div className="hidden md:flex fixed bottom-0 left-0 right-0 h-[90px] bg-[#181818] border-t border-[#282828] items-center px-4 z-40 gap-2">
+    <div
+      className="hidden md:flex fixed bottom-0 left-0 right-0 h-[90px] border-t border-[#282828] items-center px-4 z-40 gap-2"
+      style={{
+        background: `rgb(${rgb})`,
+      }}
+    >
       {/* Left: Song info */}
       <div className="flex items-center gap-3 min-w-0 w-[30%]">
         {currentSong ? (
