@@ -207,7 +207,10 @@ export default function CreatePage() {
     if (pollingRef.current.has(taskId)) return;
 
     let attempts = 0;
-    const MAX_ATTEMPTS = 60; // 60 × 5s = 5 dakika
+    const MAX_ATTEMPTS = 300; // 300 × 2s = 10 dakika
+    const POLL_INTERVAL = 2000; // 2 saniye — daha hızlı feedback
+    const ERROR_RETRY_INTERVAL = 3000; // Hata durumunda 3 saniye
+
     const poll = async () => {
       if (!mountedRef.current) return;
       const currentAttempt = ++attempts;
@@ -219,8 +222,8 @@ export default function CreatePage() {
         );
         return;
       }
-      // Her 5 denemede bir attempts sayısını güncelle
-      if (currentAttempt % 5 === 0) {
+      // Her 10 denemede bir attempts sayısını güncelle
+      if (currentAttempt % 10 === 0) {
         setProcessingTasks((prev) =>
           prev.map((t) =>
             t.taskId === taskId ? { ...t, attempts: currentAttempt } : t,
@@ -239,16 +242,16 @@ export default function CreatePage() {
             return [...fresh, ...prev];
           });
         } else {
-          const timer = setTimeout(poll, 5000);
+          const timer = setTimeout(poll, POLL_INTERVAL);
           pollingRef.current.set(taskId, timer);
         }
       } catch {
-        const timer = setTimeout(poll, 8000);
+        const timer = setTimeout(poll, ERROR_RETRY_INTERVAL);
         pollingRef.current.set(taskId, timer);
       }
     };
 
-    const timer = setTimeout(poll, 5000);
+    const timer = setTimeout(poll, POLL_INTERVAL);
     pollingRef.current.set(taskId, timer);
   }, []);
 
