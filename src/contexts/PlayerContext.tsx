@@ -82,9 +82,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const currentIndexRef = useRef(-1);
   const retryCountRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentSongRef = useRef<Song | null>(null);
 
   playlistRef.current = playlist;
   currentIndexRef.current = currentIndex;
+  currentSongRef.current = currentSong;
 
   // ── Mount: localStorage'dan geri yükle ──
   useEffect(() => {
@@ -120,6 +122,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
     }
+
+    // Duration'ı hemen metadata'dan göster (audio yüklenmeden önce)
+    setCurrentTime(0);
+    setDuration(currentSong?.duration ?? 0);
 
     audioRef.current.src = playableUrl;
     audioRef.current.load();
@@ -340,12 +346,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const handleTimeUpdate = useCallback(() => {
     const t = audioRef.current?.currentTime ?? 0;
-    const d = audioRef.current?.duration ?? 0;
+    const audioD = audioRef.current?.duration ?? 0;
+    // Stream URL'de duration Infinity veya NaN olabilir — song metadata'sına düş
+    const d =
+      Number.isFinite(audioD) && audioD > 0
+        ? audioD
+        : (currentSongRef.current?.duration ?? 0);
     setCurrentTime(t);
     setDuration(d);
 
     // Kilit ekranı ilerleme çubuğunu güncelle
-    if ("mediaSession" in navigator && d > 0) {
+    if ("mediaSession" in navigator && d > 0 && Number.isFinite(d)) {
       try {
         navigator.mediaSession.setPositionState({
           duration: d,
