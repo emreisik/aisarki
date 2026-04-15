@@ -318,12 +318,12 @@ export async function upsertSongs(
       )
       ON CONFLICT (id) DO UPDATE SET
         title      = EXCLUDED.title,
-        style      = EXCLUDED.style,
-        prompt     = EXCLUDED.prompt,
-        audio_url  = EXCLUDED.audio_url,
-        stream_url = EXCLUDED.stream_url,
-        image_url  = EXCLUDED.image_url,
-        duration   = EXCLUDED.duration,
+        style      = COALESCE(EXCLUDED.style, songs.style),
+        prompt     = COALESCE(EXCLUDED.prompt, songs.prompt),
+        audio_url  = COALESCE(NULLIF(EXCLUDED.audio_url, ''), songs.audio_url),
+        stream_url = COALESCE(NULLIF(EXCLUDED.stream_url, ''), songs.stream_url),
+        image_url  = COALESCE(NULLIF(EXCLUDED.image_url, ''), songs.image_url),
+        duration   = COALESCE(EXCLUDED.duration, songs.duration),
         status     = EXCLUDED.status,
         task_id    = COALESCE(EXCLUDED.task_id, songs.task_id),
         created_by = COALESCE(EXCLUDED.created_by, songs.created_by)

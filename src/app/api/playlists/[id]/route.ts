@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import sql from "@/lib/db";
+import { keyToCdnUrl } from "@/lib/bunnyStorage";
 
 export async function GET(
   _req: NextRequest,
@@ -44,9 +45,11 @@ export async function GET(
         title: s.title,
         style: s.style ?? undefined,
         prompt: s.prompt ?? undefined,
-        audioUrl: s.audio_url ?? undefined,
+        audioUrl:
+          (s.audio_key && keyToCdnUrl(s.audio_key)) || s.audio_url || undefined,
         streamUrl: s.stream_url ?? undefined,
-        imageUrl: s.image_url ?? undefined,
+        imageUrl:
+          (s.image_key && keyToCdnUrl(s.image_key)) || s.image_url || undefined,
         duration: s.duration != null ? Number(s.duration) : undefined,
         status: s.status,
         createdAt:

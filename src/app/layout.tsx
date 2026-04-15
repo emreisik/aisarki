@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import AppShell from "@/components/AppShell";
@@ -10,13 +10,18 @@ export const metadata: Metadata = {
   description:
     "Hubeya – Saniyeler içinde yapay zeka ile özgün şarkılar oluşturun.",
   manifest: "/manifest.json",
-  themeColor: "#0a0a0a",
-  viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Hubeya",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
