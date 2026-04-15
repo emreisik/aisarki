@@ -286,7 +286,29 @@ export default function CreatePage() {
 
   // Called by MusicGenerator when API responds with a taskId
   const handleTaskStarted = useCallback(
-    (taskId: string, prompt: string, title: string) => {
+    (
+      taskId: string,
+      prompt: string,
+      title: string,
+      streamUrl?: string,
+      songId?: string,
+    ) => {
+      // Streaming URL hemen geldi ise, hemen completed songs'a ekle
+      if (streamUrl && songId) {
+        const instantSong: Song = {
+          id: songId,
+          title: title || prompt.slice(0, 50),
+          prompt,
+          streamUrl,
+          status: "complete",
+          createdAt: new Date().toISOString(),
+        };
+        setCompletedSongs((prev) => {
+          const exists = prev.some((s) => s.id === songId);
+          return exists ? prev : [instantSong, ...prev];
+        });
+      }
+
       const newTask: ProcessingTask = {
         taskId,
         title: title || prompt.slice(0, 50),

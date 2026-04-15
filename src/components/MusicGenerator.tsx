@@ -16,7 +16,13 @@ import {
 import { GenerateRequest, SunoApiResponse } from "@/types";
 
 interface MusicGeneratorProps {
-  onTaskStarted: (taskId: string, prompt: string, title: string) => void;
+  onTaskStarted: (
+    taskId: string,
+    prompt: string,
+    title: string,
+    streamUrl?: string,
+    songId?: string,
+  ) => void;
 }
 
 /* ── Veri ── */
@@ -813,10 +819,23 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
         return;
       }
 
+      // Suno hemen streaming URL dönebildir — hemen dinlemeye başla
+      const sunoSongs = data.data?.sunoData;
+      const firstSong = sunoSongs?.[0];
+      const streamUrl = firstSong?.stream_audio_url;
+      const songId = firstSong?.id;
+
+      console.log(
+        "[generate] Suno API response:",
+        streamUrl ? "✓ streamUrl var" : "✗ streamUrl yok",
+      );
+
       onTaskStarted(
         taskId,
         prompt.trim(),
         title.trim() || prompt.trim().slice(0, 40),
+        streamUrl, // Hemen dinlemek için
+        songId, // Song ID
       );
       setPrompt("");
       setTitle("");
