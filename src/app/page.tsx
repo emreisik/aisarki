@@ -1461,7 +1461,9 @@ export default function HomePage() {
     fetch("/api/all-songs")
       .then((r) => r.json())
       .then((d) => {
-        setAllSongs(d.songs || []);
+        const songs = d.songs || [];
+        setAllSongs(songs);
+        setGeneratedSongs(songs);
         // Sayfa yenilenince processing task'ları geri yükle
         const tasks: Array<{ taskId: string }> = d.processing || [];
         tasks.forEach(({ taskId }) => {
