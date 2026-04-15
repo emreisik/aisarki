@@ -40,6 +40,7 @@ import {
 import Link from "next/link";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
+import MusicGenerator from "@/components/MusicGenerator";
 import { useSession } from "next-auth/react";
 
 /* ══════════════════════════════════════════════
@@ -1653,6 +1654,43 @@ export default function HomePage() {
     }
   };
 
+  // MusicGenerator callback — taskId gelince polling başlat, stream varsa direkt ekle
+  const handleTaskStarted = useCallback(
+    (
+      taskId: string,
+      promptText: string,
+      titleText: string,
+      streamUrl?: string,
+      songId?: string,
+    ) => {
+      setError("");
+      if (streamUrl && songId) {
+        const instantSong: Song = {
+          id: songId,
+          title: titleText || promptText.slice(0, 50),
+          prompt: promptText,
+          streamUrl,
+          status: "complete",
+          createdAt: new Date().toISOString(),
+        };
+        handleSongsAdded([instantSong]);
+        return;
+      }
+      const tempSongs: Song[] = [1, 2].map((i) => ({
+        id: `temp-${Date.now()}-${i}`,
+        title: titleText || promptText.slice(0, 40),
+        status: "processing" as const,
+        createdAt: new Date().toISOString(),
+      }));
+      handleSongsAdded(tempSongs);
+      pollForSongs(
+        taskId,
+        tempSongs.map((s) => s.id),
+      );
+    },
+    [handleSongsAdded, pollForSongs],
+  );
+
   const moreSongs = allSongs.slice(0, 18);
 
   // ── Discover verisi ──
@@ -1709,89 +1747,26 @@ export default function HomePage() {
         />
       )}
 
-      {/* ── Hero ── */}
-      <div className="pt-10 pb-4 bg-[#0a0a0a]">
-        <div className="px-6 mb-3">
-          <h1 className="text-white text-lg font-black">Şarkını Yap</h1>
+      {/* ── Hero: Şarkını Yap — MusicGenerator ön planda ── */}
+      <div
+        className="pt-10 pb-6 px-4 md:px-6"
+        style={{
+          background:
+            "linear-gradient(180deg, #0f1f15 0%, #0a1510 40%, #0a0a0a 100%)",
+        }}
+      >
+        <div className="mb-4">
+          <h1 className="text-white text-2xl md:text-3xl font-black tracking-tight">
+            Şarkını Yap
+          </h1>
+          <p className="text-[#a7a7a7] text-sm mt-1">
+            AI ile saniyeler içinde özgün şarkılar oluştur
+          </p>
         </div>
-
-        {CATEGORY_GROUPS.map((group) => (
-          <CategoryRow
-            key={group.label}
-            group={group}
-            onSelect={(item) => setActiveItem({ item, color: group.color })}
-          />
-        ))}
-
-        {/* Manuel yazma */}
-        <div className="px-6 mt-3">
-          <textarea
-            ref={textareaRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleGenerate(prompt);
-              }
-            }}
-            placeholder="Ya da kendin yaz..."
-            rows={1}
-            maxLength={500}
-            className="w-full bg-[#141414] border border-[#1e1e1e] focus:border-[#2a2a2a] rounded-xl px-3 py-2 text-white text-xs placeholder-[#2a2a2a] resize-none focus:outline-none transition-colors"
-          />
-          {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
-          <button
-            onClick={() => handleGenerate(prompt)}
-            disabled={loading || !prompt.trim()}
-            className="mt-1.5 w-full py-2 rounded-lg font-bold text-xs tracking-wide transition-all pressable disabled:opacity-30"
-            style={{
-              background: loading ? "#141414" : "#1db954",
-              color: loading ? "#535353" : "black",
-            }}
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-1.5">
-                <span className="w-3 h-3 border-2 border-[#535353]/40 border-t-[#535353] rounded-full animate-spin" />
-                Oluşturuluyor...
-              </span>
-            ) : (
-              "Oluştur"
-            )}
-          </button>
-        </div>
+        <MusicGenerator onTaskStarted={handleTaskStarted} />
       </div>
 
       <div className="bg-[#0a0a0a] pb-8">
-        {generatedSongs.length > 0 && (
-          <section className="mb-8 px-6 pt-6">
-            <h2 className="text-white text-lg font-black mb-3">
-              Oluşturulanlar
-            </h2>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-4 px-4 pb-2 border-b border-[#141414] mb-1">
-                <span className="w-7 text-center text-[#2a2a2a] text-xs">
-                  #
-                </span>
-                <span className="w-9 flex-shrink-0" />
-                <span className="flex-1 text-[#2a2a2a] text-xs uppercase tracking-widest">
-                  Başlık
-                </span>
-                <Clock3 size={12} className="text-[#2a2a2a]" />
-              </div>
-              {generatedSongs.map((song, i) => (
-                <TrackRow
-                  key={song.id}
-                  song={song}
-                  index={i}
-                  onPlay={() => playSong(song, generatedSongs)}
-                  isPlaying={currentSong?.id === song.id}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
         {playlists.length > 0 && (
           <Rail title="Çalma Listelerim">
             {playlists.map((pl) => (

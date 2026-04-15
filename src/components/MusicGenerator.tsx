@@ -11,7 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  Star,
+  Sliders,
 } from "lucide-react";
 import { GenerateRequest, SunoApiResponse } from "@/types";
 
@@ -582,7 +582,7 @@ function Chip({
       className={`flex flex-col items-start px-3 py-2 rounded-xl text-left transition-all pressable flex-shrink-0 border ${
         selected
           ? "bg-[#1db954]/15 border-[#1db954] text-white"
-          : "bg-[#1a1a1a] border-[#2a2a2a] text-[#a7a7a7] hover:border-[#535353] hover:text-white"
+          : "bg-[#1a1a1a] border-[#3a3a3a] text-[#a7a7a7] hover:border-[#535353] hover:text-white"
       }`}
     >
       <span className="text-xs font-semibold leading-tight">{label}</span>
@@ -617,7 +617,7 @@ function OptionRow<T extends { id: string; label: string; tag: string }>({
           className={`flex flex-col items-start px-3 py-2 rounded-xl text-left transition-all pressable border ${
             selected === o.id
               ? "bg-[#1db954]/15 border-[#1db954] text-white"
-              : "bg-[#1a1a1a] border-[#2a2a2a] text-[#a7a7a7] hover:border-[#535353] hover:text-white"
+              : "bg-[#1a1a1a] border-[#3a3a3a] text-[#a7a7a7] hover:border-[#535353] hover:text-white"
           }`}
         >
           <span className="text-xs font-semibold">{o.label}</span>
@@ -636,17 +636,13 @@ function OptionRow<T extends { id: string; label: string; tag: string }>({
 
 /* ── Ana component ── */
 
-const CHILD_STYLE =
-  "Turkish children's song, playful, simple joyful melody, kid-friendly, cheerful, upbeat, innocent, fun, educational, age-appropriate";
-
 export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
   const { data: session } = useSession();
   const { setShowGate } = usePlayer();
   const [prompt, setPrompt] = useState("");
   const [title, setTitle] = useState("");
-  const [mode, setMode] = useState<"idea" | "lyrics" | "child">("idea");
+  const [mode, setMode] = useState<"idea" | "lyrics">("idea");
   const customMode = mode === "lyrics";
-  const childMode = mode === "child";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -670,6 +666,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
 
   // Section open state
   const [openSection, setOpenSection] = useState<string | null>("instruments");
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const toggleSection = (s: string) =>
     setOpenSection((prev) => (prev === s ? null : s));
@@ -712,11 +709,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
     makam,
   });
 
-  const styleString = [
-    childMode ? CHILD_STYLE : "",
-    autoStyle,
-    customNotes.trim(),
-  ]
+  const styleString = [autoStyle, customNotes.trim()]
     .filter(Boolean)
     .join(", ");
 
@@ -753,7 +746,6 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             .join(", "),
           vocal: VOCALS.find((v) => v.id === vocal)?.label,
           customNotes: customNotes.trim() || undefined,
-          childMode: childMode || undefined,
         }),
       });
       const data = await res.json();
@@ -848,9 +840,9 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
   };
 
   return (
-    <div className="flex flex-col gap-0 bg-[#161616] rounded-2xl overflow-hidden border border-[#2a2a2a]">
+    <div className="flex flex-col gap-0 bg-[#1c1c1c] rounded-2xl overflow-hidden border border-[#3a3a3a]">
       {/* Mode tabs */}
-      <div className="flex bg-[#1a1a1a] p-1 gap-1 border-b border-[#2a2a2a]">
+      <div className="flex bg-[#1a1a1a] p-1 gap-1 border-b border-[#3a3a3a]">
         <button
           onClick={() => setMode("idea")}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
@@ -869,28 +861,9 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
           <Music2 size={14} />
           Sözlü
         </button>
-        <button
-          onClick={() => setMode("child")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-            mode === "child" ? "bg-[#fff8e1] text-[#f59e0b]" : "text-[#a7a7a7]"
-          }`}
-        >
-          <Star size={14} />
-          Çocuk
-        </button>
       </div>
 
       <div className="p-4 flex flex-col gap-4">
-        {/* Çocuk modu banner */}
-        {childMode && (
-          <div className="flex items-center gap-2 bg-[#1a1400] border border-[#f59e0b]/20 rounded-xl px-3 py-2.5">
-            <Star size={14} className="text-[#f59e0b] flex-shrink-0" />
-            <p className="text-[#f59e0b]/80 text-xs">
-              Çocuklara uygun, neşeli ve eğitici şarkılar üretilecek
-            </p>
-          </div>
-        )}
-
         {/* Prompt */}
         <div className="relative">
           <textarea
@@ -899,36 +872,26 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             placeholder={
               customMode
                 ? "[Nakarat]\nŞarkı sözlerini buraya yaz..."
-                : childMode
-                  ? "Hayvanlar, renkler, sayılar, arkadaşlık... konuyu yaz"
-                  : "Sahilde özgür hissettiren bir şarkı, rüzgarın sesi..."
+                : "Sahilde özgür hissettiren bir şarkı, rüzgarın sesi..."
             }
             rows={customMode ? 7 : 3}
             maxLength={customMode ? 5000 : 500}
-            className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl px-4 py-3.5 text-white text-sm placeholder-[#3a3a3a] resize-none focus:outline-none focus:border-[#535353] transition-colors"
+            className="w-full bg-[#1e1e1e] border-2 border-[#3a3a3a] rounded-xl px-4 py-4 text-white text-base placeholder-[#7a7a7a] resize-none focus:outline-none focus:border-[#1db954] transition-colors leading-relaxed"
           />
-          <span className="absolute bottom-3 right-3 text-[#535353] text-xs tabular-nums">
+          <span className="absolute bottom-3 right-3 text-[#6a6a6a] text-xs tabular-nums">
             {prompt.length}/{customMode ? 5000 : 500}
           </span>
         </div>
 
-        {/* AI Lyrics butonu — simple ve çocuk modunda göster */}
+        {/* AI Lyrics butonu */}
         {!customMode && vocal !== "none" && (
           <button
             onClick={handleGenerateLyrics}
             disabled={lyricsLoading || !prompt.trim()}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold transition-all pressable border border-[#2a2a2a] disabled:opacity-40"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold transition-all pressable border border-[#3a3a3a] disabled:opacity-40"
             style={{
-              background: lyricsLoading
-                ? "#0d0d0d"
-                : childMode
-                  ? "#1a1400"
-                  : "#0d1f14",
-              color: lyricsLoading
-                ? "#535353"
-                : childMode
-                  ? "#f59e0b"
-                  : "#1db954",
+              background: lyricsLoading ? "#0d0d0d" : "#0d1f14",
+              color: lyricsLoading ? "#535353" : "#1db954",
               borderColor: lyricsLoading ? "#2a2a2a" : "transparent",
             }}
           >
@@ -978,7 +941,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
               value={lyrics}
               onChange={(e) => setLyrics(e.target.value)}
               rows={10}
-              className="w-full bg-[#0d1f14] border border-[#1db954]/20 rounded-xl px-4 py-3.5 text-white text-xs placeholder-[#3a3a3a] resize-none focus:outline-none focus:border-[#1db954]/40 transition-colors leading-relaxed font-mono"
+              className="w-full bg-[#0d1f14] border border-[#1db954]/20 rounded-xl px-4 py-3.5 text-white text-xs placeholder-[#6a6a6a] resize-none focus:outline-none focus:border-[#1db954]/40 transition-colors leading-relaxed font-mono"
             />
             <p className="text-[#535353] text-[10px] text-center">
               Düzenleyebilirsiniz — şarkı bu sözlerle oluşturulur
@@ -993,327 +956,346 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Şarkı adı (isteğe bağlı)"
-            className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl px-4 py-3 text-white text-sm placeholder-[#3a3a3a] focus:outline-none focus:border-[#535353] transition-colors"
+            className="w-full bg-[#1e1e1e] border-2 border-[#3a3a3a] rounded-xl px-4 py-3.5 text-white text-base placeholder-[#7a7a7a] focus:outline-none focus:border-[#1db954] transition-colors"
           />
         )}
 
         {/* Divider */}
-        <div className="border-t border-[#2a2a2a] -mx-4" />
+        <div className="border-t border-[#3a3a3a] -mx-4" />
 
-        {/* ── ENSTRÜMANLAR ── */}
-        <div>
-          <SectionHeader
-            title="Enstrümanlar"
-            open={openSection === "instruments"}
-            onToggle={() => toggleSection("instruments")}
-            summary={selectedInstLabels || undefined}
+        {/* ── Gelişmiş toggle ── */}
+        <button
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold text-[#a7a7a7] hover:text-white hover:bg-[#1a1a1a] transition-colors pressable"
+        >
+          <Sliders size={15} />
+          {showAdvanced ? "Gelişmiş ayarları gizle" : "Gelişmiş ayarlar"}
+          <ChevronDown
+            size={14}
+            className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`}
           />
-          {openSection === "instruments" && (
-            <div className="mt-2 flex flex-col gap-3">
-              {/* Seçilenler */}
-              {selectedInstruments.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedInstruments.map((id) => {
-                    const inst = allInstruments.find((i) => i.id === id);
-                    if (!inst) return null;
-                    return (
+        </button>
+
+        {showAdvanced && (
+          <>
+            {/* ── ENSTRÜMANLAR ── */}
+            <div>
+              <SectionHeader
+                title="Enstrümanlar"
+                open={openSection === "instruments"}
+                onToggle={() => toggleSection("instruments")}
+                summary={selectedInstLabels || undefined}
+              />
+              {openSection === "instruments" && (
+                <div className="mt-2 flex flex-col gap-3">
+                  {/* Seçilenler */}
+                  {selectedInstruments.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedInstruments.map((id) => {
+                        const inst = allInstruments.find((i) => i.id === id);
+                        if (!inst) return null;
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => toggleInstrument(id)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1db954]/20 border border-[#1db954]/40 text-[#1db954] text-xs font-semibold pressable"
+                          >
+                            {inst.label}
+                            <X size={11} />
+                          </button>
+                        );
+                      })}
+                      {selectedInstruments.length >= 5 && (
+                        <span className="text-[#535353] text-xs self-center">
+                          maks 5
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Kategori tab */}
+                  <div className="flex gap-1 bg-[#1e1e1e] rounded-lg p-1">
+                    {(
+                      Object.keys(INSTRUMENT_CATEGORIES) as InstrumentCategory[]
+                    ).map((cat) => (
                       <button
-                        key={id}
-                        onClick={() => toggleInstrument(id)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1db954]/20 border border-[#1db954]/40 text-[#1db954] text-xs font-semibold pressable"
+                        key={cat}
+                        onClick={() => setInstCategory(cat)}
+                        className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition-colors pressable ${
+                          instCategory === cat
+                            ? "bg-[#2a2a2a] text-white"
+                            : "text-[#535353] hover:text-[#a7a7a7]"
+                        }`}
                       >
-                        {inst.label}
-                        <X size={11} />
+                        {cat === "Türk Geleneksel" ? "Türk" : cat}
                       </button>
-                    );
-                  })}
-                  {selectedInstruments.length >= 5 && (
-                    <span className="text-[#535353] text-xs self-center">
-                      maks 5
-                    </span>
+                    ))}
+                  </div>
+
+                  {/* Enstrüman listesi */}
+                  <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto scroll-area pr-1">
+                    {INSTRUMENT_CATEGORIES[instCategory].map((inst) => (
+                      <Chip
+                        key={inst.id}
+                        label={inst.label}
+                        sub={inst.sub}
+                        selected={selectedInstruments.includes(inst.id)}
+                        onClick={() => toggleInstrument(inst.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── TEMPO ── */}
+            <div>
+              <SectionHeader
+                title="Tempo"
+                open={openSection === "tempo"}
+                onToggle={() => toggleSection("tempo")}
+                summary={TEMPOS.find((t) => t.id === tempo)?.label}
+              />
+              {openSection === "tempo" && (
+                <div className="mt-2">
+                  <OptionRow
+                    options={TEMPOS}
+                    selected={tempo}
+                    onSelect={(id) =>
+                      setTempo((prev) => (prev === id ? "" : id))
+                    }
+                    extra={(t) => (t as (typeof TEMPOS)[0]).bpm}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── PRODÜKSİYON ── */}
+            <div>
+              <SectionHeader
+                title="Prodüksiyon"
+                open={openSection === "production"}
+                onToggle={() => toggleSection("production")}
+                summary={PRODUCTIONS.find((p) => p.id === production)?.label}
+              />
+              {openSection === "production" && (
+                <div className="mt-2">
+                  <OptionRow
+                    options={PRODUCTIONS}
+                    selected={production}
+                    onSelect={(id) =>
+                      setProduction((prev) => (prev === id ? "" : id))
+                    }
+                    extra={(p) => (p as (typeof PRODUCTIONS)[0]).desc}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── DUYGU ── */}
+            <div>
+              <SectionHeader
+                title="Duygu"
+                open={openSection === "mood"}
+                onToggle={() => toggleSection("mood")}
+                summary={
+                  moods.length > 0
+                    ? moods
+                        .map((id) => MOODS.find((m) => m.id === id)?.label)
+                        .join(", ")
+                    : undefined
+                }
+              />
+              {openSection === "mood" && (
+                <div className="mt-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {MOODS.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => toggleMood(m.id)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all pressable border ${
+                          moods.includes(m.id)
+                            ? "bg-[#1db954]/15 border-[#1db954] text-white"
+                            : "bg-[#1a1a1a] border-[#3a3a3a] text-[#a7a7a7] hover:border-[#535353]"
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                  {moods.length >= 3 && (
+                    <p className="text-[#535353] text-xs mt-2">maks 3 duygu</p>
                   )}
                 </div>
               )}
-
-              {/* Kategori tab */}
-              <div className="flex gap-1 bg-[#0d0d0d] rounded-lg p-1">
-                {(
-                  Object.keys(INSTRUMENT_CATEGORIES) as InstrumentCategory[]
-                ).map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setInstCategory(cat)}
-                    className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition-colors pressable ${
-                      instCategory === cat
-                        ? "bg-[#2a2a2a] text-white"
-                        : "text-[#535353] hover:text-[#a7a7a7]"
-                    }`}
-                  >
-                    {cat === "Türk Geleneksel" ? "Türk" : cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Enstrüman listesi */}
-              <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto scroll-area pr-1">
-                {INSTRUMENT_CATEGORIES[instCategory].map((inst) => (
-                  <Chip
-                    key={inst.id}
-                    label={inst.label}
-                    sub={inst.sub}
-                    selected={selectedInstruments.includes(inst.id)}
-                    onClick={() => toggleInstrument(inst.id)}
-                  />
-                ))}
-              </div>
             </div>
-          )}
-        </div>
 
-        {/* ── TEMPO ── */}
-        <div>
-          <SectionHeader
-            title="Tempo"
-            open={openSection === "tempo"}
-            onToggle={() => toggleSection("tempo")}
-            summary={TEMPOS.find((t) => t.id === tempo)?.label}
-          />
-          {openSection === "tempo" && (
-            <div className="mt-2">
-              <OptionRow
-                options={TEMPOS}
-                selected={tempo}
-                onSelect={(id) => setTempo((prev) => (prev === id ? "" : id))}
-                extra={(t) => (t as (typeof TEMPOS)[0]).bpm}
+            {/* ── VOKAL ── */}
+            <div>
+              <SectionHeader
+                title="Vokal"
+                open={openSection === "vocal"}
+                onToggle={() => toggleSection("vocal")}
+                summary={VOCALS.find((v) => v.id === vocal)?.label}
               />
-            </div>
-          )}
-        </div>
-
-        {/* ── PRODÜKSİYON ── */}
-        <div>
-          <SectionHeader
-            title="Prodüksiyon"
-            open={openSection === "production"}
-            onToggle={() => toggleSection("production")}
-            summary={PRODUCTIONS.find((p) => p.id === production)?.label}
-          />
-          {openSection === "production" && (
-            <div className="mt-2">
-              <OptionRow
-                options={PRODUCTIONS}
-                selected={production}
-                onSelect={(id) =>
-                  setProduction((prev) => (prev === id ? "" : id))
-                }
-                extra={(p) => (p as (typeof PRODUCTIONS)[0]).desc}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* ── DUYGU ── */}
-        <div>
-          <SectionHeader
-            title="Duygu"
-            open={openSection === "mood"}
-            onToggle={() => toggleSection("mood")}
-            summary={
-              moods.length > 0
-                ? moods
-                    .map((id) => MOODS.find((m) => m.id === id)?.label)
-                    .join(", ")
-                : undefined
-            }
-          />
-          {openSection === "mood" && (
-            <div className="mt-2">
-              <div className="flex flex-wrap gap-1.5">
-                {MOODS.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => toggleMood(m.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all pressable border ${
-                      moods.includes(m.id)
-                        ? "bg-[#1db954]/15 border-[#1db954] text-white"
-                        : "bg-[#1a1a1a] border-[#2a2a2a] text-[#a7a7a7] hover:border-[#535353]"
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              {moods.length >= 3 && (
-                <p className="text-[#535353] text-xs mt-2">maks 3 duygu</p>
+              {openSection === "vocal" && (
+                <div className="mt-2">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {VOCALS.map((v) => (
+                      <Chip
+                        key={v.id}
+                        label={v.label}
+                        sub={v.sub}
+                        selected={vocal === v.id}
+                        onClick={() =>
+                          setVocal((prev) => (prev === v.id ? "" : v.id))
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-          )}
-        </div>
 
-        {/* ── VOKAL ── */}
-        <div>
-          <SectionHeader
-            title="Vokal"
-            open={openSection === "vocal"}
-            onToggle={() => toggleSection("vocal")}
-            summary={VOCALS.find((v) => v.id === vocal)?.label}
-          />
-          {openSection === "vocal" && (
-            <div className="mt-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                {VOCALS.map((v) => (
-                  <Chip
-                    key={v.id}
-                    label={v.label}
-                    sub={v.sub}
-                    selected={vocal === v.id}
-                    onClick={() =>
-                      setVocal((prev) => (prev === v.id ? "" : v.id))
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── YÖRE ── */}
-        <div>
-          <SectionHeader
-            title="Yöre"
-            open={openSection === "region"}
-            onToggle={() => toggleSection("region")}
-            summary={REGIONS.find((r) => r.id === region)?.label}
-          />
-          {openSection === "region" && (
-            <div className="mt-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                {REGIONS.map((r) => (
-                  <Chip
-                    key={r.id}
-                    label={r.label}
-                    sub={r.sub}
-                    selected={region === r.id}
-                    onClick={() =>
-                      setRegion((prev) => (prev === r.id ? "" : r.id))
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── DÖNEM ── */}
-        <div>
-          <SectionHeader
-            title="Dönem"
-            open={openSection === "era"}
-            onToggle={() => toggleSection("era")}
-            summary={ERAS.find((e) => e.id === era)?.label}
-          />
-          {openSection === "era" && (
-            <div className="mt-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                {ERAS.map((e) => (
-                  <Chip
-                    key={e.id}
-                    label={e.label}
-                    sub={e.sub}
-                    selected={era === e.id}
-                    onClick={() =>
-                      setEra((prev) => (prev === e.id ? "" : e.id))
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── MAKAM ── */}
-        <div>
-          <SectionHeader
-            title="Makam"
-            open={openSection === "makam"}
-            onToggle={() => toggleSection("makam")}
-            summary={MAKAMS.find((m) => m.id === makam)?.label}
-          />
-          {openSection === "makam" && (
-            <div className="mt-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                {MAKAMS.map((m) => (
-                  <Chip
-                    key={m.id}
-                    label={m.label}
-                    sub={m.sub}
-                    selected={makam === m.id}
-                    onClick={() =>
-                      setMakam((prev) => (prev === m.id ? "" : m.id))
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── SERBEST NOTLAR ── */}
-        <div>
-          <SectionHeader
-            title="Serbest Notlar"
-            open={openSection === "custom"}
-            onToggle={() => toggleSection("custom")}
-            summary={customNotes.trim() || undefined}
-          />
-          {openSection === "custom" && (
-            <div className="mt-2 flex flex-col gap-2">
-              <textarea
-                value={customNotes}
-                onChange={(e) => setCustomNotes(e.target.value)}
-                placeholder={
-                  "bağlama ile açılış, sonra piyano devralır\nsadece akustik gitar, minimal\nnakarat öncesi davul girişi\nyavaş intro, nakarat'ta full band"
-                }
-                rows={3}
-                className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl px-3 py-3 text-white text-xs placeholder-[#3a3a3a] resize-none focus:outline-none focus:border-[#535353] transition-colors leading-relaxed"
+            {/* ── YÖRE ── */}
+            <div>
+              <SectionHeader
+                title="Yöre"
+                open={openSection === "region"}
+                onToggle={() => toggleSection("region")}
+                summary={REGIONS.find((r) => r.id === region)?.label}
               />
-              {/* Hazır notlar */}
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  "bağlama ile açılış",
-                  "ney solo",
-                  "davul girişi",
-                  "sadece akustik",
-                  "yavaş intro",
-                  "full band nakarat",
-                  "minimal aranje",
-                  "canlı performans hissi",
-                  "ud ile kapanış",
-                ].map((note) => (
-                  <button
-                    key={note}
-                    onClick={() =>
-                      setCustomNotes((prev) =>
-                        prev
-                          ? prev.endsWith(",")
-                            ? `${prev} ${note}`
-                            : `${prev}, ${note}`
-                          : note,
-                      )
-                    }
-                    className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#1a1a1a] border border-[#2a2a2a] text-[#a7a7a7] hover:border-[#535353] hover:text-white transition-colors pressable"
-                  >
-                    + {note}
-                  </button>
-                ))}
-              </div>
+              {openSection === "region" && (
+                <div className="mt-2">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {REGIONS.map((r) => (
+                      <Chip
+                        key={r.id}
+                        label={r.label}
+                        sub={r.sub}
+                        selected={region === r.id}
+                        onClick={() =>
+                          setRegion((prev) => (prev === r.id ? "" : r.id))
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            {/* ── DÖNEM ── */}
+            <div>
+              <SectionHeader
+                title="Dönem"
+                open={openSection === "era"}
+                onToggle={() => toggleSection("era")}
+                summary={ERAS.find((e) => e.id === era)?.label}
+              />
+              {openSection === "era" && (
+                <div className="mt-2">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {ERAS.map((e) => (
+                      <Chip
+                        key={e.id}
+                        label={e.label}
+                        sub={e.sub}
+                        selected={era === e.id}
+                        onClick={() =>
+                          setEra((prev) => (prev === e.id ? "" : e.id))
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── MAKAM ── */}
+            <div>
+              <SectionHeader
+                title="Makam"
+                open={openSection === "makam"}
+                onToggle={() => toggleSection("makam")}
+                summary={MAKAMS.find((m) => m.id === makam)?.label}
+              />
+              {openSection === "makam" && (
+                <div className="mt-2">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {MAKAMS.map((m) => (
+                      <Chip
+                        key={m.id}
+                        label={m.label}
+                        sub={m.sub}
+                        selected={makam === m.id}
+                        onClick={() =>
+                          setMakam((prev) => (prev === m.id ? "" : m.id))
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── SERBEST NOTLAR ── */}
+            <div>
+              <SectionHeader
+                title="Serbest Notlar"
+                open={openSection === "custom"}
+                onToggle={() => toggleSection("custom")}
+                summary={customNotes.trim() || undefined}
+              />
+              {openSection === "custom" && (
+                <div className="mt-2 flex flex-col gap-2">
+                  <textarea
+                    value={customNotes}
+                    onChange={(e) => setCustomNotes(e.target.value)}
+                    placeholder={
+                      "bağlama ile açılış, sonra piyano devralır\nsadece akustik gitar, minimal\nnakarat öncesi davul girişi\nyavaş intro, nakarat'ta full band"
+                    }
+                    rows={3}
+                    className="w-full bg-[#1e1e1e] border border-[#3a3a3a] rounded-xl px-3 py-3 text-white text-xs placeholder-[#6a6a6a] resize-none focus:outline-none focus:border-[#1db954] transition-colors leading-relaxed"
+                  />
+                  {/* Hazır notlar */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      "bağlama ile açılış",
+                      "ney solo",
+                      "davul girişi",
+                      "sadece akustik",
+                      "yavaş intro",
+                      "full band nakarat",
+                      "minimal aranje",
+                      "canlı performans hissi",
+                      "ud ile kapanış",
+                    ].map((note) => (
+                      <button
+                        key={note}
+                        onClick={() =>
+                          setCustomNotes((prev) =>
+                            prev
+                              ? prev.endsWith(",")
+                                ? `${prev} ${note}`
+                                : `${prev}, ${note}`
+                              : note,
+                          )
+                        }
+                        className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#1a1a1a] border border-[#3a3a3a] text-[#a7a7a7] hover:border-[#535353] hover:text-white transition-colors pressable"
+                      >
+                        + {note}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Style preview */}
         {hasStyle && (
-          <div className="bg-[#0d0d0d] rounded-xl px-3 py-2.5 border border-[#2a2a2a]">
+          <div className="bg-[#1e1e1e] rounded-xl px-3 py-2.5 border border-[#3a3a3a]">
             <div className="flex items-center justify-between mb-1">
               <p className="text-[#535353] text-[10px] uppercase tracking-widest">
                 Oluşturulan stil

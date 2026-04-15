@@ -92,43 +92,61 @@ export default function BottomNav() {
           href="/create"
           className="flex-1 flex flex-col items-center justify-center pressable relative"
         >
-          {/* Outer pulsing ring */}
-          <span
-            aria-hidden
-            className="absolute top-0 w-14 h-10 rounded-2xl animate-ping-slow"
-            style={{
-              background:
-                "radial-gradient(ellipse, rgba(29,185,84,0.35) 0%, transparent 70%)",
-            }}
-          />
+          {/* Outer pulsing ring — sadece inaktif */}
+          {!isCreate && (
+            <span
+              aria-hidden
+              className="absolute top-0 w-14 h-10 rounded-2xl animate-ping-slow"
+              style={{
+                background:
+                  "radial-gradient(ellipse, rgba(29,185,84,0.35) 0%, transparent 70%)",
+              }}
+            />
+          )}
           <div
             className="relative flex items-center justify-center rounded-2xl transition-all duration-200"
             style={{
               width: 60,
               height: 38,
-              background:
-                "linear-gradient(135deg, #1ed760 0%, #1db954 50%, #179c42 100%)",
+              background: isCreate
+                ? "linear-gradient(135deg, #ffffff 0%, #e8ffef 50%, #c9f5d4 100%)"
+                : "linear-gradient(135deg, #1ed760 0%, #1db954 50%, #179c42 100%)",
               boxShadow: isCreate
-                ? "0 0 32px rgba(29,185,84,0.85), 0 4px 18px rgba(29,185,84,0.6), inset 0 1px 0 rgba(255,255,255,0.25)"
+                ? "0 0 36px rgba(29,185,84,1), 0 4px 20px rgba(29,185,84,0.7), inset 0 0 0 2px #1db954, inset 0 1px 0 rgba(255,255,255,0.4)"
                 : "0 0 20px rgba(29,185,84,0.55), 0 4px 14px rgba(29,185,84,0.45), inset 0 1px 0 rgba(255,255,255,0.2)",
               transform: isCreate ? "scale(1.08)" : "scale(1)",
             }}
           >
-            <span className="relative w-6 h-6 flex items-center justify-center">
-              <Plus
-                size={24}
-                strokeWidth={3}
-                className="text-black absolute inset-0 animate-icon-plus"
-              />
+            {isCreate ? (
               <Play
                 size={22}
                 strokeWidth={2.8}
-                fill="black"
-                className="text-black absolute inset-0 ml-0.5 animate-icon-play"
+                fill="#1db954"
+                className="text-[#1db954] ml-0.5"
               />
-            </span>
+            ) : (
+              <span className="relative w-6 h-6 flex items-center justify-center">
+                <Plus
+                  size={24}
+                  strokeWidth={3}
+                  className="text-black absolute inset-0 animate-icon-plus"
+                />
+                <Play
+                  size={22}
+                  strokeWidth={2.8}
+                  fill="black"
+                  className="text-black absolute inset-0 ml-0.5 animate-icon-play"
+                />
+              </span>
+            )}
           </div>
-          <span className="text-[10px] font-extrabold tracking-tight mt-0.5 text-[#1db954] drop-shadow-[0_0_6px_rgba(29,185,84,0.6)]">
+          <span
+            className={`text-[10px] font-extrabold tracking-tight mt-0.5 ${
+              isCreate
+                ? "text-white drop-shadow-[0_0_8px_rgba(29,185,84,0.9)]"
+                : "text-[#1db954] drop-shadow-[0_0_6px_rgba(29,185,84,0.6)]"
+            }`}
+          >
             Oluştur
           </span>
         </Link>
