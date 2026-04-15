@@ -232,8 +232,7 @@ export async function getAllSongs(userId?: string): Promise<Song[]> {
           u.avatar_url   AS creator_image
         FROM songs s
         LEFT JOIN users u ON u.id::text = s.created_by
-        WHERE (s.status = 'complete' OR s.audio_url IS NOT NULL OR s.stream_url IS NOT NULL)
-          AND s.created_by = ${userId}
+        WHERE s.created_by = ${userId}
         ORDER BY s.created_at DESC
       `
     : await sql`
@@ -245,7 +244,6 @@ export async function getAllSongs(userId?: string): Promise<Song[]> {
           u.avatar_url   AS creator_image
         FROM songs s
         LEFT JOIN users u ON u.id::text = s.created_by
-        WHERE s.status = 'complete' OR s.audio_url IS NOT NULL OR s.stream_url IS NOT NULL
         ORDER BY s.created_at DESC
       `;
   return rows.map(rowToSong);
