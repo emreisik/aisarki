@@ -214,35 +214,15 @@ export default function AudioPlayer() {
     <div
       className="fixed inset-0 z-[60] flex flex-col overflow-hidden"
       style={{
-        background: `linear-gradient(to left, rgb(${rgb}), rgb(20,20,30))`,
+        background: `
+          radial-gradient(ellipse 55% 45% at 20% 25%, rgba(78, 52, 40, 0.25), transparent 55%),
+          radial-gradient(ellipse 60% 50% at 80% 75%, rgba(62, 42, 82, 0.22), transparent 58%),
+          linear-gradient(135deg, #050406 0%, #070608 50%, #040405 100%)
+        `,
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      {/* ── Blurred background image overlay ── */}
-      {currentSong.imageUrl && (
-        <div className="absolute inset-0 pointer-events-none">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={currentSong.imageUrl}
-            alt=""
-            className="w-full h-full object-cover"
-            style={{
-              filter: "blur(120px) saturate(1.6)",
-              transform: "scale(1.4)",
-              opacity: 0.35,
-            }}
-          />
-        </div>
-      )}
-      {/* Dark gradient overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `linear-gradient(to bottom, rgb(20,20,30) 0%, rgb(0,0,0) 100%)`,
-        }}
-      />
-
       {/* ── İçerik ── */}
       <div className="relative z-10 flex flex-col h-full">
         {/* Header */}

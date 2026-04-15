@@ -22,19 +22,20 @@ function fmt(s: number) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
+const FALLBACK_GRADIENT = `
+  radial-gradient(ellipse 55% 140% at 22% 50%, rgba(78, 52, 40, 0.5), transparent 65%),
+  radial-gradient(ellipse 55% 140% at 78% 50%, rgba(62, 42, 82, 0.45), transparent 65%),
+  linear-gradient(90deg, #0a0809 0%, #0d0a0d 50%, #0a090b 100%)
+`;
+
 function useDominantColor(imageUrl?: string) {
-  const [gradient, setGradient] = useState(
-    "radial-gradient(ellipse at 30% 30%, rgb(40,40,50), rgb(20,20,30))",
-  );
+  const [gradient, setGradient] = useState(FALLBACK_GRADIENT);
 
   useEffect(() => {
     if (!imageUrl) {
-      setGradient(
-        "radial-gradient(ellipse at 30% 30%, rgb(40,40,50), rgb(20,20,30))",
-      );
+      setGradient(FALLBACK_GRADIENT);
       return;
     }
-
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.src = imageUrl;
@@ -43,25 +44,20 @@ function useDominantColor(imageUrl?: string) {
       canvas.width = 1;
       canvas.height = 1;
       const ctx = canvas.getContext("2d");
-      if (ctx) {
+      if (!ctx) return;
+      try {
         ctx.drawImage(img, 0, 0, 1, 1);
         const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-        // Açık ton → koyu ton gradient (light opacity'siz, dark biraz opacity)
-        const lightR = Math.floor(r * 0.65 + 35);
-        const lightG = Math.floor(g * 0.65 + 35);
-        const lightB = Math.floor(b * 0.65 + 40);
-        const darkR = Math.floor(r * 0.35 + 15);
-        const darkG = Math.floor(g * 0.35 + 15);
-        const darkB = Math.floor(b * 0.35 + 25);
-        setGradient(
-          `radial-gradient(ellipse at 30% 30%, rgb(${lightR},${lightG},${lightB}), rgb(${darkR},${darkG},${darkB}))`,
-        );
+        setGradient(`
+          radial-gradient(ellipse 55% 140% at 22% 50%, rgba(${r},${g},${b},0.5), transparent 65%),
+          radial-gradient(ellipse 55% 140% at 78% 50%, rgba(${Math.floor(b * 0.8 + 30)},${Math.floor(r * 0.4 + 20)},${Math.floor(g * 0.8 + 40)},0.45), transparent 65%),
+          linear-gradient(90deg, #0a0809 0%, #0d0a0d 50%, #0a090b 100%)
+        `);
+      } catch {
+        setGradient(FALLBACK_GRADIENT);
       }
     };
-    img.onerror = () =>
-      setGradient(
-        "radial-gradient(ellipse at 30% 30%, rgb(40,40,50), rgb(20,20,30))",
-      );
+    img.onerror = () => setGradient(FALLBACK_GRADIENT);
   }, [imageUrl]);
 
   return gradient;
