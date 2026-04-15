@@ -214,7 +214,7 @@ export default function AudioPlayer() {
     <div
       className="fixed inset-0 z-[60] flex flex-col overflow-hidden"
       style={{
-        background: `linear-gradient(135deg, rgba(${rgb},0.4), rgba(20,20,30,0.2))`,
+        background: `linear-gradient(135deg, rgb(${rgb}), rgba(20,20,30,0.2))`,
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
@@ -239,7 +239,7 @@ export default function AudioPlayer() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: `linear-gradient(to bottom, rgba(${rgb},0) 0%, rgba(0,0,0,0.6) 100%)`,
+          background: `linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.5) 100%)`,
         }}
       />
 

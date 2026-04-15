@@ -6,7 +6,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 
 function useDominantColor(imageUrl?: string) {
   const [gradient, setGradient] = useState(
-    "radial-gradient(ellipse at 30% 30%, rgba(40,40,50,0.6), rgba(20,20,30,0.3))",
+    "radial-gradient(ellipse at 30% 30%, rgb(40,40,50), rgba(20,20,30,0.15))",
   );
 
   useEffect(() => {
@@ -28,7 +28,7 @@ function useDominantColor(imageUrl?: string) {
       if (ctx) {
         ctx.drawImage(img, 0, 0, 1, 1);
         const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-        // Açık ton → koyu ton gradient
+        // Açık ton → koyu ton gradient (light opacity'siz, dark biraz opacity)
         const lightR = Math.floor(r * 0.65 + 35);
         const lightG = Math.floor(g * 0.65 + 35);
         const lightB = Math.floor(b * 0.65 + 40);
@@ -36,7 +36,7 @@ function useDominantColor(imageUrl?: string) {
         const darkG = Math.floor(g * 0.35 + 15);
         const darkB = Math.floor(b * 0.35 + 25);
         setGradient(
-          `radial-gradient(ellipse at 30% 30%, rgba(${lightR},${lightG},${lightB},0.5), rgba(${darkR},${darkG},${darkB},0.2))`,
+          `radial-gradient(ellipse at 30% 30%, rgb(${lightR},${lightG},${lightB}), rgba(${darkR},${darkG},${darkB},0.15))`,
         );
       }
     };
