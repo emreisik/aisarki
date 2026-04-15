@@ -28,11 +28,15 @@ function fmt(s: number) {
 
 /* ── Albüm görselinden dominant renk çıkar ── */
 function useDominantColor(imageUrl?: string) {
-  const [rgb, setRgb] = useState("20,20,30");
+  const [gradient, setGradient] = useState(
+    "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
+  );
 
   useEffect(() => {
     if (!imageUrl) {
-      setRgb("20,20,30");
+      setGradient(
+        "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
+      );
       return;
     }
     let cancelled = false;
@@ -63,18 +67,26 @@ function useDominantColor(imageUrl?: string) {
           }
         }
         if (n > 0 && !cancelled) {
-          // Darker neon tarzı: RGB'yi 40% oranında al (darkness) + softer
-          const darkR = Math.floor((r / n) * 0.4 + 20);
-          const darkG = Math.floor((g / n) * 0.4 + 20);
-          const darkB = Math.floor((b / n) * 0.4 + 30);
-          setRgb(`${darkR},${darkG},${darkB}`);
+          // Neon gradient: açık merkez → koyu kenarlar
+          const lightR = Math.floor((r / n) * 0.65 + 35);
+          const lightG = Math.floor((g / n) * 0.65 + 35);
+          const lightB = Math.floor((b / n) * 0.65 + 40);
+          const darkR = Math.floor((r / n) * 0.35 + 15);
+          const darkG = Math.floor((g / n) * 0.35 + 15);
+          const darkB = Math.floor((b / n) * 0.35 + 25);
+          setGradient(
+            `radial-gradient(ellipse at 30% 30%, rgba(${lightR},${lightG},${lightB},0.5), rgba(${darkR},${darkG},${darkB},0.2))`,
+          );
         }
       } catch {
         /* CORS — fallback renk kullan */
       }
     };
     img.onerror = () => {
-      if (!cancelled) setRgb("20,20,30");
+      if (!cancelled)
+        setGradient(
+          "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
+        );
     };
     img.src = imageUrl;
     return () => {
@@ -82,7 +94,7 @@ function useDominantColor(imageUrl?: string) {
     };
   }, [imageUrl]);
 
-  return rgb;
+  return gradient;
 }
 
 /* ── Progress bar ── */

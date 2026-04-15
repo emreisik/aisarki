@@ -5,11 +5,15 @@ import { useState, useEffect } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
 
 function useDominantColor(imageUrl?: string) {
-  const [rgb, setRgb] = useState("34,34,34");
+  const [gradient, setGradient] = useState(
+    "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
+  );
 
   useEffect(() => {
     if (!imageUrl) {
-      setRgb("34,34,34");
+      setGradient(
+        "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
+      );
       return;
     }
 
@@ -24,13 +28,25 @@ function useDominantColor(imageUrl?: string) {
       if (ctx) {
         ctx.drawImage(img, 0, 0, 1, 1);
         const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-        setRgb(`${r},${g},${b}`);
+        // Neon gradient: açık merkez → koyu kenarlar
+        const lightR = Math.floor(r * 0.65 + 35);
+        const lightG = Math.floor(g * 0.65 + 35);
+        const lightB = Math.floor(b * 0.65 + 40);
+        const darkR = Math.floor(r * 0.35 + 15);
+        const darkG = Math.floor(g * 0.35 + 15);
+        const darkB = Math.floor(b * 0.35 + 25);
+        setGradient(
+          `radial-gradient(ellipse at 30% 30%, rgba(${lightR},${lightG},${lightB},0.5), rgba(${darkR},${darkG},${darkB},0.2))`,
+        );
       }
     };
-    img.onerror = () => setRgb("34,34,34");
+    img.onerror = () =>
+      setGradient(
+        "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
+      );
   }, [imageUrl]);
 
-  return rgb;
+  return gradient;
 }
 
 export default function MiniPlayer() {
