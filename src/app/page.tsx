@@ -1491,7 +1491,7 @@ export default function HomePage() {
     fetch("/api/playlists")
       .then((r) => r.json())
       .then((d) => setPlaylists(d.playlists || []));
-  }, [session]);
+  }, [session?.user?.id]);
 
   const handleSongsAdded = useCallback((newSongs: Song[]) => {
     if (newSongs.length === 0) {

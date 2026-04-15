@@ -190,7 +190,7 @@ export default function AudioPlayer() {
       return;
     }
     setLiked((v) => !v);
-  }, [session?.user, setShowGate]);
+  }, [setShowGate]);
 
   const seek = (v: number) => {
     if (audioRef.current) audioRef.current.currentTime = v;
@@ -214,7 +214,7 @@ export default function AudioPlayer() {
     <div
       className="fixed inset-0 z-[60] flex flex-col overflow-hidden"
       style={{
-        background: `linear-gradient(135deg, rgb(${rgb}), rgba(20,20,30,0.2))`,
+        background: `linear-gradient(to left, rgb(${rgb}), rgb(20,20,30))`,
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}

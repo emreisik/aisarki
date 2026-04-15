@@ -57,7 +57,7 @@ export default function ProfilePage() {
             })
         : Promise.resolve(),
     ]).finally(() => setLoading(false));
-  }, [status, session]);
+  }, [status]);
 
   if (status === "loading" || status === "unauthenticated") {
     return (

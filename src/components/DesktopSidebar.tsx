@@ -43,7 +43,7 @@ export default function DesktopSidebar() {
     fetch("/api/playlists")
       .then((r) => r.json())
       .then((d) => setPlaylists(d.playlists || []));
-  }, [session]);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (creating) inputRef.current?.focus();
