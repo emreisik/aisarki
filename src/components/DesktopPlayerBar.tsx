@@ -24,13 +24,13 @@ function fmt(s: number) {
 
 function useDominantColor(imageUrl?: string) {
   const [gradient, setGradient] = useState(
-    "radial-gradient(ellipse at 30% 30%, rgb(30,30,40), rgb(20,20,30))",
+    "radial-gradient(circle 35% at 50% 50%, rgba(30,30,40,0.2), rgba(20,20,30,1))",
   );
 
   useEffect(() => {
     if (!imageUrl) {
       setGradient(
-        "radial-gradient(ellipse at 30% 30%, rgb(30,30,40), rgb(20,20,30))",
+        "radial-gradient(circle 35% at 50% 50%, rgba(30,30,40,0.2), rgba(20,20,30,1))",
       );
       return;
     }
@@ -46,21 +46,18 @@ function useDominantColor(imageUrl?: string) {
       if (ctx) {
         ctx.drawImage(img, 0, 0, 1, 1);
         const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-        // Neon gradient: açık merkez → koyu kenarlar
-        const lightR = Math.floor(r * 0.65 + 35);
-        const lightG = Math.floor(g * 0.65 + 35);
-        const lightB = Math.floor(b * 0.65 + 40);
-        const darkR = Math.floor(r * 0.35 + 15);
-        const darkG = Math.floor(g * 0.35 + 15);
-        const darkB = Math.floor(b * 0.35 + 25);
+        // Merkez az opacity ile dominant renk, kenarlar dark black
+        const colorR = Math.floor(r * 0.65 + 35);
+        const colorG = Math.floor(g * 0.65 + 35);
+        const colorB = Math.floor(b * 0.65 + 40);
         setGradient(
-          `radial-gradient(ellipse at 30% 30%, rgb(${lightR},${lightG},${lightB}), rgb(${darkR},${darkG},${darkB}))`,
+          `radial-gradient(circle 35% at 50% 50%, rgba(${colorR},${colorG},${colorB},0.2), rgba(20,20,30,1))`,
         );
       }
     };
     img.onerror = () =>
       setGradient(
-        "radial-gradient(ellipse at 30% 30%, rgb(30,30,40), rgb(20,20,30))",
+        "radial-gradient(circle 35% at 50% 50%, rgba(30,30,40,0.2), rgba(20,20,30,1))",
       );
   }, [imageUrl]);
 
