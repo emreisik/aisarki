@@ -1241,48 +1241,16 @@ function CategoryRow({
   group: CategoryGroup;
   onSelect: (item: CategoryItem) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-
   return (
-    <div className="mb-3">
-      <div className="flex items-center justify-between mb-1.5 px-6">
-        <p className="text-[#3a3a3a] text-[10px] font-bold uppercase tracking-widest">
-          {group.label}
-        </p>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-0.5 text-[#3a3a3a] text-[10px] pressable hover:text-[#535353] transition-colors"
-        >
-          {expanded ? "Kapat" : "Tümü"}
-          <ChevronRight
-            size={10}
-            className={`transition-transform ${expanded ? "rotate-90" : ""}`}
-          />
-        </button>
-      </div>
-      {expanded ? (
-        <div className="px-6 flex flex-wrap gap-2">
-          {group.items.map((item) => (
-            <CategoryPill
-              key={item.title}
-              item={item}
-              color={group.color}
-              onClick={() => onSelect(item)}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="flex gap-2 overflow-x-auto scroll-area px-6 pb-0.5">
-          {group.items.map((item) => (
-            <CategoryPill
-              key={item.title}
-              item={item}
-              color={group.color}
-              onClick={() => onSelect(item)}
-            />
-          ))}
-        </div>
-      )}
+    <div className="flex gap-1.5 overflow-x-auto scroll-area px-6 pb-1">
+      {group.items.map((item) => (
+        <CategoryPill
+          key={item.title}
+          item={item}
+          color={group.color}
+          onClick={() => onSelect(item)}
+        />
+      ))}
     </div>
   );
 }
