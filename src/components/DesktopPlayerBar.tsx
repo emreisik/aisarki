@@ -24,13 +24,13 @@ function fmt(s: number) {
 
 function useDominantColor(imageUrl?: string) {
   const [gradient, setGradient] = useState(
-    "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
+    "radial-gradient(ellipse at 30% 30%, rgb(30,30,40), rgb(20,20,30))",
   );
 
   useEffect(() => {
     if (!imageUrl) {
       setGradient(
-        "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
+        "radial-gradient(ellipse at 30% 30%, rgb(30,30,40), rgb(20,20,30))",
       );
       return;
     }
@@ -54,13 +54,13 @@ function useDominantColor(imageUrl?: string) {
         const darkG = Math.floor(g * 0.35 + 15);
         const darkB = Math.floor(b * 0.35 + 25);
         setGradient(
-          `radial-gradient(ellipse at 30% 30%, rgba(${lightR},${lightG},${lightB},0.5), rgba(${darkR},${darkG},${darkB},0.2))`,
+          `radial-gradient(ellipse at 30% 30%, rgb(${lightR},${lightG},${lightB}), rgb(${darkR},${darkG},${darkB}))`,
         );
       }
     };
     img.onerror = () =>
       setGradient(
-        "radial-gradient(ellipse at 30% 30%, rgba(30,30,40,0.5), rgba(20,20,30,0.3))",
+        "radial-gradient(ellipse at 30% 30%, rgb(30,30,40), rgb(20,20,30))",
       );
   }, [imageUrl]);
 
