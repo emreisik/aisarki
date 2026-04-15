@@ -18,7 +18,7 @@ import {
 import { usePlayer } from "@/contexts/PlayerContext";
 
 function fmt(s: number) {
-  if (!s || isNaN(s)) return "0:00";
+  if (!s || isNaN(s) || !isFinite(s)) return "0:00";
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
