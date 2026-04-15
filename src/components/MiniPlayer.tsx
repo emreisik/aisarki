@@ -6,7 +6,7 @@ import { usePlayer } from "@/contexts/PlayerContext";
 
 function useDominantColor(imageUrl?: string) {
   const [gradient, setGradient] = useState(
-    "radial-gradient(circle 35% at 50% 50%, rgba(30,30,40,0.2), rgba(20,20,30,1))",
+    "radial-gradient(ellipse at 30% 30%, rgba(40,40,50,0.6), rgba(20,20,30,0.3))",
   );
 
   useEffect(() => {
@@ -28,12 +28,15 @@ function useDominantColor(imageUrl?: string) {
       if (ctx) {
         ctx.drawImage(img, 0, 0, 1, 1);
         const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-        // Merkez az opacity ile dominant renk, kenarlar dark black
-        const colorR = Math.floor(r * 0.65 + 35);
-        const colorG = Math.floor(g * 0.65 + 35);
-        const colorB = Math.floor(b * 0.65 + 40);
+        // Açık ton → koyu ton gradient
+        const lightR = Math.floor(r * 0.65 + 35);
+        const lightG = Math.floor(g * 0.65 + 35);
+        const lightB = Math.floor(b * 0.65 + 40);
+        const darkR = Math.floor(r * 0.35 + 15);
+        const darkG = Math.floor(g * 0.35 + 15);
+        const darkB = Math.floor(b * 0.35 + 25);
         setGradient(
-          `radial-gradient(circle 35% at 50% 50%, rgba(${colorR},${colorG},${colorB},0.2), rgba(20,20,30,1))`,
+          `radial-gradient(ellipse at 30% 30%, rgba(${lightR},${lightG},${lightB},0.5), rgba(${darkR},${darkG},${darkB},0.2))`,
         );
       }
     };
