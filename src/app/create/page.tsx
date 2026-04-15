@@ -207,21 +207,24 @@ export default function CreatePage() {
     if (pollingRef.current.has(taskId)) return;
 
     let attempts = 0;
+    let errorCount = 0;
     const MAX_ATTEMPTS = 300; // 300 × 2s = 10 dakika
+    const MAX_ERRORS = 10; // 10 hata sonra dur
     const POLL_INTERVAL = 2000; // 2 saniye — daha hızlı feedback
     const ERROR_RETRY_INTERVAL = 3000; // Hata durumunda 3 saniye
 
     const poll = async () => {
       if (!mountedRef.current) return;
       const currentAttempt = ++attempts;
+
       if (currentAttempt > MAX_ATTEMPTS) {
         pollingRef.current.delete(taskId);
-        // Sessizce silmek yerine "failed" olarak işaretle
         setProcessingTasks((prev) =>
           prev.map((t) => (t.taskId === taskId ? { ...t, failed: true } : t)),
         );
         return;
       }
+
       // Her 10 denemede bir attempts sayısını güncelle
       if (currentAttempt % 10 === 0) {
         setProcessingTasks((prev) =>
@@ -230,22 +233,46 @@ export default function CreatePage() {
           ),
         );
       }
+
       try {
         const res = await fetch(`/api/songs?taskId=${taskId}`);
         const data: { status: string; songs: Song[] } = await res.json();
+
         if (data.status === "complete" && data.songs?.length > 0) {
           pollingRef.current.delete(taskId);
           setProcessingTasks((prev) => prev.filter((t) => t.taskId !== taskId));
+
           setCompletedSongs((prev) => {
             const ids = new Set(prev.map((s) => s.id));
             const fresh = data.songs.filter((s) => !ids.has(s.id));
+            // Tüm şarkılar zaten ekli ise (streaming URL'den hemen gelmişse), polling stop et
+            if (fresh.length === 0) {
+              pollingRef.current.delete(taskId);
+            }
             return [...fresh, ...prev];
           });
-        } else {
-          const timer = setTimeout(poll, POLL_INTERVAL);
-          pollingRef.current.set(taskId, timer);
+          return;
         }
-      } catch {
+
+        // Hata sayacını sıfırla (başarılı request)
+        errorCount = 0;
+        const timer = setTimeout(poll, POLL_INTERVAL);
+        pollingRef.current.set(taskId, timer);
+      } catch (e) {
+        errorCount++;
+        console.log(
+          `[polling] Hata ${errorCount}/${MAX_ERRORS} için taskId=${taskId}`,
+        );
+
+        // Çok fazla hata — dur
+        if (errorCount > MAX_ERRORS) {
+          pollingRef.current.delete(taskId);
+          setProcessingTasks((prev) =>
+            prev.map((t) => (t.taskId === taskId ? { ...t, failed: true } : t)),
+          );
+          return;
+        }
+
         const timer = setTimeout(poll, ERROR_RETRY_INTERVAL);
         pollingRef.current.set(taskId, timer);
       }
