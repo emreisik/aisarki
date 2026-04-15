@@ -13,13 +13,13 @@ function BottomSpacer() {
   const { currentSong } = usePlayer();
   return (
     <>
-      {/* Mobile: navbar (64px) + mini player (~72px) + gap */}
+      {/* Mobile: navbar (64px + 12px extra safe padding) + mini player (~72px) + gap */}
       <div
         className="md:hidden flex-shrink-0"
         style={{
           height: currentSong
-            ? "calc(136px + env(safe-area-inset-bottom, 0px))"
-            : "calc(64px + env(safe-area-inset-bottom, 0px))",
+            ? "calc(156px + env(safe-area-inset-bottom, 0px))"
+            : "calc(76px + env(safe-area-inset-bottom, 0px))",
         }}
       />
       {/* Desktop: player bar (90px) */}

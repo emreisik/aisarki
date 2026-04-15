@@ -1089,7 +1089,7 @@ function PromptModal({
     setValues((v) => ({ ...v, [key]: v[key] === val ? "" : val }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0 md:items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end pb-[calc(76px+env(safe-area-inset-bottom,0px))] md:pb-0 md:items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"

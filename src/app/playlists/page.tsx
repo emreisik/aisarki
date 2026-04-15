@@ -123,7 +123,7 @@ function CreateModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end pb-[calc(64px+env(safe-area-inset-bottom,0px))] sm:pb-0 sm:items-center justify-center"
+      className="fixed inset-0 z-50 flex items-end pb-[calc(76px+env(safe-area-inset-bottom,0px))] sm:pb-0 sm:items-center justify-center"
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/70" />

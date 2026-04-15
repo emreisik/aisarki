@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Compass, Plus, ListMusic, User } from "lucide-react";
+import { Home, Compass, Plus, Play, ListMusic, User } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 const SIDE_TABS = [
@@ -80,33 +80,55 @@ export default function BottomNav() {
       style={{
         background: "#111111",
         borderColor: "#2a2a2a",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
       }}
     >
       {/* Sabit 64px içerik alanı — safe area'nın üstünde */}
       <div className="flex items-stretch h-16">
         {left.map(renderTab)}
 
-        {/* Merkez Oluştur */}
+        {/* Merkez Oluştur — dikkat çekici */}
         <Link
           href="/create"
-          className="flex-1 flex flex-col items-center justify-center pressable"
+          className="flex-1 flex flex-col items-center justify-center pressable relative"
         >
-          <div
-            className="flex items-center justify-center rounded-2xl transition-all duration-200"
+          {/* Outer pulsing ring */}
+          <span
+            aria-hidden
+            className="absolute top-0 w-14 h-10 rounded-2xl animate-ping-slow"
             style={{
-              width: 52,
-              height: 34,
-              background: "#1db954",
+              background:
+                "radial-gradient(ellipse, rgba(29,185,84,0.35) 0%, transparent 70%)",
+            }}
+          />
+          <div
+            className="relative flex items-center justify-center rounded-2xl transition-all duration-200"
+            style={{
+              width: 60,
+              height: 38,
+              background:
+                "linear-gradient(135deg, #1ed760 0%, #1db954 50%, #179c42 100%)",
               boxShadow: isCreate
-                ? "0 0 24px rgba(29,185,84,0.6)"
-                : "0 2px 14px rgba(29,185,84,0.4)",
-              transform: isCreate ? "scale(1.05)" : "scale(1)",
+                ? "0 0 32px rgba(29,185,84,0.85), 0 4px 18px rgba(29,185,84,0.6), inset 0 1px 0 rgba(255,255,255,0.25)"
+                : "0 0 20px rgba(29,185,84,0.55), 0 4px 14px rgba(29,185,84,0.45), inset 0 1px 0 rgba(255,255,255,0.2)",
+              transform: isCreate ? "scale(1.08)" : "scale(1)",
             }}
           >
-            <Plus size={22} strokeWidth={2.8} className="text-black" />
+            <span className="relative w-6 h-6 flex items-center justify-center">
+              <Plus
+                size={24}
+                strokeWidth={3}
+                className="text-black absolute inset-0 animate-icon-plus"
+              />
+              <Play
+                size={22}
+                strokeWidth={2.8}
+                fill="black"
+                className="text-black absolute inset-0 ml-0.5 animate-icon-play"
+              />
+            </span>
           </div>
-          <span className="text-[10px] font-bold tracking-tight mt-1 text-[#1db954]">
+          <span className="text-[10px] font-extrabold tracking-tight mt-0.5 text-[#1db954] drop-shadow-[0_0_6px_rgba(29,185,84,0.6)]">
             Oluştur
           </span>
         </Link>
