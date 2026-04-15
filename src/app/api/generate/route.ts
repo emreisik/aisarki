@@ -74,6 +74,9 @@ export async function POST(request: NextRequest) {
 
     console.log("Suno API response:", JSON.stringify(data, null, 2));
 
+    // taskId'yi çıkar (error durumunda bile olabilir)
+    const taskId = data.data?.taskId;
+
     if (!response.ok || data.code !== 200) {
       console.log("Suno reject:", JSON.stringify(data));
       // Suno bazen hatayı farklı field'larda döndürüyor
@@ -83,15 +86,29 @@ export async function POST(request: NextRequest) {
         (rawData.error as string) ||
         data.msg ||
         "Müzik oluşturulamadı";
-      // Artist name hatası için Türkçe açıklama ekle
-      const userMsg = rawMsg.toLowerCase().includes("artist name")
-        ? `Prompt'ta sanatçı adı tespit edildi. Lütfen şu kelimeyi değiştir: "${rawMsg.match(/artist name (\w+)/i)?.[1] ?? ""}". Farklı bir ifade kullan.`
-        : rawMsg;
+
+      // Hata mesajlarını Türkçeye çevir
+      let userMsg = rawMsg;
+      if (rawMsg.toLowerCase().includes("artist name")) {
+        userMsg = `Prompt'ta sanatçı adı tespit edildi. Lütfen şu kelimeyi değiştir: "${rawMsg.match(/artist name (\w+)/i)?.[1] ?? ""}". Farklı bir ifade kullan.`;
+      } else if (rawMsg.toLowerCase().includes("copyrighted")) {
+        userMsg =
+          "Şarkı üretilmedi: Telif hakkı korumalı içerik tespit edildi. Lütfen söz veya özellikleri değiştir ve tekrar deneyin.";
+      }
+
+      // Error durumunda bile taskId varsa kaydet (partial failure case)
+      if (taskId) {
+        const session = await auth();
+        const userId = session?.user?.id ?? undefined;
+        saveProcessingTask(taskId, finalPrompt, userId).catch((e) =>
+          console.error("[db] saveProcessingTask hatası (error case):", e),
+        );
+      }
+
       return NextResponse.json({ error: userMsg }, { status: 400 });
     }
 
-    // taskId'yi DB'ye kaydet — sayfa yenilenince de durum korunur
-    const taskId = data.data?.taskId;
+    // Başarılı case'de taskId'yi DB'ye kaydet
     if (taskId) {
       const session = await auth();
       const userId = session?.user?.id ?? undefined;
