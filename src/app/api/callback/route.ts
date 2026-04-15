@@ -3,8 +3,15 @@ import {
   setTaskSongs,
   markTaskComplete,
   getTaskCreatedBy,
+  updateSongAudioKey,
+  updateSongImageKey,
 } from "@/lib/taskStore";
 import { sendPushToUser } from "@/lib/pushNotification";
+import {
+  uploadAudioInBackground,
+  uploadImageInBackground,
+  isBunnyConfigured,
+} from "@/lib/bunnyStorage";
 import { Song } from "@/types";
 
 interface RawSong {
@@ -88,7 +95,7 @@ export async function POST(request: NextRequest) {
       (dataObj?.taskId as string) ||
       "";
 
-    const rawSongs = findSongsArray(body).slice(0, 1);
+    const rawSongs = findSongsArray(body);
 
     console.log(`taskId="${taskId}" | songs=${rawSongs.length}`);
 
@@ -128,6 +135,38 @@ export async function POST(request: NextRequest) {
     });
 
     setTaskSongs(taskId, songs);
+
+    // ── Bunny Storage'a kalıcı indirme ──
+    // Suno dosyaları 15 gün sonra silinir + stream URL'leri dakikalar içinde expire eder.
+    // Callback'te source_audio_url geldiğinde arka planda Bunny'e yükle, DB'ye key yaz.
+    if (isBunnyConfigured()) {
+      for (const s of songs) {
+        const src = rawSongs.find((r) => r.id === s.id);
+        if (!src) continue;
+        const longLivedAudio =
+          src.source_audio_url || src.audio_url || src.audioUrl;
+        if (longLivedAudio) {
+          uploadAudioInBackground(
+            longLivedAudio,
+            `${s.id}.mp3`,
+            async (key) => {
+              await updateSongAudioKey(s.id, key);
+            },
+          );
+        }
+        const longLivedImage =
+          src.source_image_url || src.image_url || src.imageUrl;
+        if (longLivedImage) {
+          uploadImageInBackground(
+            longLivedImage,
+            `${s.id}.jpg`,
+            async (key) => {
+              await updateSongImageKey(s.id, key);
+            },
+          );
+        }
+      }
+    }
 
     // Tüm şarkılar tamamlandıysa DB'de task'ı complete olarak işaretle
     const allComplete =

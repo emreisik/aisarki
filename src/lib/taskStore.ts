@@ -1,5 +1,6 @@
 import { Song } from "@/types";
 import sql from "./db";
+import { keyToCdnUrl } from "./bunnyStorage";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -63,6 +64,8 @@ async function ensureSchema() {
   for (const stmt of [
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS task_id TEXT`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS created_by TEXT`,
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS audio_key TEXT`,
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS image_key TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by TEXT`,
   ]) {
     try {
@@ -157,14 +160,26 @@ function rowToSong(row: Record<string, unknown>): Song {
   const creatorUsername = row.creator_username as string | null;
   const creatorImage = row.creator_image as string | null;
 
+  // Kalıcı CDN URL'i varsa onu tercih et, yoksa Suno URL fallback
+  const audioKey = row.audio_key as string | null;
+  const imageKey = row.image_key as string | null;
+  const audioUrl =
+    (audioKey && keyToCdnUrl(audioKey)) ||
+    (row.audio_url as string | null) ||
+    undefined;
+  const imageUrl =
+    (imageKey && keyToCdnUrl(imageKey)) ||
+    (row.image_url as string | null) ||
+    undefined;
+
   return {
     id: row.id as string,
     title: row.title as string,
     style: (row.style as string | null) ?? undefined,
     prompt: (row.prompt as string | null) ?? undefined,
-    audioUrl: (row.audio_url as string | null) ?? undefined,
+    audioUrl,
     streamUrl: (row.stream_url as string | null) ?? undefined,
-    imageUrl: (row.image_url as string | null) ?? undefined,
+    imageUrl,
     duration: row.duration != null ? Number(row.duration) : undefined,
     status: row.status as Song["status"],
     createdAt:
@@ -249,6 +264,31 @@ export async function getAllSongs(userId?: string): Promise<Song[]> {
         ORDER BY s.created_at DESC
       `;
   return rows.map(rowToSong);
+}
+
+export async function updateSongAudioKey(
+  songId: string,
+  audioKey: string,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    await sql`UPDATE songs SET audio_key = ${audioKey} WHERE id = ${songId}`;
+    console.log(`[db] song=${songId} audio_key=${audioKey}`);
+  } catch (e) {
+    console.error("[db] updateSongAudioKey hatası:", e);
+  }
+}
+
+export async function updateSongImageKey(
+  songId: string,
+  imageKey: string,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    await sql`UPDATE songs SET image_key = ${imageKey} WHERE id = ${songId}`;
+  } catch (e) {
+    console.error("[db] updateSongImageKey hatası:", e);
+  }
 }
 
 export async function upsertSongs(

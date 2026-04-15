@@ -7,8 +7,7 @@ import {
 } from "@/lib/taskStore";
 import { Song } from "@/types";
 
-const SUNO_API_KEY =
-  process.env.SUNO_API_KEY ?? "7049ff127b2d972a33fef22566de8512";
+const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
 
 interface RawSunoSong {

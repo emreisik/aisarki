@@ -3,8 +3,12 @@ import { GenerateRequest, SunoApiResponse } from "@/types";
 import { saveProcessingTask } from "@/lib/taskStore";
 import { auth } from "@/auth";
 
-const SUNO_API_KEY = "7049ff127b2d972a33fef22566de8512";
+const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
+
+if (!SUNO_API_KEY && process.env.NODE_ENV === "production") {
+  console.error("[generate] SUNO_API_KEY env değişkeni tanımlı değil");
+}
 
 function getCallbackUrl(request: NextRequest): string {
   // Use APP_URL env if set (production), otherwise derive from request origin
