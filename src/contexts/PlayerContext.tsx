@@ -299,7 +299,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         });
       } catch {}
     }
-  }, [session?.user]);
+  }, []);
 
   const handleEnded = useCallback(() => {
     // Repeat one: aynı şarkıyı baştan çal
