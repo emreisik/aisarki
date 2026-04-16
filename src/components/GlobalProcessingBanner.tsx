@@ -70,6 +70,29 @@ export default function GlobalProcessingBanner() {
     }
   };
 
+  const [retryingTaskId, setRetryingTaskId] = useState<string | null>(null);
+  const handleRetry = async (taskId: string) => {
+    if (retryingTaskId) return;
+    setRetryingTaskId(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/retry`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Eski failed task'ı UI'dan kaldır
+        setTasks((prev) => prev.filter((t) => t.taskId !== taskId));
+      } else {
+        // Hata — kullanıcıya bildir (basit alert yeterli)
+        alert(data.error || "Yeniden başlatılamadı");
+      }
+    } catch {
+      alert("Bağlantı hatası");
+    } finally {
+      setRetryingTaskId(null);
+    }
+  };
+
   if (tasks.length === 0) return null;
 
   // Mobil: MiniPlayer ve BottomNav'ın üstünde; desktop: alt player bar üstünde
@@ -83,7 +106,12 @@ export default function GlobalProcessingBanner() {
       style={{ bottom: mobileBottom }}
     >
       <div className="pointer-events-auto">
-        <ProcessingBanner tasks={tasks} onDismissFailed={handleDismissFailed} />
+        <ProcessingBanner
+          tasks={tasks}
+          onDismissFailed={handleDismissFailed}
+          onRetry={handleRetry}
+          retryingTaskId={retryingTaskId}
+        />
       </div>
     </div>
   );

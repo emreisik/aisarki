@@ -185,9 +185,13 @@ export async function POST(request: NextRequest) {
 
       // Error durumunda taskId varsa kaydet + failed olarak işaretle
       if (taskId) {
-        const session = await auth();
-        const userId = session?.user?.id ?? undefined;
-        saveProcessingTask(taskId, finalPrompt, userId).catch((e) =>
+        saveProcessingTask(
+          taskId,
+          finalPrompt,
+          session.user.id,
+          body as unknown as Record<string, unknown>,
+          "music",
+        ).catch((e) =>
           console.error("[db] saveProcessingTask hatası (error case):", e),
         );
         markTaskFailed(taskId, translated.title, translated.message).catch(
@@ -201,13 +205,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Başarılı case'de taskId'yi DB'ye kaydet
+    // Başarılı case'de taskId'yi + tam payload'ı kaydet (retry için)
     if (taskId) {
-      const session = await auth();
-      const userId = session?.user?.id ?? undefined;
-      saveProcessingTask(taskId, finalPrompt, userId).catch((e) =>
-        console.error("[db] saveProcessingTask hatası:", e),
-      );
+      saveProcessingTask(
+        taskId,
+        finalPrompt,
+        session.user.id,
+        body as unknown as Record<string, unknown>,
+        "music",
+      ).catch((e) => console.error("[db] saveProcessingTask hatası:", e));
     }
 
     return NextResponse.json(data);

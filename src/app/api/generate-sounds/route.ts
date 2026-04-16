@@ -115,9 +115,13 @@ export async function POST(request: NextRequest) {
         data.message || data.error || data.msg || "Ses üretimi başlatılamadı";
       const translated = translateSunoError(data.code, rawMsg);
       if (taskId) {
-        saveProcessingTask(taskId, prompt.trim(), session.user.id).catch((e) =>
-          console.error("[db] saveProcessingTask hatası:", e),
-        );
+        saveProcessingTask(
+          taskId,
+          prompt.trim(),
+          session.user.id,
+          body as unknown as Record<string, unknown>,
+          "sounds",
+        ).catch((e) => console.error("[db] saveProcessingTask hatası:", e));
         markTaskFailed(taskId, translated.title, translated.message).catch(
           () => {},
         );
@@ -133,9 +137,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (taskId) {
-      saveProcessingTask(taskId, prompt.trim(), session.user.id).catch((e) =>
-        console.error("[db] saveProcessingTask hatası:", e),
-      );
+      saveProcessingTask(
+        taskId,
+        prompt.trim(),
+        session.user.id,
+        body as unknown as Record<string, unknown>,
+        "sounds",
+      ).catch((e) => console.error("[db] saveProcessingTask hatası:", e));
     }
 
     return NextResponse.json(data);

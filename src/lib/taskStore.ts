@@ -69,6 +69,8 @@ async function ensureSchema() {
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_title TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_message TEXT`,
+    sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS payload JSONB`,
+    sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS endpoint TEXT`,
   ]) {
     try {
       await stmt;
@@ -85,13 +87,54 @@ export async function saveProcessingTask(
   taskId: string,
   prompt: string,
   userId?: string,
+  payload?: Record<string, unknown>,
+  endpoint?: "music" | "sounds",
 ): Promise<void> {
   await ensureSchema();
   await sql`
-    INSERT INTO tasks (task_id, prompt, created_by)
-    VALUES (${taskId}, ${prompt}, ${userId ?? null})
+    INSERT INTO tasks (task_id, prompt, created_by, payload, endpoint)
+    VALUES (
+      ${taskId},
+      ${prompt},
+      ${userId ?? null},
+      ${payload ? JSON.stringify(payload) : null},
+      ${endpoint ?? null}
+    )
     ON CONFLICT (task_id) DO NOTHING
   `;
+}
+
+export interface TaskPayload {
+  taskId: string;
+  payload: Record<string, unknown> | null;
+  endpoint: string | null;
+  userId: string | null;
+  prompt: string;
+}
+
+export async function getTaskPayload(
+  taskId: string,
+): Promise<TaskPayload | null> {
+  try {
+    await ensureSchema();
+    const rows = await sql`
+      SELECT task_id, payload, endpoint, created_by, prompt
+      FROM tasks
+      WHERE task_id = ${taskId}
+      LIMIT 1
+    `;
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return {
+      taskId: r.task_id as string,
+      payload: (r.payload as Record<string, unknown> | null) ?? null,
+      endpoint: (r.endpoint as string | null) ?? null,
+      userId: (r.created_by as string | null) ?? null,
+      prompt: (r.prompt as string) ?? "",
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function markTaskComplete(taskId: string): Promise<void> {

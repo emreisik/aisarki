@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, RotateCcw } from "lucide-react";
 
 export interface ProcessingTask {
   taskId: string;
@@ -16,9 +16,13 @@ export interface ProcessingTask {
 export default function ProcessingBanner({
   tasks,
   onDismissFailed,
+  onRetry,
+  retryingTaskId,
 }: {
   tasks: ProcessingTask[];
   onDismissFailed?: (taskId: string) => void;
+  onRetry?: (taskId: string) => void;
+  retryingTaskId?: string | null;
 }) {
   if (tasks.length === 0) return null;
 
@@ -150,14 +154,35 @@ export default function ProcessingBanner({
                   &ldquo;{t.title}&rdquo;
                 </p>
               )}
-              {onDismissFailed && (
-                <button
-                  onClick={() => onDismissFailed(t.taskId)}
-                  className="mt-3 text-xs font-semibold text-red-300 hover:text-white border border-red-500/40 hover:border-red-500 hover:bg-red-500/10 rounded-full px-3 py-1 transition-colors pressable"
-                >
-                  Tamam, kapat
-                </button>
-              )}
+              <div className="flex items-center gap-2 mt-3">
+                {onRetry && (
+                  <button
+                    onClick={() => onRetry(t.taskId)}
+                    disabled={retryingTaskId === t.taskId}
+                    className="flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-[#a78bfa] to-[#7c3aed] hover:scale-105 rounded-full px-3.5 py-1.5 transition-all pressable disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                  >
+                    {retryingTaskId === t.taskId ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Yeniden başlatılıyor...
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw size={12} />
+                        Tekrar Dene
+                      </>
+                    )}
+                  </button>
+                )}
+                {onDismissFailed && (
+                  <button
+                    onClick={() => onDismissFailed(t.taskId)}
+                    className="text-xs font-semibold text-red-300 hover:text-white border border-red-500/40 hover:border-red-500 hover:bg-red-500/10 rounded-full px-3 py-1.5 transition-colors pressable"
+                  >
+                    Kapat
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
