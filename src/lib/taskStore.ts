@@ -69,6 +69,7 @@ async function ensureSchema() {
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS play_count INT NOT NULL DEFAULT 0`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS play_count_7d INT NOT NULL DEFAULT 0`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS like_count INT NOT NULL DEFAULT 0`,
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS comment_count INT NOT NULL DEFAULT 0`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_title TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_message TEXT`,
@@ -116,6 +117,16 @@ async function ensureSchema() {
       PRIMARY KEY (user_id, song_id)
     )
   `;
+  // song_comments — Suno tarzı yorum sistemi
+  await sql`
+    CREATE TABLE IF NOT EXISTS song_comments (
+      id         TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      song_id    TEXT NOT NULL,
+      user_id    TEXT NOT NULL,
+      body       TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
   for (const stmt of [
     sql`CREATE INDEX IF NOT EXISTS idx_song_likes_user_created ON song_likes (user_id, created_at DESC)`,
     sql`CREATE INDEX IF NOT EXISTS idx_song_likes_song ON song_likes (song_id)`,
@@ -127,6 +138,8 @@ async function ensureSchema() {
     sql`CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows (follower_id, created_at DESC)`,
     sql`CREATE INDEX IF NOT EXISTS idx_follows_following ON follows (following_id)`,
     sql`CREATE INDEX IF NOT EXISTS idx_tasks_active ON tasks (status, created_at DESC) WHERE status IN ('processing', 'failed')`,
+    sql`CREATE INDEX IF NOT EXISTS idx_song_comments_song_created ON song_comments (song_id, created_at DESC)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_song_comments_user ON song_comments (user_id)`,
   ]) {
     try {
       await stmt;
@@ -357,6 +370,8 @@ function rowToSong(row: Record<string, unknown>): Song {
     status: row.status as Song["status"],
     playCount: row.play_count != null ? Number(row.play_count) : undefined,
     likeCount: row.like_count != null ? Number(row.like_count) : undefined,
+    commentCount:
+      row.comment_count != null ? Number(row.comment_count) : undefined,
     createdAt:
       row.created_at instanceof Date
         ? row.created_at.toISOString()
@@ -404,7 +419,9 @@ export async function getSongsByTaskId(taskId: string): Promise<Song[]> {
       u.avatar_url   AS creator_image
     FROM songs s
     LEFT JOIN users u ON u.id::text = s.created_by
-    WHERE s.task_id = ${taskId} AND s.status = 'complete' AND s.audio_key IS NOT NULL
+    WHERE s.task_id = ${taskId}
+      AND s.status = 'complete'
+      AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
     ORDER BY s.created_at ASC
   `;
   return rows.map(rowToSong);
@@ -423,7 +440,7 @@ export async function getAllSongs(userId?: string): Promise<Song[]> {
         FROM songs s
         LEFT JOIN users u ON u.id::text = s.created_by
         WHERE s.created_by = ${userId}
-          AND s.audio_key IS NOT NULL
+          AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
         ORDER BY s.created_at DESC
       `
     : await sql`
@@ -435,7 +452,7 @@ export async function getAllSongs(userId?: string): Promise<Song[]> {
           u.avatar_url   AS creator_image
         FROM songs s
         LEFT JOIN users u ON u.id::text = s.created_by
-        WHERE s.audio_key IS NOT NULL
+        WHERE (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
         ORDER BY s.created_at DESC
       `;
   return rows.map(rowToSong);
@@ -1075,4 +1092,140 @@ export async function getLikedSongIds(userId: string): Promise<Set<string>> {
     SELECT song_id FROM song_likes WHERE user_id = ${userId}
   `;
   return new Set(rows.map((r) => r.song_id as string));
+}
+
+/* ── Comments ── */
+
+export interface CommentRow {
+  id: string;
+  songId: string;
+  userId: string;
+  body: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    name: string;
+    username: string;
+    image?: string;
+  };
+}
+
+export async function addComment(
+  songId: string,
+  userId: string,
+  body: string,
+): Promise<CommentRow | null> {
+  await ensureSchema();
+  const trimmed = body.trim().slice(0, 1000);
+  if (!trimmed) return null;
+  const rows = await sql`
+    INSERT INTO song_comments (song_id, user_id, body)
+    VALUES (${songId}, ${userId}, ${trimmed})
+    RETURNING id, song_id, user_id, body, created_at
+  `;
+  await sql`UPDATE songs SET comment_count = comment_count + 1 WHERE id = ${songId}`;
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id as string,
+    songId: r.song_id as string,
+    userId: r.user_id as string,
+    body: r.body as string,
+    createdAt:
+      r.created_at instanceof Date
+        ? r.created_at.toISOString()
+        : (r.created_at as string),
+  };
+}
+
+export async function getComments(
+  songId: string,
+  limit: number = 100,
+): Promise<CommentRow[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT
+      c.id, c.song_id, c.user_id, c.body, c.created_at,
+      u.id AS u_id, u.display_name, u.username, u.avatar_url
+    FROM song_comments c
+    LEFT JOIN users u ON u.id::text = c.user_id
+    WHERE c.song_id = ${songId}
+    ORDER BY c.created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => ({
+    id: r.id as string,
+    songId: r.song_id as string,
+    userId: r.user_id as string,
+    body: r.body as string,
+    createdAt:
+      r.created_at instanceof Date
+        ? r.created_at.toISOString()
+        : (r.created_at as string),
+    user:
+      r.u_id && r.username
+        ? {
+            id: r.u_id as string,
+            name: (r.display_name as string) ?? (r.username as string),
+            username: r.username as string,
+            image: (r.avatar_url as string) ?? undefined,
+          }
+        : undefined,
+  }));
+}
+
+/** Comment sahibi veya şarkı sahibi silebilir. */
+export async function deleteComment(
+  commentId: string,
+  userId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT c.song_id, c.user_id, s.created_by
+    FROM song_comments c
+    LEFT JOIN songs s ON s.id = c.song_id
+    WHERE c.id = ${commentId}
+    LIMIT 1
+  `;
+  if (rows.length === 0) return false;
+  const r = rows[0];
+  const isAuthor = r.user_id === userId;
+  const isSongOwner = r.created_by === userId;
+  if (!isAuthor && !isSongOwner) return false;
+  await sql`DELETE FROM song_comments WHERE id = ${commentId}`;
+  await sql`
+    UPDATE songs
+    SET comment_count = GREATEST(comment_count - 1, 0)
+    WHERE id = ${r.song_id}
+  `;
+  return true;
+}
+
+/* ── Similar songs (aynı sanatçı) ── */
+
+export async function getSimilarSongs(
+  songId: string,
+  limit: number = 8,
+): Promise<Song[]> {
+  await ensureSchema();
+  // Aynı sanatçının diğer şarkıları, en popüler önce
+  const rows = await sql`
+    SELECT
+      s2.*,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image
+    FROM songs s1
+    JOIN songs s2
+      ON s2.created_by = s1.created_by
+     AND s2.id <> s1.id
+    LEFT JOIN users u ON u.id::text = s2.created_by
+    WHERE s1.id = ${songId}
+      AND s2.status = 'complete'
+      AND s2.audio_key IS NOT NULL
+    ORDER BY s2.play_count DESC, s2.created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(rowToSong);
 }

@@ -1,32 +1,15 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import Link from "next/link";
+import { use, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Play,
-  Pause,
-  Music2,
-  Heart,
-  Share2,
-  Check,
-} from "lucide-react";
+import { ArrowLeft, Music2, Wand2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
-
-function fmt(s?: number) {
-  if (!s || isNaN(s)) return null;
-  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-}
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("tr-TR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
+import SongHero from "@/components/song/SongHero";
+import LyricsBlock from "@/components/song/LyricsBlock";
+import CommentsSection from "@/components/song/CommentsSection";
+import SimilarRail from "@/components/song/SimilarRail";
 
 function useDominantColor(imageUrl?: string | null) {
   const [rgb, setRgb] = useState("30,30,40");
@@ -60,7 +43,7 @@ function useDominantColor(imageUrl?: string | null) {
           }
         }
         if (n > 0 && !cancelled) {
-          const dk = 0.65;
+          const dk = 0.55;
           setRgb(
             `${Math.floor((r / n) * dk)},${Math.floor((g / n) * dk)},${Math.floor((b / n) * dk)}`,
           );
@@ -84,31 +67,104 @@ export default function SongClient({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const { data: session } = useSession();
   const { playSong, currentSong, playing, togglePlay } = usePlayer();
+
   const [song, setSong] = useState<Song | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
+  // Like state
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [likeBusy, setLikeBusy] = useState(false);
+
+  // Follow state
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+
+  // Comment count (hero badge'de göstermek için)
+  const [commentCount, setCommentCount] = useState(0);
+
+  // Dominant renk — hero gradient
+  const rgb = useDominantColor(song?.imageUrl);
+
+  // Şarkı fetch
   useEffect(() => {
+    let cancelled = false;
     fetch(`/api/song/${id}`)
       .then((r) => r.json())
-      .then((d) => setSong(d.song ?? null))
-      .finally(() => setLoading(false));
+      .then((d) => {
+        if (cancelled) return;
+        const s: Song | null = d.song ?? null;
+        setSong(s);
+        setLikeCount(s?.likeCount ?? 0);
+        setCommentCount(s?.commentCount ?? 0);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
+  // Liked durumu (login varsa)
+  useEffect(() => {
+    if (!session?.user?.id || !song?.id) return;
+    let cancelled = false;
+    fetch(`/api/likes/ids`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        const ids: string[] = d.ids ?? [];
+        setLiked(ids.includes(song.id));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, song?.id]);
+
+  // Follow durumu
+  useEffect(() => {
+    if (!session?.user?.id || !song?.creator?.username) return;
+    if (session.user.id === song.creator.id) return;
+    let cancelled = false;
+    fetch(`/api/profile/${song.creator.username}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        setIsFollowing(Boolean(d.isFollowing));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, song?.creator?.id, song?.creator?.username]);
+
   const isActive = currentSong?.id === song?.id;
-  const dominantRgb = useDominantColor(song?.imageUrl);
+
+  const handlePlay = () => {
+    if (!song || song.status !== "complete") return;
+    if (isActive) togglePlay();
+    else playSong(song, [song]);
+  };
 
   const handleShare = async () => {
     const url = `${window.location.origin}/song/${id}`;
     if (navigator.share) {
-      await navigator.share({
-        title: song?.title ?? "Hubeya",
-        text: song?.creator
-          ? `${song.title} — ${song.creator.name} • Hubeya`
-          : song?.title,
-        url,
-      });
+      try {
+        await navigator.share({
+          title: song?.title ?? "Hubeya",
+          text: song?.creator
+            ? `${song.title} — ${song.creator.name} • Hubeya`
+            : song?.title,
+          url,
+        });
+      } catch {
+        /* kullanıcı iptal etti */
+      }
     } else {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -116,11 +172,59 @@ export default function SongClient({
     }
   };
 
-  const handlePlay = () => {
-    if (!song || song.status !== "complete") return;
-    if (isActive) togglePlay();
-    else playSong(song, [song]);
+  const handleToggleLike = async () => {
+    if (!song?.id || likeBusy) return;
+    if (!session?.user) {
+      router.push("/auth/signin");
+      return;
+    }
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setLikeCount((c) => Math.max(0, c + (nextLiked ? 1 : -1)));
+    setLikeBusy(true);
+    try {
+      const res = await fetch("/api/likes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ songId: song.id }),
+      });
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      setLiked(!!d.liked);
+      if (typeof d.likeCount === "number") setLikeCount(d.likeCount);
+    } catch {
+      // revert
+      setLiked(!nextLiked);
+      setLikeCount((c) => Math.max(0, c + (nextLiked ? -1 : 1)));
+    } finally {
+      setLikeBusy(false);
+    }
   };
+
+  const handleToggleFollow = async () => {
+    if (!song?.creator?.id || followBusy) return;
+    if (!session?.user) {
+      router.push("/auth/signin");
+      return;
+    }
+    setFollowBusy(true);
+    try {
+      const res = await fetch(`/api/follow/${song.creator.id}`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setIsFollowing(Boolean(d.following));
+      }
+    } finally {
+      setFollowBusy(false);
+    }
+  };
+
+  const handleRemix = useCallback(() => {
+    if (!song?.id) return;
+    router.push(`/create?remixFrom=${song.id}`);
+  }, [router, song?.id]);
 
   if (loading) {
     return (
@@ -145,105 +249,104 @@ export default function SongClient({
     );
   }
 
+  const canFollow = !!song.creator && song.creator.id !== session?.user?.id;
+
   return (
     <div className="min-h-full bg-[#0a0a0a]">
-      {/* Hero */}
+      {/* Arka plan gradient — hero arkasında */}
       <div
-        className="relative pb-0 overflow-hidden"
+        className="sticky top-0 -z-10 h-0"
         style={{
-          background: `linear-gradient(180deg, rgb(${dominantRgb}) 0%, rgba(${dominantRgb},0.6) 50%, #0a0a0a 100%)`,
-          minHeight: 380,
+          background: `linear-gradient(180deg, rgb(${rgb}) 0%, rgba(${rgb},0.3) 30%, #0a0a0a 60%)`,
         }}
-      >
-        {song.imageUrl && (
-          <div
-            className="absolute inset-0 opacity-20"
-            style={{
-              backgroundImage: `url(${song.imageUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              filter: "blur(40px)",
-              transform: "scale(1.1)",
-            }}
-          />
-        )}
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[480px] -z-10 opacity-80"
+        style={{
+          background: `linear-gradient(180deg, rgb(${rgb}) 0%, rgba(${rgb},0.3) 50%, rgba(10,10,10,0) 100%)`,
+        }}
+      />
 
+      {/* Top bar */}
+      <div className="sticky top-0 z-20 backdrop-blur bg-black/20">
         <button
           onClick={() => router.back()}
-          className="absolute top-4 left-4 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/30 pressable"
+          className="flex items-center gap-2 px-4 py-3 text-white hover:text-[#1db954] transition-colors pressable"
         >
-          <ArrowLeft size={20} className="text-white" />
+          <ArrowLeft size={20} />
+          <span className="text-sm font-semibold">Geri</span>
         </button>
+      </div>
 
-        <div className="relative z-10 px-5 pt-14 pb-6 flex flex-col items-center gap-5">
-          <div className="w-56 h-56 rounded-xl overflow-hidden shadow-2xl flex-shrink-0">
-            {song.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={song.imageUrl}
-                alt={song.title}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-[#282828] flex items-center justify-center">
-                <Music2 size={64} className="text-[#535353]" />
-              </div>
-            )}
-          </div>
+      {/* İçerik — split layout */}
+      <div className="mx-auto max-w-[1400px] px-4 md:px-8 pb-28">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+          {/* Sol kolon */}
+          <div className="flex-1 min-w-0">
+            <SongHero
+              song={song}
+              isActive={isActive}
+              playing={playing}
+              onPlay={handlePlay}
+              onShare={handleShare}
+              copied={copied}
+              liked={liked}
+              likeBusy={likeBusy}
+              onToggleLike={handleToggleLike}
+              isFollowing={isFollowing}
+              followBusy={followBusy}
+              onToggleFollow={handleToggleFollow}
+              canFollow={canFollow}
+              commentCount={commentCount}
+            />
 
-          <div className="w-full">
-            <h1 className="text-white text-2xl font-black leading-tight truncate">
-              {song.title}
-            </h1>
-            {song.creator && (
-              <Link
-                href={`/profile/${song.creator.username}`}
-                className="text-white/70 text-sm font-semibold mt-1 inline-block hover:text-white transition-colors"
+            {/* Mobile Remix — hero altına */}
+            <div className="lg:hidden mt-5">
+              <button
+                onClick={handleRemix}
+                className="w-full flex items-center justify-center gap-2 rounded-full bg-white/10 hover:bg-white/15 text-white font-bold py-3 transition-colors pressable"
               >
-                {song.creator.name}
-              </Link>
-            )}
+                <Wand2 size={18} /> Remix Yap
+              </button>
+            </div>
+
+            {/* Sözler */}
+            <div className="mt-8 pt-8 border-t border-white/5">
+              <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-4">
+                Sözler
+              </p>
+              <LyricsBlock text={song.prompt} />
+            </div>
+
+            {/* Yorumlar */}
+            <div className="mt-10 pt-8 border-t border-white/5">
+              <CommentsSection
+                songId={id}
+                songOwnerId={song.creator?.id}
+                onCountChange={setCommentCount}
+              />
+            </div>
           </div>
+
+          {/* Sağ kolon — desktop only */}
+          <aside className="hidden lg:flex lg:w-[320px] flex-col flex-shrink-0">
+            <div className="sticky top-16">
+              <SimilarRail songId={id} creatorName={song.creator?.name} />
+
+              <button
+                onClick={handleRemix}
+                className="mt-6 w-full flex items-center justify-center gap-2 rounded-full bg-white/10 hover:bg-white/15 text-white font-bold py-3 transition-colors pressable"
+              >
+                <Wand2 size={18} /> Remix Yap
+              </button>
+            </div>
+          </aside>
         </div>
-      </div>
 
-      {/* Controls */}
-      <div className="px-5 py-4 flex items-center justify-between">
-        <button className="w-10 h-10 flex items-center justify-center pressable">
-          <Heart size={24} className="text-[#a7a7a7]" />
-        </button>
-
-        <button
-          onClick={handlePlay}
-          disabled={song.status !== "complete"}
-          className="w-16 h-16 rounded-full bg-[#1db954] flex items-center justify-center pressable hover:scale-105 transition-transform shadow-2xl disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {isActive && playing ? (
-            <Pause size={30} fill="black" className="text-black" />
-          ) : (
-            <Play size={30} fill="black" className="text-black ml-1" />
-          )}
-        </button>
-
-        <button
-          onClick={handleShare}
-          className="w-10 h-10 flex items-center justify-center pressable"
-        >
-          {copied ? (
-            <Check size={22} className="text-[#1db954]" />
-          ) : (
-            <Share2 size={22} className="text-[#a7a7a7]" />
-          )}
-        </button>
-      </div>
-
-      {/* Meta */}
-      <div className="px-5 pt-2 pb-10 border-t border-white/5">
-        <p className="text-[#a7a7a7] text-xs mt-4">
-          {fmt(song.duration) ? `${fmt(song.duration)} · ` : ""}
-          {fmtDate(song.createdAt)}
-        </p>
-        <p className="text-[#535353] text-xs mt-1">Hubeya ile oluşturuldu</p>
+        {/* Mobile Similar — en sonda */}
+        <div className="lg:hidden mt-10 pt-8 border-t border-white/5">
+          <SimilarRail songId={id} creatorName={song.creator?.name} />
+        </div>
       </div>
     </div>
   );

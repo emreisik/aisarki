@@ -21,6 +21,8 @@ export interface Song {
   likeCount?: number;
   /** O anki kullanıcı bu şarkıyı beğendi mi? (opsiyonel, frontend için) */
   liked?: boolean;
+  /** Toplam yorum sayısı (song_comments tablosundan denormalize) */
+  commentCount?: number;
   createdAt: string;
   creator?: SongCreator;
 }
@@ -38,6 +40,15 @@ export interface Playlist {
   owner?: { username: string; displayName: string };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SongComment {
+  id: string;
+  songId: string;
+  userId: string;
+  body: string;
+  createdAt: string;
+  user?: SongCreator;
 }
 
 export interface GenerateRequest {
