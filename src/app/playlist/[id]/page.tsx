@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import { useRouter } from "next/navigation";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useSession } from "next-auth/react";
 import { Playlist, Song } from "@/types";
@@ -40,6 +41,7 @@ export default function PlaylistPage({
   const { id } = use(params);
   const { playSong, currentSong, playing, togglePlay } = usePlayer();
   const { data: session } = useSession();
+  const router = useRouter();
 
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,6 +131,28 @@ export default function PlaylistPage({
       setEditOpen(false);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!playlist) return;
+    const ok = confirm(
+      `"${playlist.title}" ${isAlbum ? "albümünü" : "listesini"} silmek istediğine emin misin? Bu işlem geri alınamaz.`,
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/playlists/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        router.push("/playlists");
+      } else {
+        alert("Silinemedi — tekrar dene");
+      }
+    } catch {
+      alert("Bağlantı hatası");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -383,6 +407,22 @@ export default function PlaylistPage({
                   <Check size={16} />
                 )}
                 Kaydet
+              </button>
+            </div>
+
+            {/* Tehlike bölgesi — sil */}
+            <div className="mt-6 pt-5 border-t border-[#2a2a2a]">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="w-full flex items-center justify-center gap-2 text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 hover:bg-red-500/5 rounded-full py-2.5 text-sm font-semibold transition-colors pressable disabled:opacity-40"
+              >
+                {deleting ? (
+                  <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Trash2 size={15} />
+                )}
+                {isAlbum ? "Albümü" : "Listeyi"} kalıcı olarak sil
               </button>
             </div>
           </div>

@@ -100,6 +100,22 @@ export async function DELETE(
   }
 
   const { id } = await params;
+
+  // Önce sahibi olduğumuzu doğrula (404/403 ayrımı için)
+  const owns = await sql`
+    SELECT 1 FROM playlists
+    WHERE id = ${id} AND user_id = ${session.user.id}
+    LIMIT 1
+  `;
+  if (owns.length === 0) {
+    return NextResponse.json(
+      { error: "Bulunamadı veya yetkin yok" },
+      { status: 404 },
+    );
+  }
+
+  // Orphan kayıtları temizle, sonra playlist'i sil
+  await sql`DELETE FROM playlist_songs WHERE playlist_id = ${id}`;
   await sql`DELETE FROM playlists WHERE id = ${id} AND user_id = ${session.user.id}`;
 
   return NextResponse.json({ ok: true });
