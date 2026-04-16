@@ -14,7 +14,7 @@ export async function GET() {
         u.username     AS creator_username
       FROM songs s
       LEFT JOIN users u ON u.id::text = s.created_by
-      WHERE s.status = 'complete'
+      WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
       ORDER BY s.created_at DESC
       LIMIT 200
     `;

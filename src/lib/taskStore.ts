@@ -116,6 +116,9 @@ export interface ProcessingTask {
   taskId: string;
   prompt: string;
   startedAt: string;
+  // Suno callback "first" aşamasında geçici cover image gelir — UI blur'lu gösterir
+  imageUrl?: string;
+  title?: string;
 }
 
 export async function getProcessingTasks(
@@ -139,14 +142,22 @@ export async function getProcessingTasks(
             AND created_at > NOW() - INTERVAL '2 hours'
           ORDER BY created_at DESC
         `;
-    return rows.map((r) => ({
-      taskId: r.task_id as string,
-      prompt: (r.prompt as string) ?? "",
-      startedAt:
-        r.created_at instanceof Date
-          ? r.created_at.toISOString()
-          : (r.created_at as string),
-    }));
+    return rows.map((r) => {
+      const taskId = r.task_id as string;
+      // In-memory cache'ten geçici cover image al (callback first aşamasında geldi)
+      const cached = taskStore.get(taskId);
+      const firstWithImage = cached?.find((s) => s.imageUrl);
+      return {
+        taskId,
+        prompt: (r.prompt as string) ?? "",
+        startedAt:
+          r.created_at instanceof Date
+            ? r.created_at.toISOString()
+            : (r.created_at as string),
+        imageUrl: firstWithImage?.imageUrl,
+        title: cached?.[0]?.title,
+      };
+    });
   } catch {
     return [];
   }
@@ -229,7 +240,7 @@ export async function getSongsByTaskId(taskId: string): Promise<Song[]> {
       u.avatar_url   AS creator_image
     FROM songs s
     LEFT JOIN users u ON u.id::text = s.created_by
-    WHERE s.task_id = ${taskId} AND s.status = 'complete'
+    WHERE s.task_id = ${taskId} AND s.status = 'complete' AND s.audio_key IS NOT NULL
     ORDER BY s.created_at ASC
   `;
   return rows.map(rowToSong);
@@ -248,7 +259,7 @@ export async function getAllSongs(userId?: string): Promise<Song[]> {
         FROM songs s
         LEFT JOIN users u ON u.id::text = s.created_by
         WHERE s.created_by = ${userId}
-          AND (s.audio_url IS NOT NULL OR s.stream_url IS NOT NULL)
+          AND s.audio_key IS NOT NULL
         ORDER BY s.created_at DESC
       `
     : await sql`
@@ -260,7 +271,7 @@ export async function getAllSongs(userId?: string): Promise<Song[]> {
           u.avatar_url   AS creator_image
         FROM songs s
         LEFT JOIN users u ON u.id::text = s.created_by
-        WHERE s.audio_url IS NOT NULL OR s.stream_url IS NOT NULL
+        WHERE s.audio_key IS NOT NULL
         ORDER BY s.created_at DESC
       `;
   return rows.map(rowToSong);
@@ -404,7 +415,7 @@ export async function getUserSongs(userId: string): Promise<Song[]> {
       u.avatar_url   AS creator_image
     FROM songs s
     LEFT JOIN users u ON u.id::text = s.created_by
-    WHERE s.status = 'complete' AND s.created_by = ${userId}
+    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL AND s.created_by = ${userId}
     ORDER BY s.created_at DESC
   `;
   return rows.map(rowToSong);

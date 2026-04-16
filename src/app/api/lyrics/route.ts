@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  ARTIST_PRESETS,
+  REGIONS,
+  MAKAMS,
+  ArtistPresetId,
+  RegionId,
+  MakamId,
+} from "@/lib/turkishMusicKB";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 interface LyricsRequest {
   // Bağlam
   topic: string; // "annem için doğum günü şarkısı"
-  // Stil parametreleri
+  // Stil parametreleri (legacy — string label)
   region?: string;
   era?: string;
   makam?: string;
@@ -13,8 +21,10 @@ interface LyricsRequest {
   vocal?: string;
   // Serbest notlar
   customNotes?: string;
-  // Çocuk modu
-  childMode?: boolean;
+  // ── Türk Müzik Bilgi Tabanı entegrasyonu ──
+  artistId?: string; // ArtistPresetId — sanatçı tarzı (lyricsStyle KB'den çekilir)
+  regionId?: string; // RegionId — yöresel ağız (lehçe dictionary KB'den)
+  makamId?: string; // MakamId — makam mood KB'den
 }
 
 export async function POST(request: NextRequest) {
@@ -31,10 +41,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Konu gereklidir" }, { status: 400 });
   }
 
+  // KB ile zenginleştir: sanatçı/yöre/makam ID'lerinden detaylı context çek
+  const artist =
+    body.artistId && body.artistId in ARTIST_PRESETS
+      ? ARTIST_PRESETS[body.artistId as ArtistPresetId]
+      : undefined;
+  const region =
+    body.regionId && body.regionId in REGIONS
+      ? REGIONS[body.regionId as RegionId]
+      : undefined;
+  const makam =
+    body.makamId && body.makamId in MAKAMS
+      ? MAKAMS[body.makamId as MakamId]
+      : undefined;
+
   const contextLines: string[] = [];
-  if (body.region) contextLines.push(`Yöre: ${body.region}`);
+  if (artist) {
+    contextLines.push(`Sanatçı tarzı: ${artist.label}`);
+    contextLines.push(`Tarz açıklaması: ${artist.lyricsStyle}`);
+  }
+  if (region) {
+    contextLines.push(`Yöre: ${region.label}`);
+    contextLines.push(
+      `Yöresel temalar (kullan): ${region.lyricsThemes.join(", ")}`,
+    );
+    if (Object.keys(region.lyricsLehce).length > 0) {
+      const lehceList = Object.entries(region.lyricsLehce)
+        .map(([tr, lehce]) => `"${tr}" → "${lehce}"`)
+        .join(", ");
+      contextLines.push(
+        `Yöresel ağız (uygula): ${lehceList}. Bu kelimeler geçerse bu şekilde yaz.`,
+      );
+    }
+  } else if (body.region) {
+    contextLines.push(`Yöre: ${body.region}`);
+  }
+  if (makam) {
+    contextLines.push(
+      `Makam: ${makam.label} — ${makam.mood}. Bu makamın duygusal ağırlığını yansıt.`,
+    );
+  } else if (body.makam) {
+    contextLines.push(`Makam: ${body.makam}`);
+  }
   if (body.era) contextLines.push(`Dönem: ${body.era}`);
-  if (body.makam) contextLines.push(`Makam: ${body.makam}`);
   if (body.mood) contextLines.push(`Duygu: ${body.mood}`);
   if (body.vocal) contextLines.push(`Vokal: ${body.vocal}`);
   if (body.customNotes) contextLines.push(`Ek notlar: ${body.customNotes}`);
@@ -44,30 +93,22 @@ export async function POST(request: NextRequest) {
       ? `\nMüzikal bağlam:\n${contextLines.join("\n")}`
       : "";
 
-  const systemPrompt = body.childMode
-    ? `Sen yaratıcı bir Türk çocuk şarkısı yazarısın. Çocukların seveceği, eğlenceli, öğretici ve neşeli şarkı sözleri yazarsın.
+  const systemPrompt = `Sen profesyonel bir Türk müzik sözü yazarısın. Arabesk, halk türküsü, şehir popu, TSM, sufi ilahi, Anadolu rock, fantezi ve özgün müzik gibi Türk müzik geleneklerinin tümüne hakimsin. Verilen bağlama ve müzikal stile **birebir uygun**, gerçek duygusal derinliği olan şarkı sözleri yazarsın.
+
+KRİTİK KURAL: Sözlerde veya herhangi bir yerde **gerçek sanatçı/şarkıcı adı geçmesin** (Suno telif kontrolü için). Stil karakteristiklerini tarif et, isim kullanma.
 
 Kurallar:
 - Sözler tamamen Türkçe olmalı
-- Şarkı formatında yaz: [Verse 1], [Chorus], [Verse 2] gibi bölüm etiketleri kullan
-- Her bölüm 4-6 satır olsun
-- Basit, akılda kalıcı kafiyeler kullan — 3-8 yaş çocuklar için uygun
-- Tekrar eden nakarat olsun (çocuklar ezberlemeyi sever)
-- Cümleler kısa ve anlaşılır olsun
-- Hayvanlar, renkler, sayılar, doğa, arkadaşlık, aile gibi temaları kullana bilirsin
-- Neşeli, umut dolu, pozitif bir ton
-- Sadece sözleri yaz, açıklama ekleme`
-    : `Sen profesyonel bir Türk müzik sözü yazarısın. Verilen bağlama ve müzikal stile uygun, gerçek duygusal derinliği olan şarkı sözleri yazarsın.
-
-Kurallar:
-- Sözler tamamen Türkçe olmalı
-- Şarkı formatında yaz: [Verse 1], [Chorus], [Verse 2], [Bridge] gibi bölüm etiketleri kullan
+- Şarkı formatında yaz: [Intro] [Verse 1] [Chorus] [Verse 2] [Bridge] [Outro] gibi bölüm etiketleri kullan (köşeli parantez içinde, İngilizce)
 - Her bölüm 4-6 satır olsun
 - Kafiye ve ritim önemli — şarkı söylenebilir olmalı
-- Yöre ve dönem belirtildiyse o dile, ağza, duygu dünyasına uy (Karadeniz ağzı, arabesk dili vs.)
-- Makam belirtildiyse o makamın duygusal ağırlığını yansıt
-- Klişeden kaçın, özgün imgeler kullan
-- Sadece sözleri yaz, açıklama ekleme`;
+- **Stil tarzı verildiyse**: o stilin dilini, kelime tercihini, duygu yaklaşımını yansıt (sanatçı adı kullanmadan)
+- **Yöre verildiyse**: yöresel kelimeleri kullan, yöresel temaları (yayla, kemençe, fındık, deniz vb.) öre
+- **Yöresel ağız sözlüğü verildiyse**: o kelimeleri tam belirtildiği şekilde yaz (örn "yapayrum")
+- **Makam verildiyse**: o makamın duygusal ağırlığını yansıt
+- Klişeden kaçın: "yağmur, yıldız, gözyaşı" yerine somut Türk kültürel imgeler kullan
+- Türkçe diyakritikleri eksiksiz kullan (ç, ğ, ı, ö, ş, ü)
+- Sadece sözleri yaz, açıklama veya başlık ekleme`;
 
   const userPrompt = `Şarkı konusu: ${body.topic.trim()}${contextBlock}
 

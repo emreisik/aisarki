@@ -4,6 +4,7 @@ import DesktopSidebar from "./DesktopSidebar";
 import BottomNav from "./BottomNav";
 import TopBar from "./TopBar";
 import PlayerShell from "./PlayerShell";
+import GlobalProcessingBanner from "./GlobalProcessingBanner";
 import AppLogo from "./AppLogo";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -68,6 +69,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <BottomNav />
       <PlayerShell />
+      <GlobalProcessingBanner />
     </>
   );
 }

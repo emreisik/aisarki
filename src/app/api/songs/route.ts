@@ -4,7 +4,14 @@ import {
   setTaskSongs,
   markTaskComplete,
   getSongsByTaskId,
+  updateSongAudioKey,
+  updateSongImageKey,
 } from "@/lib/taskStore";
+import {
+  uploadAudioInBackground,
+  uploadImageInBackground,
+  isBunnyConfigured,
+} from "@/lib/bunnyStorage";
 import { Song } from "@/types";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
@@ -136,10 +143,42 @@ async function fetchFromSunoApi(taskId: string): Promise<Song[] | null> {
     console.log(
       `[songs] Parsed ${mapped.length} songs, complete=${mapped.filter((s) => s.status === "complete").length}`,
     );
+    // Local dev fallback: callback gelmese bile Bunny upload'ı tetikle
+    const playableComplete = mapped.filter((s) => s.status === "complete");
+    if (playableComplete.length > 0) {
+      maybeTriggerBunnyUpload(playableComplete, rawArr);
+    }
     return mapped;
   } catch (e) {
     console.log(`[songs] fetchFromSunoApi error for taskId=${taskId}:`, e);
     return null;
+  }
+}
+
+/**
+ * Local dev fallback: callback gelmese bile polling sırasında Bunny upload
+ * tetikle. Çift çalışması sorun değil — Bunny PUT idempotent (aynı path'e
+ * overwrite), aynı audio_key iki kez set edilse de sorun yok.
+ */
+function maybeTriggerBunnyUpload(songs: Song[], rawArr: RawSunoSong[]) {
+  if (!isBunnyConfigured()) return;
+  for (const song of songs) {
+    const raw = rawArr.find((r) => r.id === song.id);
+    if (!raw) continue;
+    const longLivedAudio =
+      raw.source_audio_url || raw.audio_url || raw.audioUrl;
+    if (longLivedAudio && longLivedAudio.startsWith("http")) {
+      uploadAudioInBackground(longLivedAudio, `${song.id}.mp3`, async (key) => {
+        await updateSongAudioKey(song.id, key);
+      });
+    }
+    const longLivedImage =
+      raw.source_image_url || raw.image_url || raw.imageUrl;
+    if (longLivedImage && longLivedImage.startsWith("http")) {
+      uploadImageInBackground(longLivedImage, `${song.id}.jpg`, async (key) => {
+        await updateSongImageKey(song.id, key);
+      });
+    }
   }
 }
 

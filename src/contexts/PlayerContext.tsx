@@ -94,8 +94,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const { song, playlist: pl, index, time, isOpen } = JSON.parse(raw);
-      // audioUrl veya streamUrl varsa oynatabilir
-      if (!song?.audioUrl && !song?.streamUrl) return;
+      // Sadece kalıcı audioUrl (Bunny CDN) varsa oynatabilir
+      if (!song?.audioUrl) return;
 
       restoreTimeRef.current = time ?? 0;
       setCurrentSong(song);
@@ -109,8 +109,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // ── Şarkı değişince yükle ──
   useEffect(() => {
     if (!audioRef.current) return;
-    // audioUrl veya streamUrl varsa kullan
-    const playableUrl = currentSong?.audioUrl || currentSong?.streamUrl;
+    // Sadece kalıcı audioUrl (Bunny CDN) — stream URL fallback yok (duration sorununu önler)
+    const playableUrl = currentSong?.audioUrl;
     if (!playableUrl) return;
 
     const savedTime = restoreTimeRef.current;
@@ -153,7 +153,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const handleAudioError = useCallback(() => {
     const song = currentSong;
     if (!song) return;
-    const url = song.audioUrl || song.streamUrl;
+    const url = song.audioUrl;
     if (!url) return;
 
     const MAX_RETRIES = 4;
@@ -172,12 +172,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     retryTimerRef.current = setTimeout(async () => {
       if (!audioRef.current) return;
-      // Önce API'den taze URL'i çek (audioUrl gelmişse)
+      // Önce API'den taze URL'i çek (Bunny audio_key güncellenmiş olabilir)
       try {
         const res = await fetch(`/api/song/${song.id}`, { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          const fresh = data?.song?.audioUrl || data?.song?.streamUrl;
+          const fresh = data?.song?.audioUrl;
           if (fresh && fresh !== audioRef.current.src) {
             audioRef.current.src = fresh;
           }

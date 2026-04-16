@@ -41,6 +41,7 @@ import Link from "next/link";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import MusicGenerator from "@/components/MusicGenerator";
+import { ProcessingTask } from "@/components/ProcessingBanner";
 import { useSession } from "next-auth/react";
 
 /* ══════════════════════════════════════════════
@@ -849,12 +850,6 @@ const CATEGORY_GROUPS: CategoryGroup[] = [
             type: "text",
           },
           {
-            key: "artist",
-            label: "Beğendiğin arabesk sanatçı",
-            placeholder: "Orhan Gencebay, İbrahim Tatlıses...",
-            type: "text",
-          },
-          {
             key: "mood",
             label: "Duygu yoğunluğu",
             type: "select",
@@ -864,7 +859,6 @@ const CATEGORY_GROUPS: CategoryGroup[] = [
         buildPrompt: (v) =>
           seg(
             v.theme ? `${v.theme} temalı` : "Kader ve aşk temalı",
-            v.artist && `${v.artist} tarzında`,
             `${v.mood || "dramatik"} arabesk şarkı`,
           ),
       },
@@ -1582,21 +1576,28 @@ export default function HomePage() {
       try {
         const res = await fetch(`/api/songs?taskId=${taskId}`);
         const data = await res.json();
-        if (data.status === "complete" && data.songs?.length > 0) {
+        // SADECE audioUrl (Bunny CDN) gelen şarkıları tamamlandı say
+        const playable = ((data.songs as Song[]) ?? []).filter(
+          (s) => s.audioUrl,
+        );
+        if (
+          data.status === "complete" &&
+          playable.length > 0 &&
+          playable.length >= (data.songs?.length ?? 1)
+        ) {
           activePolls.current.delete(taskId);
+          // Banner'dan kaldır
+          setProcessingTasks((prev) => prev.filter((t) => t.taskId !== taskId));
           // Tüm temp girişleri kaldır, gerçek şarkıları başa ekle
           setGeneratedSongs((prev) => {
             const withoutTemps = prev.filter((s) => !tempIds.includes(s.id));
             const ids = new Set(withoutTemps.map((s) => s.id));
-            const fresh = (data.songs as Song[]).filter((s) => !ids.has(s.id));
+            const fresh = playable.filter((s) => !ids.has(s.id));
             return [...fresh, ...withoutTemps];
           });
           setAllSongs((prev) => {
             const ids = new Set(prev.map((s) => s.id));
-            return [
-              ...(data.songs as Song[]).filter((s) => !ids.has(s.id)),
-              ...prev,
-            ];
+            return [...playable.filter((s) => !ids.has(s.id)), ...prev];
           });
         } else {
           setTimeout(poll, 5000);
@@ -1654,41 +1655,34 @@ export default function HomePage() {
     }
   };
 
-  // MusicGenerator callback — taskId gelince polling başlat, stream varsa direkt ekle
+  // MusicGenerator callback — taskId alınınca processing banner görünür
+  // (state /api/all-songs polling üzerinden besleniyor); polling sadece DB'de audio_key
+  // gelene kadar bekler, ardından completedSongs'a ekler.
   const handleTaskStarted = useCallback(
     (
       taskId: string,
       promptText: string,
       titleText: string,
-      streamUrl?: string,
-      songId?: string,
+      _streamUrl?: string,
+      _songId?: string,
     ) => {
       setError("");
-      if (streamUrl && songId) {
-        const instantSong: Song = {
-          id: songId,
-          title: titleText || promptText.slice(0, 50),
-          prompt: promptText,
-          streamUrl,
-          status: "complete",
-          createdAt: new Date().toISOString(),
-        };
-        handleSongsAdded([instantSong]);
-        return;
-      }
-      const tempSongs: Song[] = [1, 2].map((i) => ({
-        id: `temp-${Date.now()}-${i}`,
-        title: titleText || promptText.slice(0, 40),
-        status: "processing" as const,
-        createdAt: new Date().toISOString(),
-      }));
-      handleSongsAdded(tempSongs);
-      pollForSongs(
-        taskId,
-        tempSongs.map((s) => s.id),
-      );
+      // Banner'ı hemen göster (polling next iter'a kadar boş kalmasın)
+      setProcessingTasks((prev) => {
+        if (prev.some((t) => t.taskId === taskId)) return prev;
+        return [
+          {
+            taskId,
+            title: titleText || promptText.slice(0, 50),
+            startedAt: new Date().toISOString(),
+          },
+          ...prev,
+        ];
+      });
+      // Şarkılar audio_key sahibi olduğunda discover/playlist gibi listelerde otomatik belirir.
+      pollForSongs(taskId, []);
     },
-    [handleSongsAdded, pollForSongs],
+    [pollForSongs],
   );
 
   const moreSongs = allSongs.slice(0, 18);
@@ -1701,6 +1695,43 @@ export default function HomePage() {
       .then((d) => setDiscoverSongs(d.songs || []))
       .catch(() => {});
   }, []);
+
+  // ── Üretim sürecindeki taskları takip et (her 5sn poll) ──
+  const [processingTasks, setProcessingTasks] = useState<ProcessingTask[]>([]);
+  useEffect(() => {
+    if (!session?.user) return;
+    let cancelled = false;
+    const fetchTasks = async () => {
+      try {
+        const res = await fetch("/api/all-songs", { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled) return;
+        const tasks: Array<{
+          taskId: string;
+          prompt: string;
+          startedAt: string;
+          imageUrl?: string;
+          title?: string;
+        }> = data.processing ?? [];
+        setProcessingTasks(
+          tasks.map((t) => ({
+            taskId: t.taskId,
+            title: t.title || t.prompt?.slice(0, 50) || "Şarkı",
+            startedAt: t.startedAt,
+            imageUrl: t.imageUrl,
+          })),
+        );
+      } catch {
+        /* sessizce geç */
+      }
+    };
+    fetchTasks();
+    const id = setInterval(fetchTasks, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [session?.user]);
 
   // Saatlik selamlama
   const greeting = (() => {

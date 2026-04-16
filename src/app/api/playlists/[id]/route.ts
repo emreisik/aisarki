@@ -24,7 +24,7 @@ export async function GET(
     SELECT s.*, ps.position, ps.added_at
     FROM playlist_songs ps
     JOIN songs s ON s.id = ps.song_id
-    WHERE ps.playlist_id = ${id}
+    WHERE ps.playlist_id = ${id} AND s.audio_key IS NOT NULL
     ORDER BY ps.position ASC, ps.added_at ASC
   `;
 

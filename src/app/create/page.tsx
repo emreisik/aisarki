@@ -4,138 +4,185 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Song } from "@/types";
 import MusicGenerator from "@/components/MusicGenerator";
-import SongCard from "@/components/SongCard";
+import { ProcessingTask } from "@/components/ProcessingBanner";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Loader2, Music2, Play, ListPlus } from "lucide-react";
+import { Music2, ListPlus, Play, Pause, Clock3 } from "lucide-react";
 
-interface ProcessingTask {
-  taskId: string;
-  title: string;
-  startedAt: string;
-  attempts?: number;
-  failed?: boolean;
+// ── Completed song row ────────────────────────────────────────────────────────
+
+function formatDate(iso?: string) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  } catch {
+    return "";
+  }
 }
 
-// ── Processing banner card ────────────────────────────────────────────────────
+function fmtTime(sec: number) {
+  if (!sec || isNaN(sec) || !isFinite(sec)) return "0:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
-function ProcessingBanner({
-  tasks,
-  onDismissFailed,
+/** Üst kısımda küçük şarkı kartı — cover + play + title + style + tarih */
+function SongResultCard({
+  song,
+  selected,
+  playing,
+  onSelect,
+  onPlay,
 }: {
-  tasks: ProcessingTask[];
-  onDismissFailed: (taskId: string) => void;
+  song: Song;
+  selected: boolean;
+  playing: boolean;
+  onSelect: () => void;
+  onPlay: () => void;
 }) {
-  if (tasks.length === 0) return null;
-
-  const activeTasks = tasks.filter((t) => !t.failed);
-  const failedTasks = tasks.filter((t) => t.failed);
-
   return (
-    <div className="mb-6 flex flex-col gap-3">
-      {activeTasks.length > 0 && (
-        <div className="rounded-2xl overflow-hidden border border-[#1db954]/20 bg-[#0d1f14]">
-          {/* Glowing top bar */}
-          <div
-            className="h-1 w-full"
-            style={{
-              background:
-                "linear-gradient(90deg, #1db954 0%, #17a349 50%, #1db954 100%)",
-              backgroundSize: "200% 100%",
-              animation: "shimmer 2s linear infinite",
-            }}
+    <button
+      type="button"
+      onClick={onSelect}
+      className="w-full flex items-center gap-3 rounded-2xl p-3 transition-all text-left pressable"
+      style={{
+        background: selected ? "rgba(124,58,237,0.08)" : "#141414",
+        borderWidth: 1,
+        borderStyle: "solid",
+        borderColor: selected ? "#7c3aed" : "#2a2a2a",
+      }}
+    >
+      {/* Cover + play */}
+      <div className="relative w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-[#7c3aed]/30 to-[#2a2a2a]">
+        {song.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={song.imageUrl}
+            alt={song.title}
+            className="w-full h-full object-cover"
           />
-
-          <div className="px-4 py-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-[#1db954]/10 flex items-center justify-center">
-                <Loader2 size={16} className="text-[#1db954] animate-spin" />
-              </div>
-              <div>
-                <p className="text-white text-sm font-bold">
-                  {activeTasks.length === 1
-                    ? "Şarkın oluşturuluyor"
-                    : `${activeTasks.length} şarkı oluşturuluyor`}
-                </p>
-                <p className="text-[#1db954]/70 text-xs">
-                  Sayfa yenilenirse devam eder · ~1–3 dk
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {activeTasks.map((t) => (
-                <div
-                  key={t.taskId}
-                  className="flex items-center gap-3 bg-[#1db954]/5 rounded-xl px-3 py-2.5"
-                >
-                  {/* Waveform animation */}
-                  <span className="flex items-end gap-[3px] h-4 flex-shrink-0">
-                    {[0, 0.2, 0.1, 0.3, 0.05].map((d, i) => (
-                      <span
-                        key={i}
-                        className="wave-bar rounded-sm"
-                        style={{
-                          width: "2px",
-                          height: "100%",
-                          background: "#1db954",
-                          animationDelay: `${d}s`,
-                        }}
-                      />
-                    ))}
-                  </span>
-                  <p className="text-white text-sm font-medium flex-1 truncate">
-                    {t.title}
-                  </p>
-                  <span className="text-[#1db954]/60 text-xs flex-shrink-0">
-                    {t.attempts != null
-                      ? `${t.attempts}. deneme`
-                      : "×2 versiyon"}
-                  </span>
-                </div>
-              ))}
-            </div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Music2 size={18} className="text-white/50" />
           </div>
-        </div>
-      )}
-
-      {failedTasks.length > 0 && (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-3 flex flex-col gap-2">
-          <p className="text-red-400 text-sm font-semibold">
-            Oluşturma zaman aşımına uğradı
-          </p>
-          {failedTasks.map((t) => (
-            <div
-              key={t.taskId}
-              className="flex items-center justify-between gap-2"
-            >
-              <p className="text-[#a7a7a7] text-xs truncate flex-1">
-                {t.title}
-              </p>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <a
-                  href={`/api/debug-task?taskId=${t.taskId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#a7a7a7] hover:text-white text-xs underline"
-                >
-                  Detay
-                </a>
-                <button
-                  onClick={() => onDismissFailed(t.taskId)}
-                  className="text-[#535353] hover:text-red-400 text-xs transition-colors"
-                >
-                  Kapat
-                </button>
-              </div>
-            </div>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlay();
+          }}
+          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity"
+        >
+          <Play size={18} fill="white" className="text-white" />
+        </button>
+      </div>
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <p className="text-white text-sm font-bold truncate">{song.title}</p>
+        {song.style && (
+          <p className="text-[#a78bfa] text-xs truncate mt-0.5">{song.style}</p>
+        )}
+        <p className="text-[#6a6a6a] text-[11px] mt-1 flex items-center gap-1">
+          <Clock3 size={10} />
+          {formatDate(song.createdAt)}
+        </p>
+      </div>
+      {playing && (
+        <span className="flex items-end gap-[2px] h-4 flex-shrink-0">
+          {[0, 0.15, 0.3].map((d, i) => (
+            <span
+              key={i}
+              className="wave-bar rounded-sm"
+              style={{
+                width: 2,
+                height: "100%",
+                background: "#7c3aed",
+                animationDelay: `${d}s`,
+              }}
+            />
           ))}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** Seçili şarkı için detay panel — büyük player + lyrics */
+function SelectedSongPanel({
+  song,
+  isCurrent,
+  currentTime,
+  duration,
+  onTogglePlay,
+  onAddToPlaylist,
+}: {
+  song: Song;
+  isCurrent: boolean;
+  currentTime: number;
+  duration: number;
+  onTogglePlay: () => void;
+  onAddToPlaylist: () => void;
+}) {
+  const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const displayDuration = duration || song.duration || 0;
+  return (
+    <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-5 flex flex-col gap-4">
+      {/* Title + actions */}
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-white text-lg font-black truncate flex-1">
+          {song.title}
+        </h3>
+        <button
+          type="button"
+          onClick={onAddToPlaylist}
+          className="w-9 h-9 rounded-lg bg-[#1e1e1e] border border-[#3a3a3a] flex items-center justify-center text-[#a7a7a7] hover:text-[#a78bfa] hover:border-[#a78bfa] transition-colors pressable"
+          title="Listeye ekle"
+        >
+          <ListPlus size={15} />
+        </button>
+      </div>
+
+      {/* Player: play button + progress + time */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onTogglePlay}
+          className="w-10 h-10 rounded-full bg-gradient-to-br from-[#a78bfa] to-[#7c3aed] flex items-center justify-center pressable shadow-lg"
+        >
+          {isCurrent ? (
+            <Pause size={16} fill="white" className="text-white" />
+          ) : (
+            <Play size={16} fill="white" className="text-white ml-0.5" />
+          )}
+        </button>
+        <div className="flex-1 relative h-2 rounded-full bg-[#2a2a2a] overflow-hidden">
+          <div
+            className="absolute top-0 left-0 h-full rounded-full bg-gradient-to-r from-[#a78bfa] to-[#7c3aed] transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="text-[#a7a7a7] text-xs tabular-nums flex-shrink-0">
+          {fmtTime(currentTime)} / {fmtTime(displayDuration)}
+        </span>
+      </div>
+
+      {/* Lyrics */}
+      {song.prompt && (
+        <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-[#2a2a2a]">
+          <p className="text-[#7a7a7a] text-[11px] uppercase tracking-widest font-bold">
+            Sözler
+          </p>
+          <pre className="text-[#d4d4d4] text-sm leading-relaxed whitespace-pre-wrap font-sans max-h-96 overflow-y-auto scroll-area">
+            {song.prompt}
+          </pre>
         </div>
       )}
     </div>
   );
 }
-
-// ── Completed song row ────────────────────────────────────────────────────────
 
 function CompletedSection({
   songs,
@@ -148,34 +195,47 @@ function CompletedSection({
   currentSongId?: string;
   onAddToPlaylist: (song: Song) => void;
 }) {
+  const { playing, currentTime, duration, togglePlay } = usePlayer();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // İlk gelen şarkıyı otomatik seç
+  useEffect(() => {
+    if (!selectedId && songs.length > 0) setSelectedId(songs[0].id);
+  }, [songs, selectedId]);
+
   if (songs.length === 0) return null;
 
+  const selected = songs.find((s) => s.id === selectedId) ?? songs[0];
+  const isCurrent = currentSongId === selected.id;
+
   return (
-    <div>
-      <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-3">
-        Bu Oturumda Tamamlananlar
-      </p>
-      <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-3">
+      {/* Üstte şarkı kartları (Suno 2 versiyon üretir) */}
+      <div className="flex flex-col gap-2">
         {songs.map((song) => (
-          <div key={song.id} className="flex items-center gap-2 group">
-            <div className="flex-1 min-w-0">
-              <SongCard
-                song={song}
-                onPlay={(s) => onPlay(s)}
-                isPlaying={currentSongId === song.id}
-                variant="row"
-              />
-            </div>
-            <button
-              onClick={() => onAddToPlaylist(song)}
-              className="flex-shrink-0 w-9 h-9 rounded-full bg-[#1a1a1a] hover:bg-[#2a2a2a] flex items-center justify-center text-[#a7a7a7] hover:text-[#1db954] transition-colors pressable opacity-0 group-hover:opacity-100"
-              title="Listeye ekle"
-            >
-              <ListPlus size={15} />
-            </button>
-          </div>
+          <SongResultCard
+            key={song.id}
+            song={song}
+            selected={selectedId === song.id}
+            playing={currentSongId === song.id && playing}
+            onSelect={() => setSelectedId(song.id)}
+            onPlay={() => onPlay(song)}
+          />
         ))}
       </div>
+
+      {/* Seçili şarkı detay paneli */}
+      <SelectedSongPanel
+        song={selected}
+        isCurrent={isCurrent && playing}
+        currentTime={isCurrent ? currentTime : 0}
+        duration={isCurrent ? duration : (selected.duration ?? 0)}
+        onTogglePlay={() => {
+          if (isCurrent) togglePlay();
+          else onPlay(selected);
+        }}
+        onAddToPlaylist={() => onAddToPlaylist(selected)}
+      />
     </div>
   );
 }
@@ -238,17 +298,34 @@ export default function CreatePage() {
         const res = await fetch(`/api/songs?taskId=${taskId}`);
         const data: { status: string; songs: Song[] } = await res.json();
 
-        if (data.status === "complete" && data.songs?.length > 0) {
+        // Geçici cover image varsa banner'a yansıt (blur olarak gösterilsin)
+        const previewImage = data.songs?.find((s) => s.imageUrl)?.imageUrl;
+        if (previewImage) {
+          setProcessingTasks((prev) =>
+            prev.map((t) =>
+              t.taskId === taskId && !t.imageUrl
+                ? { ...t, imageUrl: previewImage }
+                : t,
+            ),
+          );
+        }
+
+        // SADECE audioUrl (Bunny CDN) gelen şarkıları tamamlandı say
+        // Stream URL ile tamamlanma yetersiz — duration ve seek çalışmıyor
+        const playableSongs = (data.songs ?? []).filter((s) => s.audioUrl);
+
+        if (
+          data.status === "complete" &&
+          playableSongs.length > 0 &&
+          // Suno 2 versiyon üretir; ikisi de Bunny'de mi diye bekle (yoksa tek tek ekle)
+          playableSongs.length >= (data.songs?.length ?? 1)
+        ) {
           pollingRef.current.delete(taskId);
           setProcessingTasks((prev) => prev.filter((t) => t.taskId !== taskId));
 
           setCompletedSongs((prev) => {
             const ids = new Set(prev.map((s) => s.id));
-            const fresh = data.songs.filter((s) => !ids.has(s.id));
-            // Tüm şarkılar zaten ekli ise (streaming URL'den hemen gelmişse), polling stop et
-            if (fresh.length === 0) {
-              pollingRef.current.delete(taskId);
-            }
+            const fresh = playableSongs.filter((s) => !ids.has(s.id));
             return [...fresh, ...prev];
           });
           return;
@@ -292,13 +369,16 @@ export default function CreatePage() {
           taskId: string;
           prompt: string;
           startedAt: string;
+          imageUrl?: string;
+          title?: string;
         }> = d.processing ?? [];
         if (tasks.length > 0) {
           setProcessingTasks(
             tasks.map((t) => ({
               taskId: t.taskId,
-              title: t.prompt?.slice(0, 50) || "Şarkı",
+              title: t.title || t.prompt?.slice(0, 50) || "Şarkı",
               startedAt: t.startedAt,
+              imageUrl: t.imageUrl,
             })),
           );
         }
@@ -317,27 +397,11 @@ export default function CreatePage() {
       taskId: string,
       prompt: string,
       title: string,
-      streamUrl?: string,
-      songId?: string,
+      _streamUrl?: string,
+      _songId?: string,
     ) => {
-      // Streaming URL hemen geldi ise, hemen completed songs'a ekle
-      // Bu durumda polling başlamayacak (processingTasks'e eklenmeyecek)
-      if (streamUrl && songId) {
-        const instantSong: Song = {
-          id: songId,
-          title: title || prompt.slice(0, 50),
-          prompt,
-          streamUrl,
-          status: "complete",
-          createdAt: new Date().toISOString(),
-        };
-        setCompletedSongs((prev) => {
-          const exists = prev.some((s) => s.id === songId);
-          return exists ? prev : [instantSong, ...prev];
-        });
-        // Streaming URL varsa, processingTasks'e ekleme — kullanıcı zaten dinleyebilir
-        return;
-      }
+      // Stream URL parametreleri artık göz ardı ediliyor — sadece audio_key (Bunny CDN)
+      // gelene kadar polling devam eder. Tamamlandığında completedSongs'a ekleyelir.
 
       // Streaming URL yok → polling başlatmak için processingTasks'e ekle
       const newTask: ProcessingTask = {
@@ -367,10 +431,6 @@ export default function CreatePage() {
     [router],
   );
 
-  const handleDismissFailed = useCallback((taskId: string) => {
-    setProcessingTasks((prev) => prev.filter((t) => t.taskId !== taskId));
-  }, []);
-
   const hasActivity = processingTasks.length > 0 || completedSongs.length > 0;
 
   return (
@@ -389,13 +449,9 @@ export default function CreatePage() {
           <MusicGenerator onTaskStarted={handleTaskStarted} />
         </div>
 
-        {/* Right column: processing + completed */}
-        {hasActivity && (
+        {/* Right column: completed only (processing yukarıya taşındı) */}
+        {completedSongs.length > 0 && (
           <div className="w-full md:flex-1 md:min-w-0">
-            <ProcessingBanner
-              tasks={processingTasks}
-              onDismissFailed={handleDismissFailed}
-            />
             <CompletedSection
               songs={completedSongs}
               onPlay={handlePlay}
