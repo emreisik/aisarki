@@ -1071,9 +1071,9 @@ function PromptModal({
 }) {
   const Icon = item.icon;
   const [values, setValues] = useState<Record<string, string>>({});
+  const [closing, setClosing] = useState(false);
   const preview = item.buildPrompt(values);
 
-  // En az bir text alanı doldurulmuş olmalı
   const textFields = item.fields.filter((f) => f.type === "text");
   const hasInput =
     textFields.length === 0 || textFields.some((f) => values[f.key]?.trim());
@@ -1083,47 +1083,52 @@ function PromptModal({
   const toggle = (key: string, val: string) =>
     setValues((v) => ({ ...v, [key]: v[key] === val ? "" : val }));
 
+  const dismiss = useCallback(() => {
+    setClosing(true);
+    setTimeout(onClose, 280);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end pb-[calc(76px+env(safe-area-inset-bottom,0px))] md:pb-0 md:items-center justify-center">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      {/* Backdrop — blur + fade */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
+        className={`absolute inset-0 bg-black/60 backdrop-blur-md ${closing ? "backdrop-exit" : "backdrop-enter"}`}
+        onClick={dismiss}
       />
 
-      {/* Sheet */}
-      <div className="relative z-10 w-full md:max-w-lg bg-[#111] rounded-t-3xl md:rounded-3xl border border-[#1e1e1e] max-h-[90vh] flex flex-col">
-        {/* Handle (mobile) */}
-        <div className="flex justify-center pt-3 pb-1 md:hidden">
-          <div className="w-10 h-1 rounded-full bg-[#2a2a2a]" />
+      {/* ── Full-height native sheet ── */}
+      <div
+        className={`relative z-10 w-full h-[92vh] bg-[#0c0c0c] rounded-t-[28px] flex flex-col ${closing ? "sheet-exit" : "sheet-enter"}`}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-2.5 pb-1">
+          <div className="w-9 h-[5px] rounded-full bg-[#333]" />
         </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e1e1e]">
-          <div className="flex items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: color + "22" }}
-            >
-              <Icon size={16} style={{ color }} />
-            </div>
-            <h2 className="text-white font-black text-lg">
-              {item.title} Şarkısı
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-[#1a1a1a] text-[#535353] hover:text-white transition-colors pressable"
+        {/* ── Header — icon hero + title ── */}
+        <div className="flex flex-col items-center pt-3 pb-5 px-6">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-3"
+            style={{
+              background: `linear-gradient(135deg, ${color}30, ${color}10)`,
+              boxShadow: `0 8px 32px ${color}15`,
+            }}
           >
-            <X size={18} />
-          </button>
+            <Icon size={28} style={{ color }} />
+          </div>
+          <h2 className="text-white text-xl font-black tracking-tight">
+            {item.title}
+          </h2>
+          <p className="text-[#666] text-xs mt-0.5">
+            Bilgileri doldur, şarkını oluşturalım
+          </p>
         </div>
 
-        {/* Form */}
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+        {/* ── Form — scrollable ── */}
+        <div className="flex-1 overflow-y-auto scroll-area px-5 pb-4 space-y-5">
           {item.fields.map((field) => (
             <div key={field.key}>
-              <label className="text-[#a7a7a7] text-xs font-semibold uppercase tracking-widest mb-2 block">
+              <label className="text-[#888] text-[11px] font-semibold uppercase tracking-widest mb-2 block pl-1">
                 {field.label}
               </label>
               {field.type === "text" ? (
@@ -1131,9 +1136,11 @@ function PromptModal({
                   value={values[field.key] || ""}
                   onChange={(e) => set(field.key, e.target.value)}
                   placeholder={field.placeholder}
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-xl px-4 py-3 text-white text-sm placeholder-[#3a3a3a] focus:outline-none transition-colors"
+                  className="w-full bg-[#161616] rounded-2xl px-4 py-3.5 text-white text-[15px] placeholder-[#333] focus:outline-none focus:ring-1 transition-shadow"
+                  style={{ focusRingColor: color } as React.CSSProperties}
                 />
               ) : (
+                /* iOS segmented-control tarzı seçim */
                 <div className="flex flex-wrap gap-2">
                   {field.options?.map((opt) => {
                     const active = values[field.key] === opt;
@@ -1141,18 +1148,17 @@ function PromptModal({
                       <button
                         key={opt}
                         onClick={() => toggle(field.key, opt)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all pressable border"
+                        className="px-4 py-2.5 rounded-2xl text-[13px] font-semibold transition-all pressable active:scale-95"
                         style={
                           active
                             ? {
-                                background: color + "22",
-                                borderColor: color + "66",
-                                color,
+                                background: color,
+                                color: "#000",
+                                boxShadow: `0 4px 14px ${color}40`,
                               }
                             : {
-                                background: "#1a1a1a",
-                                borderColor: "#2a2a2a",
-                                color: "#a7a7a7",
+                                background: "#161616",
+                                color: "#888",
                               }
                         }
                       >
@@ -1165,21 +1171,27 @@ function PromptModal({
             </div>
           ))}
 
-          {/* Prompt önizleme */}
+          {/* Prompt önizleme — native card */}
           {preview && (
-            <div className="rounded-xl border border-[#1e1e1e] bg-[#0d0d0d] p-4">
-              <p className="text-[#535353] text-[10px] font-bold uppercase tracking-widest mb-1.5">
-                Oluşturulacak prompt
+            <div
+              className="rounded-2xl p-4 mt-2"
+              style={{
+                background: `${color}08`,
+                border: `1px solid ${color}15`,
+              }}
+            >
+              <p className="text-[#555] text-[10px] font-bold uppercase tracking-widest mb-1.5">
+                Oluşturulacak
               </p>
-              <p className="text-[#a7a7a7] text-sm leading-relaxed italic">
-                "{preview}"
+              <p className="text-[#aaa] text-[13px] leading-relaxed">
+                {preview}
               </p>
             </div>
           )}
         </div>
 
-        {/* CTA */}
-        <div className="px-5 py-4 border-t border-[#1e1e1e]">
+        {/* ── CTA — safe area destekli ── */}
+        <div className="px-5 pt-3 pb-[calc(16px+env(safe-area-inset-bottom,0px))]">
           <button
             onClick={() => {
               if (!preview) return;
@@ -1188,10 +1200,11 @@ function PromptModal({
               onGenerate(full);
             }}
             disabled={!preview || !hasInput}
-            className="w-full py-4 rounded-2xl font-black text-sm tracking-wide transition-all pressable disabled:opacity-30"
+            className="w-full py-4 rounded-2xl font-black text-[15px] tracking-wide transition-all pressable active:scale-[0.98] disabled:opacity-25"
             style={{
               background: preview && hasInput ? color : "#1a1a1a",
-              color: preview && hasInput ? "black" : "#535353",
+              color: preview && hasInput ? "#000" : "#444",
+              boxShadow: preview && hasInput ? `0 6px 24px ${color}35` : "none",
             }}
           >
             {hasInput ? "Şarkıyı Oluştur" : "Bilgileri doldurun"}
@@ -1203,9 +1216,9 @@ function PromptModal({
 }
 
 /* ══════════════════════════════════════════════
-   Kategori pill
+   Kategori kartı — native app tarzı büyük kutular
 ══════════════════════════════════════════════ */
-function CategoryPill({
+function CategoryCard({
   item,
   color,
   onClick,
@@ -1218,34 +1231,68 @@ function CategoryPill({
   return (
     <button
       onClick={onClick}
-      className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#141414] border border-[#1e1e1e] hover:border-[#2a2a2a] hover:bg-[#1a1a1a] transition-all pressable"
+      className="flex-shrink-0 w-[110px] aspect-square rounded-2xl flex flex-col items-center justify-center gap-2.5 pressable transition-transform active:scale-95"
+      style={{
+        background: `linear-gradient(145deg, ${color}18, ${color}08)`,
+        border: `1px solid ${color}20`,
+      }}
     >
-      <Icon size={14} style={{ color }} className="flex-shrink-0" />
-      <span className="text-white text-xs font-semibold whitespace-nowrap">
+      <div
+        className="w-11 h-11 rounded-xl flex items-center justify-center"
+        style={{ background: `${color}20` }}
+      >
+        <Icon size={22} style={{ color }} />
+      </div>
+      <span className="text-white/90 text-[11px] font-semibold leading-tight text-center px-2">
         {item.title}
       </span>
     </button>
   );
 }
 
-/* ── Kategori satırı ── */
-function CategoryRow({
-  group,
+/* ── Kategori carousel — yatay snap scroll ── */
+function CategoryCarousel({
+  groups,
   onSelect,
 }: {
-  group: CategoryGroup;
-  onSelect: (item: CategoryItem) => void;
+  groups: CategoryGroup[];
+  onSelect: (item: CategoryItem, color: string) => void;
 }) {
+  const [activeTab, setActiveTab] = useState(0);
+  const group = groups[activeTab];
+
   return (
-    <div className="flex gap-1.5 overflow-x-auto scroll-area px-6 pb-1">
-      {group.items.map((item) => (
-        <CategoryPill
-          key={item.title}
-          item={item}
-          color={group.color}
-          onClick={() => onSelect(item)}
-        />
-      ))}
+    <div>
+      {/* Tab bar */}
+      <div className="flex gap-2 overflow-x-auto scroll-area px-5 mb-4">
+        {groups.map((g, i) => (
+          <button
+            key={g.label}
+            onClick={() => setActiveTab(i)}
+            className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all pressable"
+            style={
+              i === activeTab
+                ? { background: g.color, color: "#000" }
+                : { background: "#ffffff08", color: "#888" }
+            }
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Kartlar — snap scroll */}
+      <div className="flex gap-3 overflow-x-auto scroll-area px-5 pb-2 snap-x snap-mandatory">
+        {group.items.map((item) => (
+          <div key={item.title} className="snap-start">
+            <CategoryCard
+              item={item}
+              color={group.color}
+              onClick={() => onSelect(item, group.color)}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1577,45 +1624,51 @@ export default function HomePage() {
 
   return (
     <div className="min-h-full">
-      {/* ── Hero: Şarkı üretimi /create sayfasında — buradan yönlendirme ── */}
+      {/* ── Şarkını Oluştur — native app section ── */}
       <div
-        className="pt-10 pb-8 px-4 md:px-6"
+        className="pt-4 pb-6"
         style={{
           background:
-            "linear-gradient(180deg, #1a0e2e 0%, #0e1a2e 40%, #0a0a0a 100%)",
+            "linear-gradient(180deg, #1a0e2e 0%, #0e1a2e 50%, #0a0a0a 100%)",
         }}
       >
-        <Link
-          href="/create"
-          className="group block relative overflow-hidden rounded-2xl border-2 border-[#a78bfa]/30 hover:border-[#a78bfa] bg-gradient-to-br from-[#2a1550] via-[#1a0e35] to-[#0d0820] p-6 md:p-8 pressable transition-colors shadow-[0_0_40px_rgba(167,139,250,0.15)]"
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <p className="text-[#a78bfa] text-xs font-bold uppercase tracking-widest">
-                {greeting}
-              </p>
-              <h1 className="text-white text-2xl md:text-4xl font-black mt-1 leading-tight">
-                Şarkını oluştur
-              </h1>
-              <p className="text-white/70 text-sm mt-2">
-                AI ile saniyeler içinde özgün Türkçe şarkılar yap
-              </p>
-              <span className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#a78bfa] to-[#7c3aed] text-white font-bold text-sm shadow-lg group-hover:scale-105 transition-transform">
-                🎵 Oluşturmaya başla
-              </span>
-            </div>
-            <div
-              className="hidden sm:flex w-24 h-24 md:w-28 md:h-28 rounded-2xl items-center justify-center flex-shrink-0 text-5xl md:text-6xl"
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(167,139,250,0.3), rgba(124,58,237,0.15))",
-              }}
+        {/* Başlık + serbest oluşturma linki */}
+        <div className="px-5 mb-5">
+          <p className="text-[#a78bfa] text-[10px] font-bold uppercase tracking-[0.15em]">
+            {greeting}
+          </p>
+          <div className="flex items-end justify-between mt-1">
+            <h1 className="text-white text-[22px] font-black leading-tight">
+              Şarkını oluştur
+            </h1>
+            <Link
+              href="/create"
+              className="text-[#a78bfa] text-xs font-semibold pressable"
             >
-              🎼
-            </div>
+              Serbest mod &rarr;
+            </Link>
           </div>
-        </Link>
+        </div>
+
+        {/* Kategori carousel */}
+        <CategoryCarousel
+          groups={CATEGORY_GROUPS}
+          onSelect={(item, color) => setSelectedCat({ item, color })}
+        />
       </div>
+
+      {/* ── Kategori prompt modal ── */}
+      {selectedCat && (
+        <PromptModal
+          item={selectedCat.item}
+          color={selectedCat.color}
+          onClose={() => setSelectedCat(null)}
+          onGenerate={(prompt) => {
+            setSelectedCat(null);
+            router.push(`/create?prompt=${encodeURIComponent(prompt)}`);
+          }}
+        />
+      )}
 
       <div className="bg-[#0a0a0a] pb-8">
         {session?.user && (

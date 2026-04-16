@@ -7,14 +7,11 @@ import {
   Heart,
   Share2,
   Music2,
-  UserPlus,
-  UserCheck,
-  Headphones,
-  MessageCircle,
   MoreHorizontal,
   Check,
   ArrowLeft,
   Wand2,
+  ChevronRight,
 } from "lucide-react";
 import { Song } from "@/types";
 import { formatListenerCount } from "@/lib/formatNumber";
@@ -40,12 +37,13 @@ interface Props {
   rgb: string;
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("tr-TR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+function fmtDuration(s?: number) {
+  if (!s || isNaN(s)) return "";
+  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+}
+
+function fmtYear(iso: string) {
+  return new Date(iso).getFullYear().toString();
 }
 
 export default function SongHero({
@@ -72,192 +70,176 @@ export default function SongHero({
 
   return (
     <div>
-      {/* Album art — full-width, immersive */}
-      <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#282828]">
-        {song.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={song.imageUrl}
-            alt={song.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={72} className="text-[#535353]" />
-          </div>
-        )}
+      {/* ── Geri butonu ── */}
+      <button
+        onClick={onBack}
+        className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white pressable active:scale-95 mb-4"
+      >
+        <ArrowLeft size={18} />
+      </button>
 
-        {/* Gradient overlay — alt kısımda dominant renge fade */}
-        <div
-          className="absolute inset-x-0 bottom-0 h-2/5"
-          style={{
-            background: `linear-gradient(to top, rgb(${rgb}), transparent)`,
-          }}
-        />
-
-        {/* Floating back button */}
-        <button
-          onClick={onBack}
-          className="absolute left-4 z-10 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white pressable hover:bg-black/60 transition-colors"
-          style={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
-        >
-          <ArrowLeft size={20} />
-        </button>
-
-        {/* Floating share button */}
-        <button
-          onClick={onShare}
-          className="absolute right-4 z-10 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white pressable hover:bg-black/60 transition-colors"
-          style={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
-        >
-          {copied ? (
-            <Check size={18} className="text-[#1db954]" />
+      {/* ── Kapak resmi — ortada, büyük ── */}
+      <div className="flex justify-center">
+        <div className="w-[240px] h-[240px] rounded-lg overflow-hidden shadow-2xl bg-[#1a1a1a]">
+          {song.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={song.imageUrl}
+              alt={song.title}
+              className="w-full h-full object-cover"
+            />
           ) : (
-            <Share2 size={18} />
+            <div className="w-full h-full flex items-center justify-center">
+              <Music2 size={64} className="text-[#333]" />
+            </div>
           )}
-        </button>
-      </div>
-
-      {/* Song info */}
-      <div className="mt-5">
-        <h1 className="text-white text-2xl font-black leading-tight">
-          {song.title}
-        </h1>
-
-        {/* Sanatçı + Follow */}
-        {song.creator && (
-          <div className="flex items-center gap-3 mt-2.5">
-            <Link
-              href={`/profile/${song.creator.username}`}
-              className="flex items-center gap-2 group"
-            >
-              <div className="w-7 h-7 rounded-full bg-[#282828] overflow-hidden flex items-center justify-center flex-shrink-0">
-                {song.creator.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={song.creator.image}
-                    alt={song.creator.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-white text-[11px] font-bold">
-                    {song.creator.name[0]?.toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <span className="text-white text-sm font-semibold group-hover:underline">
-                {song.creator.name}
-              </span>
-            </Link>
-            {canFollow && (
-              <button
-                onClick={onToggleFollow}
-                disabled={followBusy}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border transition-all pressable disabled:opacity-50 ${
-                  isFollowing
-                    ? "border-[#1db954] text-[#1db954] hover:border-white hover:text-white"
-                    : "border-white/40 text-white hover:border-white"
-                }`}
-              >
-                {isFollowing ? (
-                  <>
-                    <UserCheck size={12} /> Takip ediliyor
-                  </>
-                ) : (
-                  <>
-                    <UserPlus size={12} /> Takip et
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Tarz + tarih */}
-        <div className="flex items-center gap-2 mt-3 text-xs text-[#a7a7a7]">
-          {mainStyle && (
-            <>
-              <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[11px] font-semibold">
-                {mainStyle}
-              </span>
-              <span className="text-[#535353]">·</span>
-            </>
-          )}
-          <span>{fmtDate(song.createdAt)}</span>
         </div>
       </div>
 
-      {/* Aksiyon çubuğu */}
-      <div className="flex items-center gap-2 mt-5">
-        {/* Play */}
-        <button
-          onClick={onPlay}
-          disabled={song.status !== "complete"}
-          className="w-14 h-14 rounded-full bg-[#1db954] hover:bg-[#1ed760] flex items-center justify-center pressable hover:scale-105 transition-all shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {isActive && playing ? (
-            <Pause size={24} fill="black" className="text-black" />
-          ) : (
-            <Play size={24} fill="black" className="text-black ml-0.5" />
-          )}
-        </button>
+      {/* ── Şarkı bilgileri ── */}
+      <div className="mt-6">
+        <h1 className="text-white text-[22px] font-black leading-tight">
+          {song.title}
+        </h1>
 
-        {/* Like */}
-        <button
-          onClick={onToggleLike}
-          disabled={likeBusy}
-          className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors pressable ${
-            liked
-              ? "text-[#1db954]"
-              : "text-white/70 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          <Heart size={22} fill={liked ? "#1db954" : "none"} />
-        </button>
+        {/* Sanatçı — avatar + isim (tıklanabilir) */}
+        {song.creator && (
+          <Link
+            href={`/profile/${song.creator.username}`}
+            className="flex items-center gap-2 mt-2 group"
+          >
+            <div className="w-6 h-6 rounded-full bg-[#282828] overflow-hidden flex items-center justify-center flex-shrink-0">
+              {song.creator.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={song.creator.image}
+                  alt={song.creator.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-white text-[10px] font-bold">
+                  {song.creator.name[0]?.toUpperCase()}
+                </span>
+              )}
+            </div>
+            <span className="text-white text-[13px] font-semibold group-hover:underline">
+              {song.creator.name}
+            </span>
+          </Link>
+        )}
 
-        {/* Remix */}
-        <button
-          onClick={onRemix}
-          className="w-11 h-11 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/5 transition-colors pressable"
-          title="Remix Yap"
-        >
-          <Wand2 size={20} />
-        </button>
-
-        <div className="flex-1" />
-
-        {/* More */}
-        <button
-          className="w-11 h-11 rounded-full flex items-center justify-center text-[#a7a7a7] hover:text-white hover:bg-white/5 transition-colors pressable"
-          title="Daha fazla"
-        >
-          <MoreHorizontal size={22} />
-        </button>
+        {/* Meta: Tarz • Yıl • Süre */}
+        <p className="text-[#888] text-[13px] mt-1.5">
+          {[mainStyle, fmtYear(song.createdAt), fmtDuration(song.duration)]
+            .filter(Boolean)
+            .join(" \u00b7 ")}
+        </p>
       </div>
 
-      {/* Stats satırı */}
-      <div className="flex items-center gap-4 mt-3 text-[#a7a7a7] text-xs">
-        {song.playCount != null && song.playCount > 0 && (
-          <span className="flex items-center gap-1.5">
-            <Headphones size={14} />
+      {/* ── Aksiyon bar — Spotify layout ── */}
+      <div className="flex items-center mt-5">
+        {/* Sol: like + share + remix + more */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onToggleLike}
+            disabled={likeBusy}
+            className={`w-10 h-10 rounded-full flex items-center justify-center pressable active:scale-95 transition-all ${
+              liked ? "text-[#1db954]" : "text-[#a7a7a7] hover:text-white"
+            }`}
+          >
+            <Heart size={22} fill={liked ? "#1db954" : "none"} />
+          </button>
+
+          <button
+            onClick={onShare}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[#a7a7a7] hover:text-white pressable active:scale-95 transition-colors"
+          >
+            {copied ? (
+              <Check size={18} className="text-[#1db954]" />
+            ) : (
+              <Share2 size={18} />
+            )}
+          </button>
+
+          <button
+            onClick={onRemix}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[#a7a7a7] hover:text-white pressable active:scale-95 transition-colors"
+            title="Remix Yap"
+          >
+            <Wand2 size={18} />
+          </button>
+
+          <button className="w-10 h-10 rounded-full flex items-center justify-center text-[#a7a7a7] hover:text-white pressable active:scale-95 transition-colors">
+            <MoreHorizontal size={22} />
+          </button>
+        </div>
+
+        {/* Sağ: play butonu */}
+        <div className="ml-auto">
+          <button
+            onClick={onPlay}
+            disabled={song.status !== "complete"}
+            className="w-12 h-12 rounded-full bg-[#1db954] flex items-center justify-center pressable active:scale-95 transition-transform shadow-lg disabled:opacity-30"
+          >
+            {isActive && playing ? (
+              <Pause size={22} fill="black" className="text-black" />
+            ) : (
+              <Play size={22} fill="black" className="text-black ml-0.5" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Sanatçı kartı — tıklanabilir ── */}
+      {song.creator && (
+        <Link
+          href={`/profile/${song.creator.username}`}
+          className="flex items-center gap-3 mt-8 p-3 rounded-xl bg-[#161616] hover:bg-[#1a1a1a] pressable active:scale-[0.98] transition-all group"
+        >
+          <div className="w-12 h-12 rounded-full bg-[#282828] overflow-hidden flex items-center justify-center flex-shrink-0">
+            {song.creator.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={song.creator.image}
+                alt={song.creator.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-white text-lg font-black">
+                {song.creator.name[0]?.toUpperCase()}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-[#888] font-semibold uppercase tracking-wider">
+              Sanatçı
+            </p>
+            <p className="text-white text-[15px] font-semibold truncate">
+              {song.creator.name}
+            </p>
+          </div>
+          <ChevronRight
+            size={18}
+            className="text-[#555] flex-shrink-0 group-hover:text-white transition-colors"
+          />
+        </Link>
+      )}
+
+      {/* ── İstatistikler ── */}
+      {(song.playCount || likeCount > 0) && (
+        <div className="flex items-center gap-4 mt-4 text-[#888] text-xs">
+          {song.playCount != null && song.playCount > 0 && (
             <span className="tabular-nums">
               {formatListenerCount(song.playCount)} dinlenme
             </span>
-          </span>
-        )}
-        <span className="flex items-center gap-1.5">
-          <Heart size={14} />
-          <span className="tabular-nums">
-            {formatListenerCount(likeCount)} beğeni
-          </span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <MessageCircle size={14} />
-          <span className="tabular-nums">
-            {formatListenerCount(commentCount)} yorum
-          </span>
-        </span>
-      </div>
+          )}
+          {likeCount > 0 && (
+            <span className="tabular-nums">
+              {formatListenerCount(likeCount)} beğeni
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

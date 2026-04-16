@@ -22,7 +22,6 @@ interface ProcessingTaskState {
   attempts?: number;
 }
 
-// Suno her task için 2 varyant üretir — placeholder slot sayısı
 const VARIANT_COUNT = 2;
 
 export default function CreatePage() {
@@ -46,13 +45,12 @@ export default function CreatePage() {
     };
   }, []);
 
-  // Tek bir task için polling — Suno callback sonrası şarkı DB'ye düşene kadar
   const startPolling = useCallback((taskId: string) => {
     if (pollingRef.current.has(taskId)) return;
 
     let attempts = 0;
     let errorCount = 0;
-    const MAX_ATTEMPTS = 300; // 10 dk
+    const MAX_ATTEMPTS = 300;
     const MAX_ERRORS = 10;
     const POLL_INTERVAL = 2000;
     const ERROR_RETRY_INTERVAL = 3000;
@@ -81,7 +79,6 @@ export default function CreatePage() {
         const res = await fetch(`/api/songs?taskId=${taskId}`);
         const data: { status: string; songs: Song[] } = await res.json();
 
-        // Geçici cover — skeleton'da blur olarak göster
         const previewImage = data.songs?.find((s) => s.imageUrl)?.imageUrl;
         if (previewImage) {
           setProcessingTasks((prev) =>
@@ -93,7 +90,6 @@ export default function CreatePage() {
           );
         }
 
-        // Çalınabilir = audioUrl VEYA streamUrl
         const playableSongs = (data.songs ?? []).filter(
           (s) => s.audioUrl || s.streamUrl,
         );
@@ -130,7 +126,6 @@ export default function CreatePage() {
     pollingRef.current.set(taskId, timer);
   }, []);
 
-  // Mount + 5sn'de bir — processing task'ları + kullanıcı şarkılarını tazele
   useEffect(() => {
     let cancelled = false;
     const fetchFeed = async () => {
@@ -165,10 +160,8 @@ export default function CreatePage() {
           }));
         });
 
-        // Kullanıcının son 20 şarkısı (kalıcı — sayfa yenilense de kalır)
         if (Array.isArray(d.songs)) {
           setSongs((prev) => {
-            // Mevcut state'te henüz DB'ye düşmemiş polling sonucu olabilir — koru
             const byId = new Map<string, Song>();
             for (const s of prev) byId.set(s.id, s);
             for (const s of d.songs as Song[]) byId.set(s.id, s);
@@ -190,7 +183,6 @@ export default function CreatePage() {
     };
   }, []);
 
-  // Her aktif task için polling başlat
   useEffect(() => {
     processingTasks.forEach((t) => {
       if (!t.failed) startPolling(t.taskId);
@@ -262,75 +254,71 @@ export default function CreatePage() {
   const hasActivity = processingTasks.length > 0 || songs.length > 0;
 
   return (
-    <div className="min-h-full bg-[#121212]">
-      {/* Hero */}
-      <div className="bg-gradient-to-b from-[#1a3a2a] to-[#121212] pt-16 md:pt-20 px-6 pb-6">
-        <h1 className="text-white text-3xl font-black tracking-tight">
-          Oluştur
-        </h1>
-        <p className="text-[#a7a7a7] text-sm mt-1">AI ile özgün şarkılar yap</p>
-      </div>
+    <div className="min-h-full bg-[#0a0a0a]">
+      <div className="mx-auto max-w-[640px] px-5 pt-6 pb-28">
+        {/* Başlık */}
+        <h1 className="text-white text-2xl font-black">Oluştur</h1>
+        <p className="text-[#666] text-[13px] mt-1 mb-6">
+          AI ile özgün şarkılar yap
+        </p>
 
-      <div className="px-6 py-6 flex flex-col md:flex-row gap-8 items-start">
-        {/* Sol: üretim formu */}
-        <div className="w-full md:max-w-lg md:flex-shrink-0">
-          <MusicGenerator onTaskStarted={handleTaskStarted} />
-        </div>
+        {/* Form */}
+        <MusicGenerator onTaskStarted={handleTaskStarted} />
 
-        {/* Sağ: birleşik timeline (Suno tarzı) */}
-        <div className="w-full md:flex-1 md:min-w-0 flex flex-col gap-1">
-          {hasActivity && (
-            <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-2 px-3">
+        {/* Son üretimler */}
+        {hasActivity && (
+          <div className="mt-10">
+            <p className="text-[#666] text-[11px] font-semibold uppercase tracking-wider mb-3">
               Son Üretimler
             </p>
-          )}
-
-          {/* Aktif üretim — her task için 2 skeleton satır */}
-          {processingTasks.map((task) =>
-            task.failed ? (
-              <GenerationRowSkeleton
-                key={task.taskId}
-                failed
-                errorTitle={task.errorTitle}
-                errorMessage={task.errorMessage}
-                onCancel={() => handleDismissFailed(task.taskId)}
-                onRetry={() => handleRetry(task.taskId)}
-                retrying={retryingTaskId === task.taskId}
-              />
-            ) : (
-              Array.from({ length: VARIANT_COUNT }).map((_, i) => (
-                <GenerationRowSkeleton
-                  key={`${task.taskId}:${i}`}
-                  imageHint={task.imageUrl}
-                  onCancel={
-                    i === 0 ? () => handleDismissFailed(task.taskId) : undefined
-                  }
+            <div className="flex flex-col gap-0.5">
+              {processingTasks.map((task) =>
+                task.failed ? (
+                  <GenerationRowSkeleton
+                    key={task.taskId}
+                    failed
+                    errorTitle={task.errorTitle}
+                    errorMessage={task.errorMessage}
+                    onCancel={() => handleDismissFailed(task.taskId)}
+                    onRetry={() => handleRetry(task.taskId)}
+                    retrying={retryingTaskId === task.taskId}
+                  />
+                ) : (
+                  Array.from({ length: VARIANT_COUNT }).map((_, i) => (
+                    <GenerationRowSkeleton
+                      key={`${task.taskId}:${i}`}
+                      imageHint={task.imageUrl}
+                      onCancel={
+                        i === 0
+                          ? () => handleDismissFailed(task.taskId)
+                          : undefined
+                      }
+                    />
+                  ))
+                ),
+              )}
+              {songs.map((song) => (
+                <GenerationRow
+                  key={song.id}
+                  song={song}
+                  isPlaying={currentSong?.id === song.id}
+                  onPlay={() => handlePlay(song)}
+                  onOpenDetail={() => handleOpenDetail(song)}
                 />
-              ))
-            ),
-          )}
-
-          {/* Tamamlanmış şarkılar */}
-          {songs.map((song) => (
-            <GenerationRow
-              key={song.id}
-              song={song}
-              isPlaying={currentSong?.id === song.id}
-              onPlay={() => handlePlay(song)}
-              onOpenDetail={() => handleOpenDetail(song)}
-            />
-          ))}
-
-          {/* Empty state */}
-          {!hasActivity && (
-            <div className="hidden md:flex flex-col items-center justify-center py-20 text-center">
-              <Music2 size={40} className="text-[#535353] mb-3" />
-              <p className="text-[#535353] text-sm">
-                Oluşturduğun şarkılar burada görünür
-              </p>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!hasActivity && (
+          <div className="flex flex-col items-center py-16 text-center">
+            <Music2 size={36} className="text-[#333] mb-3" />
+            <p className="text-[#444] text-sm">
+              Oluşturduğun şarkılar burada görünür
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

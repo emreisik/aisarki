@@ -5,33 +5,70 @@ import { useRouter } from "next/navigation";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useSession } from "next-auth/react";
 import { Playlist, Song } from "@/types";
+import Link from "next/link";
 import {
   Play,
   Pause,
   Shuffle,
-  Clock3,
   Music2,
   MoreHorizontal,
   Trash2,
   Plus,
   Disc3,
-  Pencil,
-  X,
   Check,
-  List as ListIcon,
+  Heart,
+  Share2,
+  ArrowLeft,
 } from "lucide-react";
 
-function fmt(s?: number) {
-  if (!s || isNaN(s)) return "--:--";
-  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-}
-
-function totalDuration(songs: Song[]) {
-  const secs = songs.reduce((a, s) => a + (s.duration ?? 0), 0);
-  if (secs < 60) return `${secs} sn`;
-  const m = Math.floor(secs / 60);
-  if (m < 60) return `${m} dk`;
-  return `${Math.floor(m / 60)} sa ${m % 60} dk`;
+/* ── Kapak resminden dominant renk ── */
+function useDominantColor(url?: string | null) {
+  const [rgb, setRgb] = useState("40,20,60");
+  useEffect(() => {
+    if (!url) return;
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const size = 60;
+        const c = document.createElement("canvas");
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, size, size);
+        const d = ctx.getImageData(0, 0, size, size).data;
+        let r = 0,
+          g = 0,
+          b = 0,
+          n = 0;
+        for (let i = 0; i < d.length; i += 8) {
+          const br = (d[i] + d[i + 1] + d[i + 2]) / 3;
+          if (br > 20 && br < 235) {
+            r += d[i];
+            g += d[i + 1];
+            b += d[i + 2];
+            n++;
+          }
+        }
+        if (n > 0 && !cancelled) {
+          const dk = 0.55;
+          setRgb(
+            `${Math.floor((r / n) * dk)},${Math.floor((g / n) * dk)},${Math.floor((b / n) * dk)}`,
+          );
+        }
+      } catch {
+        /* CORS */
+      }
+    };
+    img.src = url;
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return rgb;
 }
 
 export default function PlaylistPage({
@@ -53,6 +90,7 @@ export default function PlaylistPage({
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isOwner = session?.user?.id && playlist?.userId === session.user.id;
 
@@ -71,17 +109,22 @@ export default function PlaylistPage({
   }, [addOpen]);
 
   const songs = playlist?.songs ?? [];
+  const isAlbum = playlist?.type === "album";
+  const rgb = useDominantColor(playlist?.coverUrl);
 
   const isCurrentPlaylist =
     currentSong && songs.some((s) => s.id === currentSong.id);
 
   const handlePlayAll = () => {
     if (songs.length === 0) return;
-    if (isCurrentPlaylist) {
-      togglePlay();
-    } else {
-      playSong(songs[0], songs);
-    }
+    if (isCurrentPlaylist) togglePlay();
+    else playSong(songs[0], songs);
+  };
+
+  const shufflePlay = () => {
+    if (songs.length === 0) return;
+    const shuffled = [...songs].sort(() => Math.random() - 0.5);
+    playSong(shuffled[0], shuffled);
   };
 
   const removeSong = async (songId: string) => {
@@ -135,7 +178,6 @@ export default function PlaylistPage({
     }
   };
 
-  const [deleting, setDeleting] = useState(false);
   const handleDelete = async () => {
     if (!playlist) return;
     const ok = confirm(
@@ -145,11 +187,8 @@ export default function PlaylistPage({
     setDeleting(true);
     try {
       const res = await fetch(`/api/playlists/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        router.push("/playlists");
-      } else {
-        alert("Silinemedi — tekrar dene");
-      }
+      if (res.ok) router.push("/playlists");
+      else alert("Silinemedi — tekrar dene");
     } catch {
       alert("Bağlantı hatası");
     } finally {
@@ -165,8 +204,7 @@ export default function PlaylistPage({
     });
     setPlaylist((prev) => {
       if (!prev) return prev;
-      const already = prev.songs?.some((s) => s.id === song.id);
-      if (already) return prev;
+      if (prev.songs?.some((s) => s.id === song.id)) return prev;
       return {
         ...prev,
         songs: [...(prev.songs ?? []), song],
@@ -176,6 +214,7 @@ export default function PlaylistPage({
     });
   };
 
+  /* ── Loading ── */
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -193,29 +232,26 @@ export default function PlaylistPage({
     );
   }
 
-  const isAlbum = playlist.type === "album";
-  const heroGradient = isAlbum
-    ? "linear-gradient(180deg, #1a5a3a 0%, #0f2318 45%, #121212 100%)"
-    : "linear-gradient(180deg, #7e3aad 0%, #3a1d5c 45%, #121212 100%)";
-
-  // Şarkı sayısı + yaklaşık süre (Spotify tarzı: "50 şarkı, yaklaşık 3 sa")
-  const totalSecs = songs.reduce((a, s) => a + (s.duration ?? 0), 0);
-  const hrs = Math.floor(totalSecs / 3600);
-  const mins = Math.round((totalSecs % 3600) / 60);
-  const durationLabel =
-    hrs > 0
-      ? `yaklaşık ${hrs} sa${mins > 0 ? ` ${mins} dk` : ""}`
-      : mins > 0
-        ? `yaklaşık ${mins} dk`
-        : "";
-
   return (
-    <div className="min-h-full pb-8">
-      {/* ── Hero ── */}
-      <div style={{ background: heroGradient }} className="pt-16 md:pt-20">
-        <div className="px-6 pb-6 flex flex-col md:flex-row md:items-end gap-6">
-          {/* Cover */}
-          <div className="w-48 h-48 md:w-56 md:h-56 flex-shrink-0 rounded-md overflow-hidden shadow-2xl mx-auto md:mx-0">
+    <div className="min-h-full bg-[#0a0a0a]">
+      {/* ══ Hero — Spotify native ══ */}
+      <div
+        className="relative pb-6"
+        style={{
+          background: `linear-gradient(180deg, rgb(${rgb}) 0%, rgba(${rgb},0.3) 65%, #0a0a0a 100%)`,
+        }}
+      >
+        {/* Geri butonu */}
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 left-4 z-10 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white pressable"
+        >
+          <ArrowLeft size={18} />
+        </button>
+
+        {/* Kapak resmi — ortada */}
+        <div className="pt-14 flex justify-center">
+          <div className="w-[180px] h-[180px] rounded-md overflow-hidden shadow-2xl">
             {playlist.coverUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -233,124 +269,95 @@ export default function PlaylistPage({
                 }}
               >
                 {isAlbum ? (
-                  <Disc3 size={64} className="text-white/80" />
+                  <Disc3 size={56} className="text-white/80" />
                 ) : (
-                  <Music2 size={64} className="text-white/80" />
+                  <Music2 size={56} className="text-white/80" />
                 )}
               </div>
             )}
           </div>
+        </div>
 
-          {/* Info */}
-          <div className="flex flex-col gap-3 text-center md:text-left flex-1 min-w-0">
-            <p
-              className="text-xs font-semibold uppercase tracking-widest"
-              style={{ color: "rgba(255,255,255,0.85)" }}
-            >
-              {playlist.isPublic
-                ? isAlbum
-                  ? "Açık Albüm"
-                  : "Açık Çalma Listesi"
-                : isAlbum
-                  ? "Özel Albüm"
-                  : "Özel Çalma Listesi"}
+        {/* Bilgi */}
+        <div className="px-5 mt-5">
+          <h1 className="text-white text-2xl font-black leading-tight">
+            {playlist.title}
+          </h1>
+          {playlist.description && (
+            <p className="text-white/60 text-[13px] mt-1 leading-snug">
+              {playlist.description}
             </p>
-            <div className="flex items-center gap-3 justify-center md:justify-start">
-              <h1
-                className="text-white font-black leading-none tracking-tight"
-                style={{
-                  fontSize: "clamp(2.5rem, 7vw, 6rem)",
-                  lineHeight: 1.02,
-                }}
-              >
-                {playlist.title}
-              </h1>
-              {isOwner && (
-                <button
-                  onClick={openEdit}
-                  className="flex-shrink-0 p-2 rounded-full text-[#a7a7a7] hover:text-white hover:bg-white/10 transition-colors pressable mt-2"
-                  title="Düzenle"
-                >
-                  <Pencil size={18} />
-                </button>
-              )}
+          )}
+          <div className="flex items-center gap-2 mt-3">
+            <div className="w-5 h-5 rounded-full bg-[#1db954] flex items-center justify-center">
+              <Music2 size={10} className="text-black" />
             </div>
-            {playlist.description && (
-              <p className="text-white/70 text-sm max-w-2xl">
-                {playlist.description}
-              </p>
-            )}
-            <div className="flex items-center gap-1.5 text-sm text-white/90 flex-wrap justify-center md:justify-start">
-              <span className="font-bold text-white">
-                {playlist.owner?.displayName ?? "Hubeya"}
-              </span>
-              {songs.length > 0 && (
-                <>
-                  <span className="text-white/60">·</span>
-                  <span className="text-white/80">
-                    {songs.length} şarkı
-                    {durationLabel && `, ${durationLabel}`}
-                  </span>
-                </>
-              )}
-            </div>
+            <span className="text-white text-[13px] font-semibold">
+              {playlist.owner?.displayName ?? "Hubeya"}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* ── Controls (Spotify tarzı: play + shuffle + add + more | queue/list) ── */}
-      <div className="px-6 py-6 bg-[#121212] flex items-center gap-5">
-        {songs.length > 0 && (
-          <button
-            onClick={handlePlayAll}
-            className="w-14 h-14 rounded-full bg-[#1db954] flex items-center justify-center pressable hover:scale-105 transition-transform shadow-xl"
-            title={isCurrentPlaylist && playing ? "Duraklat" : "Çal"}
-          >
-            {isCurrentPlaylist && playing ? (
-              <Pause size={26} fill="black" className="text-black" />
-            ) : (
-              <Play size={26} fill="black" className="text-black ml-1" />
-            )}
+      {/* ══ Aksiyon bar — Spotify native layout ══ */}
+      <div className="px-5 py-3 flex items-center">
+        {/* Sol: like + share + edit */}
+        <div className="flex items-center gap-3">
+          <button className="text-[#a7a7a7] hover:text-white pressable active:scale-95 transition-all">
+            <Heart size={24} />
           </button>
-        )}
-
-        <button
-          className="text-[#a7a7a7] hover:text-white transition-colors pressable"
-          title="Karıştır"
-        >
-          <Shuffle size={28} />
-        </button>
-
-        {isOwner && (
-          <button
-            onClick={() => setAddOpen(!addOpen)}
-            className="w-10 h-10 rounded-full border-2 border-[#7a7a7a] text-[#7a7a7a] hover:text-white hover:border-white flex items-center justify-center transition-colors pressable"
-            title="Şarkı ekle"
-          >
-            <Plus size={20} />
+          <button className="text-[#a7a7a7] hover:text-white pressable active:scale-95 transition-all">
+            <Share2 size={22} />
           </button>
-        )}
+          {isOwner && (
+            <button
+              onClick={openEdit}
+              className="text-[#a7a7a7] hover:text-white pressable active:scale-95 transition-all"
+            >
+              <MoreHorizontal size={24} />
+            </button>
+          )}
+        </div>
 
-        {isOwner && (
+        {/* Sağ: shuffle + play */}
+        <div className="ml-auto flex items-center gap-4">
           <button
-            onClick={openEdit}
-            className="text-[#a7a7a7] hover:text-white transition-colors pressable"
-            title="Diğer"
+            onClick={shufflePlay}
+            className="text-[#a7a7a7] hover:text-[#1db954] pressable active:scale-95 transition-all"
           >
-            <MoreHorizontal size={28} />
+            <Shuffle size={24} />
           </button>
-        )}
-
-        {/* Sağ taraf — "Liste" view mode (gelecek için placeholder) */}
-        <div className="ml-auto flex items-center gap-2 text-[#a7a7a7] text-sm">
-          <span className="hidden md:inline">Liste</span>
-          <ListIcon size={18} />
+          {songs.length > 0 && (
+            <button
+              onClick={handlePlayAll}
+              className="w-12 h-12 rounded-full bg-[#1db954] flex items-center justify-center pressable active:scale-95 transition-transform shadow-lg"
+            >
+              {isCurrentPlaylist && playing ? (
+                <Pause size={22} fill="black" className="text-black" />
+              ) : (
+                <Play size={22} fill="black" className="text-black ml-0.5" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* ── Add song panel ── */}
+      {/* ══ Add song butonu (owner) ══ */}
+      {isOwner && (
+        <div className="px-5 mb-2">
+          <button
+            onClick={() => setAddOpen(!addOpen)}
+            className="flex items-center gap-2 text-[#a7a7a7] hover:text-white text-sm font-semibold pressable"
+          >
+            <Plus size={18} />
+            Şarkı ekle
+          </button>
+        </div>
+      )}
+
+      {/* ══ Add song panel ══ */}
       {addOpen && (
-        <div className="mx-6 mb-4 bg-[#1a1a1a] rounded-xl p-4">
+        <div className="mx-5 mb-4 bg-[#161616] rounded-xl p-4">
           <p className="text-white font-semibold text-sm mb-3">Şarkı ekle</p>
           <div className="flex flex-col gap-1 max-h-64 overflow-y-auto scroll-area">
             {allSongs
@@ -359,9 +366,9 @@ export default function PlaylistPage({
                 <button
                   key={song.id}
                   onClick={() => addSong(song)}
-                  className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-[#282828] transition-colors text-left pressable"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#222] transition-colors text-left pressable"
                 >
-                  <div className="w-9 h-9 rounded flex-shrink-0 overflow-hidden bg-[#282828]">
+                  <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-[#222]">
                     {song.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -371,54 +378,167 @@ export default function PlaylistPage({
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Music2 size={12} className="text-[#535353]" />
+                        <Music2 size={14} className="text-[#444]" />
                       </div>
                     )}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-white text-sm font-medium truncate">
                       {song.title}
                     </p>
-                    <p className="text-[#a7a7a7] text-xs truncate">
-                      {song.style?.split(",")[0] || "Hubeya"}
+                    <p className="text-[#888] text-xs truncate">
+                      {song.creator?.name || "Hubeya"}
                     </p>
                   </div>
-                  <Plus
-                    size={16}
-                    className="text-[#1db954] flex-shrink-0 ml-auto"
-                  />
+                  <Plus size={16} className="text-[#1db954] flex-shrink-0" />
                 </button>
               ))}
           </div>
         </div>
       )}
 
-      {/* ── Edit modal ── */}
+      {/* ══ Şarkı listesi — Spotify native ══ */}
+      <div className="px-5 pb-8">
+        {songs.length === 0 ? (
+          <div className="py-16 text-center">
+            <Music2 size={40} className="text-[#333] mx-auto mb-3" />
+            <p className="text-white font-semibold mb-1">Henüz şarkı yok</p>
+            <p className="text-[#888] text-sm">
+              &quot;Şarkı ekle&quot; butonuyla içerik ekle
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col">
+            {songs.map((song) => {
+              const isActive = currentSong?.id === song.id;
+              return (
+                <div
+                  key={song.id}
+                  className={`flex items-center gap-3 py-2.5 rounded-lg group transition-colors ${
+                    isActive ? "bg-[#ffffff08]" : ""
+                  }`}
+                >
+                  {/* Kapak */}
+                  <button
+                    onClick={() =>
+                      isActive ? togglePlay() : playSong(song, songs)
+                    }
+                    className="w-12 h-12 rounded flex-shrink-0 overflow-hidden bg-[#1a1a1a] relative pressable"
+                  >
+                    {song.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={song.imageUrl}
+                        alt={song.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Music2 size={16} className="text-[#444]" />
+                      </div>
+                    )}
+                    {/* Wave / play overlay */}
+                    {isActive && playing && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <span className="flex items-end justify-center gap-[2px] h-3.5">
+                          {[0, 0.15, 0.3].map((d, k) => (
+                            <span
+                              key={k}
+                              className="wave-bar rounded-sm"
+                              style={{
+                                width: "2px",
+                                height: "100%",
+                                animationDelay: `${d}s`,
+                              }}
+                            />
+                          ))}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Başlık + sanatçı */}
+                  <button
+                    onClick={() =>
+                      isActive ? togglePlay() : playSong(song, songs)
+                    }
+                    className="flex-1 min-w-0 text-left pressable"
+                  >
+                    <p
+                      className={`text-[15px] font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+                    >
+                      {song.title}
+                    </p>
+                    <p className="text-[#888] text-[13px] truncate mt-0.5">
+                      {song.creator ? (
+                        <Link
+                          href={`/profile/${song.creator.username}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:underline"
+                        >
+                          {song.creator.name}
+                        </Link>
+                      ) : (
+                        song.style?.split(",")[0] || "Hubeya"
+                      )}
+                    </p>
+                  </button>
+
+                  {/* Sağ aksiyonlar */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {isOwner && (
+                      <div className="relative">
+                        <button
+                          onClick={() =>
+                            setMenuSong(menuSong === song.id ? null : song.id)
+                          }
+                          className="w-8 h-8 flex items-center justify-center text-[#888] hover:text-white pressable"
+                        >
+                          <MoreHorizontal size={18} />
+                        </button>
+                        {menuSong === song.id && (
+                          <div className="absolute right-0 top-full mt-1 w-44 bg-[#1a1a1a] rounded-xl shadow-2xl z-20 overflow-hidden border border-[#222]">
+                            <button
+                              onClick={() => removeSong(song.id)}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-[#222] transition-colors text-left"
+                            >
+                              <Trash2 size={15} />
+                              Listeden çıkar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ══ Edit modal — native sheet ══ */}
       {editOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end pb-[calc(76px+env(safe-area-inset-bottom,0px))] sm:pb-0 sm:items-center justify-center"
+          className="fixed inset-0 z-50 flex items-end justify-center"
           onClick={() => setEditOpen(false)}
         >
-          <div className="absolute inset-0 bg-black/70" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm backdrop-enter" />
           <div
-            className="relative z-10 w-full sm:max-w-md bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl"
+            className="relative z-10 w-full bg-[#0c0c0c] rounded-t-[28px] p-6 sheet-enter"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-white text-lg font-bold">
-                {isAlbum ? "Albümü Düzenle" : "Listeyi Düzenle"}
-              </h2>
-              <button
-                onClick={() => setEditOpen(false)}
-                className="text-[#a7a7a7] hover:text-white pressable"
-              >
-                <X size={20} />
-              </button>
+            <div className="flex justify-center mb-4">
+              <div className="w-9 h-[5px] rounded-full bg-[#333]" />
             </div>
 
-            <div className="space-y-3">
+            <h2 className="text-white text-lg font-bold mb-5 text-center">
+              {isAlbum ? "Albümü Düzenle" : "Listeyi Düzenle"}
+            </h2>
+
+            <div className="space-y-4">
               <div>
-                <label className="text-[#a7a7a7] text-xs font-semibold uppercase tracking-widest block mb-1.5">
+                <label className="text-[#888] text-[11px] font-semibold uppercase tracking-widest block mb-2 pl-1">
                   {isAlbum ? "Albüm adı" : "Liste adı"}
                 </label>
                 <input
@@ -427,11 +547,11 @@ export default function PlaylistPage({
                   onChange={(e) => setEditTitle(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && saveEdit()}
                   maxLength={80}
-                  className="w-full bg-[#282828] text-white placeholder-[#535353] rounded-md px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-[#1db954]"
+                  className="w-full bg-[#161616] text-white rounded-2xl px-4 py-3.5 text-[15px] outline-none focus:ring-1 focus:ring-[#1db954] transition-shadow"
                 />
               </div>
               <div>
-                <label className="text-[#a7a7a7] text-xs font-semibold uppercase tracking-widest block mb-1.5">
+                <label className="text-[#888] text-[11px] font-semibold uppercase tracking-widest block mb-2 pl-1">
                   Açıklama
                 </label>
                 <textarea
@@ -440,22 +560,22 @@ export default function PlaylistPage({
                   maxLength={200}
                   rows={3}
                   placeholder="İsteğe bağlı"
-                  className="w-full bg-[#282828] text-white placeholder-[#535353] rounded-md px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-[#1db954] resize-none"
+                  className="w-full bg-[#161616] text-white placeholder-[#444] rounded-2xl px-4 py-3.5 text-[15px] outline-none focus:ring-1 focus:ring-[#1db954] resize-none transition-shadow"
                 />
               </div>
             </div>
 
-            <div className="flex gap-3 mt-5">
+            <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setEditOpen(false)}
-                className="flex-1 border border-[#535353] text-white font-semibold rounded-full py-3 text-sm hover:border-white transition-colors pressable"
+                className="flex-1 border border-[#333] text-white font-semibold rounded-full py-3.5 text-sm pressable active:scale-95"
               >
                 İptal
               </button>
               <button
                 onClick={saveEdit}
                 disabled={saving || !editTitle.trim()}
-                className="flex-1 bg-[#1db954] text-black font-bold rounded-full py-3 text-sm hover:bg-[#1ed760] transition-colors pressable disabled:opacity-40 flex items-center justify-center gap-2"
+                className="flex-1 bg-[#1db954] text-black font-bold rounded-full py-3.5 text-sm pressable active:scale-95 disabled:opacity-30 flex items-center justify-center gap-2"
               >
                 {saving ? (
                   <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
@@ -466,12 +586,12 @@ export default function PlaylistPage({
               </button>
             </div>
 
-            {/* Tehlike bölgesi — sil */}
-            <div className="mt-6 pt-5 border-t border-[#2a2a2a]">
+            {/* Sil */}
+            <div className="mt-6 pt-5 border-t border-[#1a1a1a]">
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="w-full flex items-center justify-center gap-2 text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 hover:bg-red-500/5 rounded-full py-2.5 text-sm font-semibold transition-colors pressable disabled:opacity-40"
+                className="w-full flex items-center justify-center gap-2 text-red-400 py-3 text-sm font-semibold pressable active:scale-95 disabled:opacity-30"
               >
                 {deleting ? (
                   <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
@@ -481,166 +601,12 @@ export default function PlaylistPage({
                 {isAlbum ? "Albümü" : "Listeyi"} kalıcı olarak sil
               </button>
             </div>
+
+            {/* Safe area */}
+            <div className="h-[env(safe-area-inset-bottom,0px)]" />
           </div>
         </div>
       )}
-
-      {/* ── Track list ── */}
-      <div className="px-6 bg-[#121212]">
-        {songs.length === 0 ? (
-          <div className="py-16 text-center">
-            <Music2 size={40} className="text-[#535353] mx-auto mb-3" />
-            <p className="text-white font-semibold mb-1">Henüz şarkı yok</p>
-            <p className="text-[#a7a7a7] text-sm">
-              &quot;Şarkı ekle&quot; butonuyla içerik ekle
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Column headers — Spotify tarzı: # | Title | Album | Date added | ⏱ */}
-            <div
-              className="grid gap-4 px-4 pb-2 border-b border-[#282828] mb-2 text-[#a7a7a7] text-xs uppercase tracking-widest items-center"
-              style={{ gridTemplateColumns: "32px 1fr 1fr 140px 60px 32px" }}
-            >
-              <span className="text-center">#</span>
-              <span>Başlık</span>
-              <span className="hidden md:block">Albüm</span>
-              <span className="hidden lg:block">Eklenme</span>
-              <span className="text-right">
-                <Clock3 size={14} className="inline" />
-              </span>
-              <span />
-            </div>
-
-            {songs.map((song, i) => {
-              const isActive = currentSong?.id === song.id;
-              const dateLabel = song.createdAt
-                ? new Date(song.createdAt).toLocaleDateString("tr-TR", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })
-                : "";
-              const albumLabel = song.title;
-              return (
-                <div
-                  key={song.id}
-                  className="grid gap-4 px-4 py-2 rounded-md hover:bg-[#ffffff1a] transition-colors group items-center"
-                  style={{
-                    gridTemplateColumns: "32px 1fr 1fr 140px 60px 32px",
-                  }}
-                >
-                  {/* Index / wave */}
-                  <div className="text-center">
-                    {isActive ? (
-                      <span className="flex items-end justify-center gap-[2px] h-4">
-                        {[0, 0.15, 0.3].map((d, k) => (
-                          <span
-                            key={k}
-                            className="wave-bar rounded-sm"
-                            style={{
-                              width: "2px",
-                              height: "100%",
-                              animationDelay: `${d}s`,
-                            }}
-                          />
-                        ))}
-                      </span>
-                    ) : (
-                      <>
-                        <span className="text-[#a7a7a7] text-sm group-hover:hidden">
-                          {i + 1}
-                        </span>
-                        <button
-                          onClick={() => playSong(song, songs)}
-                          className="hidden group-hover:flex items-center justify-center w-full pressable"
-                        >
-                          <Play size={14} fill="white" className="text-white" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Title col: cover + title + creator */}
-                  <button
-                    onClick={() => playSong(song, songs)}
-                    className="flex items-center gap-3 min-w-0 text-left pressable"
-                  >
-                    <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-[#282828]">
-                      {song.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={song.imageUrl}
-                          alt={song.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Music2 size={14} className="text-[#535353]" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
-                      >
-                        {song.title}
-                      </p>
-                      <p className="text-[#a7a7a7] text-xs truncate">
-                        {song.creator?.name ||
-                          song.style?.split(",")[0] ||
-                          "Hubeya"}
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* Album */}
-                  <span className="hidden md:block text-[#a7a7a7] text-sm truncate">
-                    {albumLabel}
-                  </span>
-
-                  {/* Date added */}
-                  <span className="hidden lg:block text-[#a7a7a7] text-sm tabular-nums">
-                    {dateLabel}
-                  </span>
-
-                  {/* Duration */}
-                  <span className="text-[#a7a7a7] text-sm tabular-nums text-right">
-                    {fmt(song.duration)}
-                  </span>
-
-                  {/* Owner: context menu */}
-                  {isOwner ? (
-                    <div className="relative">
-                      <button
-                        onClick={() =>
-                          setMenuSong(menuSong === song.id ? null : song.id)
-                        }
-                        className="w-8 h-8 flex items-center justify-center text-[#a7a7a7] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity pressable"
-                      >
-                        <MoreHorizontal size={18} />
-                      </button>
-                      {menuSong === song.id && (
-                        <div className="absolute right-0 top-full mt-1 w-44 bg-[#282828] rounded-md shadow-2xl z-10 overflow-hidden">
-                          <button
-                            onClick={() => removeSong(song.id)}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-[#3e3e3e] transition-colors text-left"
-                          >
-                            <Trash2 size={15} />
-                            Listeden çıkar
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <span />
-                  )}
-                </div>
-              );
-            })}
-          </>
-        )}
-      </div>
     </div>
   );
 }

@@ -78,7 +78,7 @@ export default function LikedSongsPage() {
   return (
     <div className="min-h-full pb-8">
       {/* Hero */}
-      <div style={{ background: heroGradient }} className="pt-16 md:pt-20">
+      <div style={{ background: heroGradient }} className="pt-4">
         <div className="px-6 pb-6 flex flex-col md:flex-row md:items-end gap-6">
           {/* Cover — kırmızı-mor kalp */}
           <div

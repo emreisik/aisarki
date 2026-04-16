@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Play, Pause, Music2, Clock3, UserCheck, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { Play, Pause, Music2, MoreHorizontal, ArrowLeft } from "lucide-react";
 import { formatListenerCount } from "@/lib/formatNumber";
 
 interface PublicUser {
@@ -36,17 +37,11 @@ function fmt(s?: number) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
-function fmtCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)} B`;
-  return String(n);
-}
-
-/* Albüm kapağından dominant renk — hero gradient için */
-function useHeroColor(songs: Song[]) {
+/* ── Avatar/kapaktan dominant renk ── */
+function useHeroColor(avatarUrl?: string, songImageUrl?: string) {
   const [rgb, setRgb] = useState("30,30,40");
+  const url = avatarUrl || songImageUrl;
   useEffect(() => {
-    const url = songs.find((s) => s.imageUrl)?.imageUrl;
     if (!url) return;
     let cancelled = false;
     const img = new Image();
@@ -55,10 +50,10 @@ function useHeroColor(songs: Song[]) {
       if (cancelled) return;
       try {
         const size = 60;
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d");
+        const c = document.createElement("canvas");
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext("2d");
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, size, size);
         const d = ctx.getImageData(0, 0, size, size).data;
@@ -89,13 +84,14 @@ function useHeroColor(songs: Song[]) {
     return () => {
       cancelled = true;
     };
-  }, [songs]);
+  }, [url]);
   return rgb;
 }
 
 export default function ArtistPage() {
   const params = useParams();
   const username = params.username as string;
+  const router = useRouter();
   const { data: session } = useSession();
   const { playSong, currentSong, playing, togglePlay } = usePlayer();
 
@@ -104,7 +100,7 @@ export default function ArtistPage() {
   const [notFound, setNotFound] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
 
-  const rgb = useHeroColor(data?.songs ?? []);
+  const rgb = useHeroColor(data?.user.avatarUrl, data?.songs[0]?.imageUrl);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -114,8 +110,7 @@ export default function ArtistPage() {
         return;
       }
       if (!res.ok) return;
-      const json = await res.json();
-      setData(json);
+      setData(await res.json());
     } finally {
       setLoading(false);
     }
@@ -126,8 +121,7 @@ export default function ArtistPage() {
   }, [fetchProfile]);
 
   const handleFollow = async () => {
-    if (!session?.user) return;
-    if (!data) return;
+    if (!session?.user || !data) return;
     setFollowLoading(true);
     try {
       const res = await fetch(`/api/follow/${data.user.id}`, {
@@ -151,32 +145,28 @@ export default function ArtistPage() {
   };
 
   const songs = data?.songs ?? [];
-  const popularSongs = songs.slice(0, 5);
-  const discography = songs.slice(5);
 
   const isThisArtistPlaying =
     currentSong && songs.some((s) => s.id === currentSong.id) && playing;
 
   const handlePlayAll = () => {
     if (songs.length === 0) return;
-    if (currentSong && songs.some((s) => s.id === currentSong.id)) {
-      togglePlay();
-    } else {
-      playSong(songs[0], songs);
-    }
+    if (currentSong && songs.some((s) => s.id === currentSong.id)) togglePlay();
+    else playSong(songs[0], songs);
   };
 
+  /* ── Loading skeleton ── */
   if (loading) {
     return (
-      <div className="min-h-full bg-[#121212]">
-        <div className="pt-16 md:pt-20 h-64 shimmer" />
-        <div className="px-6 py-8 flex flex-col gap-3">
+      <div className="min-h-full bg-[#0a0a0a]">
+        <div className="pt-4 h-72 shimmer" />
+        <div className="px-5 py-6 flex flex-col gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded shimmer" />
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded shimmer flex-shrink-0" />
               <div className="flex-1 flex flex-col gap-2">
-                <div className="h-3 w-1/3 rounded-full shimmer" />
-                <div className="h-2.5 w-1/5 rounded-full shimmer" />
+                <div className="h-3 w-2/5 rounded-full shimmer" />
+                <div className="h-2.5 w-1/4 rounded-full shimmer" />
               </div>
             </div>
           ))}
@@ -185,48 +175,40 @@ export default function ArtistPage() {
     );
   }
 
+  /* ── Not found ── */
   if (notFound || !data) {
     return (
-      <div className="min-h-full bg-[#121212] flex flex-col items-center justify-center gap-4 pt-20">
-        <Music2 size={56} className="text-[#535353]" />
+      <div className="min-h-full bg-[#0a0a0a] flex flex-col items-center justify-center gap-4 pt-20">
+        <Music2 size={48} className="text-[#333]" />
         <p className="text-white font-bold text-xl">Kullanıcı bulunamadı</p>
-        <p className="text-[#a7a7a7] text-sm">@{username} mevcut değil</p>
+        <p className="text-[#888] text-sm">@{username} mevcut değil</p>
       </div>
     );
   }
 
-  const { user, followerCount, followingCount, isFollowing } = data;
+  const { user, followerCount, isFollowing } = data;
   const isOwnProfile = session?.user?.id === user.id;
 
   return (
-    <div className="min-h-full bg-[#121212]">
-      {/* ── Hero ── */}
+    <div className="min-h-full bg-[#0a0a0a]">
+      {/* ══ Hero — Spotify native ══ */}
       <div
-        className="relative pt-16 md:pt-20 pb-6 overflow-hidden"
+        className="relative pb-6"
         style={{
-          background: `linear-gradient(180deg, rgb(${rgb}) 0%, rgba(18,18,18,0.4) 100%)`,
-          minHeight: 280,
+          background: `linear-gradient(180deg, rgb(${rgb}) 0%, rgba(${rgb},0.3) 65%, #0a0a0a 100%)`,
         }}
       >
-        {/* Blurred cover arka plan */}
-        {songs[0]?.imageUrl && (
-          <div className="absolute inset-0 pointer-events-none">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={songs[0].imageUrl}
-              alt=""
-              className="w-full h-full object-cover"
-              style={{
-                filter: "blur(100px) saturate(1.3)",
-                transform: "scale(1.5)",
-                opacity: 0.2,
-              }}
-            />
-          </div>
-        )}
-        <div className="relative z-10 px-6 flex flex-col items-center md:flex-row md:items-end gap-6">
-          {/* Avatar */}
-          <div className="w-36 h-36 md:w-48 md:h-48 rounded-full overflow-hidden flex-shrink-0 shadow-2xl bg-[#282828] flex items-center justify-center border-4 border-black/20">
+        {/* Geri */}
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 left-4 z-10 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white pressable active:scale-95"
+        >
+          <ArrowLeft size={18} />
+        </button>
+
+        {/* Avatar — ortada */}
+        <div className="pt-14 flex justify-center">
+          <div className="w-[140px] h-[140px] rounded-full overflow-hidden shadow-2xl bg-[#1a1a1a] flex items-center justify-center">
             {user.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -235,305 +217,224 @@ export default function ArtistPage() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <span
-                className="text-white font-black"
-                style={{ fontSize: "clamp(2rem, 8vw, 5rem)" }}
-              >
+              <span className="text-white text-5xl font-black">
                 {user.displayName[0]?.toUpperCase()}
               </span>
             )}
           </div>
+        </div>
 
-          {/* Info */}
-          <div className="flex flex-col items-center md:items-start gap-2 text-center md:text-left">
-            <p className="text-white/70 text-xs font-bold uppercase tracking-widest">
-              Sanatçı
+        {/* İsim + dinleyici */}
+        <div className="px-5 mt-5 text-center">
+          <h1 className="text-white text-[28px] font-black leading-tight">
+            {user.displayName}
+          </h1>
+          {data.stats && data.stats.monthlyListeners > 0 ? (
+            <p className="text-[#aaa] text-[13px] mt-1.5">
+              {formatListenerCount(data.stats.monthlyListeners)} aylık dinleyici
             </p>
-            <h1
-              className="text-white font-black leading-none"
-              style={{ fontSize: "clamp(2rem, 8vw, 5rem)" }}
-            >
-              {user.displayName}
-            </h1>
-            <p className="text-white/60 text-sm">@{user.username}</p>
-            {data.stats && data.stats.monthlyListeners > 0 && (
-              <p className="text-white text-sm mt-1">
-                <span className="font-bold">
-                  {formatListenerCount(data.stats.monthlyListeners)}
-                </span>{" "}
-                <span className="text-white/70">aylık dinleyici</span>
-              </p>
-            )}
-            <div className="flex items-center gap-4 text-sm text-white/60 mt-1 flex-wrap">
-              <span>
-                <span className="text-white font-bold">
-                  {fmtCount(followerCount)}
-                </span>{" "}
-                takipçi
-              </span>
-              <span>
-                <span className="text-white font-bold">
-                  {fmtCount(followingCount)}
-                </span>{" "}
-                takip
-              </span>
-              <span>
-                <span className="text-white font-bold">{songs.length}</span>{" "}
-                şarkı
-              </span>
-              {data.stats && data.stats.totalStreams > 0 && (
-                <span>
-                  <span className="text-white font-bold">
-                    {formatListenerCount(data.stats.totalStreams)}
-                  </span>{" "}
-                  dinlenme
-                </span>
-              )}
-            </div>
-          </div>
+          ) : (
+            <p className="text-[#aaa] text-[13px] mt-1.5">
+              {formatListenerCount(followerCount)} takipçi
+            </p>
+          )}
         </div>
       </div>
 
-      {/* ── Controls ── */}
-      <div className="px-6 py-6 bg-[#121212] flex items-center gap-5">
-        {songs.length > 0 && (
-          <button
-            onClick={handlePlayAll}
-            className="w-14 h-14 rounded-full bg-[#1db954] flex items-center justify-center pressable hover:scale-105 transition-transform shadow-xl"
-          >
-            {isThisArtistPlaying ? (
-              <Pause size={26} fill="black" className="text-black" />
-            ) : (
-              <Play size={26} fill="black" className="text-black ml-1" />
-            )}
+      {/* ══ Aksiyon bar ══ */}
+      <div className="px-5 py-3 flex items-center">
+        {/* Sol: follow + more */}
+        <div className="flex items-center gap-3">
+          {!isOwnProfile && (
+            <button
+              onClick={handleFollow}
+              disabled={followLoading || !session?.user}
+              className={`rounded-full px-5 py-1.5 text-[13px] font-bold border pressable active:scale-95 transition-all disabled:opacity-40 ${
+                isFollowing
+                  ? "border-[#1db954] text-[#1db954]"
+                  : "border-[#888] text-white"
+              }`}
+            >
+              {isFollowing ? "Takip ediliyor" : "Takip et"}
+            </button>
+          )}
+          <button className="text-[#888] hover:text-white pressable active:scale-95 transition-colors">
+            <MoreHorizontal size={24} />
           </button>
-        )}
+        </div>
 
-        {/* Follow butonu — kendi profilini görüntülemiyorsa */}
-        {!isOwnProfile && (
-          <button
-            onClick={handleFollow}
-            disabled={followLoading || !session?.user}
-            className={`flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all pressable border ${
-              isFollowing
-                ? "border-[#1db954] text-[#1db954] hover:border-white hover:text-white"
-                : "border-white/40 text-white hover:border-white"
-            } disabled:opacity-50`}
-          >
-            {isFollowing ? (
-              <>
-                <UserCheck size={16} />
-                Takip ediliyor
-              </>
-            ) : (
-              <>
-                <UserPlus size={16} />
-                {session?.user ? "Takip et" : "Takip et"}
-              </>
-            )}
-          </button>
-        )}
+        {/* Sağ: play */}
+        <div className="ml-auto">
+          {songs.length > 0 && (
+            <button
+              onClick={handlePlayAll}
+              className="w-12 h-12 rounded-full bg-[#1db954] flex items-center justify-center pressable active:scale-95 transition-transform shadow-lg"
+            >
+              {isThisArtistPlaying ? (
+                <Pause size={22} fill="black" className="text-black" />
+              ) : (
+                <Play size={22} fill="black" className="text-black ml-0.5" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── Popüler şarkılar ── */}
+      {/* ══ Popüler şarkılar ══ */}
       {songs.length > 0 && (
-        <div className="px-6 pb-6">
-          <h2 className="text-white font-bold text-xl mb-4">Popüler</h2>
-
+        <div className="px-5 pb-6">
+          <h2 className="text-white font-bold text-lg mb-3">Popüler</h2>
           <div className="flex flex-col">
-            {/* Column headers */}
-            <div className="flex items-center gap-4 px-4 pb-2 border-b border-[#282828] mb-1 text-[#a7a7a7] text-xs uppercase tracking-widest">
-              <span className="w-8 text-center">#</span>
-              <span className="w-10 flex-shrink-0" />
-              <span className="flex-1">Başlık</span>
-              <Clock3 size={14} className="flex-shrink-0" />
-            </div>
+            {songs.slice(0, 5).map((song, i) => {
+              const isActive = currentSong?.id === song.id;
+              return (
+                <div
+                  key={song.id}
+                  className={`flex items-center gap-3 py-2.5 rounded-lg group transition-colors ${
+                    isActive ? "bg-[#ffffff08]" : ""
+                  }`}
+                >
+                  {/* Numara / wave */}
+                  <div className="w-6 text-center flex-shrink-0">
+                    {isActive && playing ? (
+                      <span className="flex items-end justify-center gap-[2px] h-3.5">
+                        {[0, 0.15, 0.3].map((d, k) => (
+                          <span
+                            key={k}
+                            className="wave-bar rounded-sm"
+                            style={{
+                              width: "2px",
+                              height: "100%",
+                              animationDelay: `${d}s`,
+                            }}
+                          />
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="text-[#888] text-sm">{i + 1}</span>
+                    )}
+                  </div>
 
-            {popularSongs.map((song, i) => (
-              <SongRow
-                key={song.id}
-                song={song}
-                index={i + 1}
-                songs={songs}
-                isActive={currentSong?.id === song.id}
-                isPlaying={playing}
-                onPlay={() => playSong(song, songs)}
-                onToggle={togglePlay}
-              />
-            ))}
+                  {/* Kapak */}
+                  <button
+                    onClick={() =>
+                      isActive ? togglePlay() : playSong(song, songs)
+                    }
+                    className="w-12 h-12 rounded flex-shrink-0 overflow-hidden bg-[#1a1a1a] pressable"
+                  >
+                    {song.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={song.imageUrl}
+                        alt={song.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Music2 size={16} className="text-[#444]" />
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Başlık — tıklanabilir → şarkı detay */}
+                  <Link
+                    href={`/song/${song.id}`}
+                    className="flex-1 min-w-0 pressable"
+                  >
+                    <p
+                      className={`text-[15px] font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+                    >
+                      {song.title}
+                    </p>
+                    {song.playCount != null && song.playCount > 0 && (
+                      <p className="text-[#888] text-[12px] tabular-nums mt-0.5">
+                        {formatListenerCount(song.playCount)}
+                      </p>
+                    )}
+                  </Link>
+
+                  {/* Sağ: more */}
+                  <button className="w-8 h-8 flex items-center justify-center text-[#888] hover:text-white pressable opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <MoreHorizontal size={18} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* ── Diskografi ── */}
-      {discography.length > 0 && (
-        <div className="px-6 pb-10">
-          <h2 className="text-white font-bold text-xl mb-4">Diskografi</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {discography.map((song) => (
-              <button
-                key={song.id}
-                onClick={() => playSong(song, songs)}
-                className="bg-[#181818] hover:bg-[#282828] transition-colors rounded-lg p-3 text-left pressable group"
-              >
-                <div className="w-full aspect-square rounded-md overflow-hidden mb-3 bg-[#282828] relative">
-                  {song.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={song.imageUrl}
-                      alt={song.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Music2 size={32} className="text-[#535353]" />
-                    </div>
-                  )}
-                  {/* Play overlay */}
-                  <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform">
-                      {currentSong?.id === song.id && playing ? (
-                        <Pause size={18} fill="black" className="text-black" />
-                      ) : (
-                        <Play
-                          size={18}
-                          fill="black"
-                          className="text-black ml-0.5"
-                        />
-                      )}
+      {/* ══ Diskografi — grid kartları ══ */}
+      {songs.length > 5 && (
+        <div className="px-5 pb-10">
+          <h2 className="text-white font-bold text-lg mb-3">Diskografi</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {songs.slice(5).map((song) => {
+              const isActive = currentSong?.id === song.id;
+              return (
+                <button
+                  key={song.id}
+                  onClick={() =>
+                    isActive ? togglePlay() : playSong(song, songs)
+                  }
+                  className="bg-[#161616] hover:bg-[#1a1a1a] transition-colors rounded-xl p-3 text-left pressable group"
+                >
+                  <div className="w-full aspect-square rounded-lg overflow-hidden bg-[#1a1a1a] relative mb-2.5">
+                    {song.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={song.imageUrl}
+                        alt={song.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Music2 size={28} className="text-[#333]" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform">
+                        {isActive && playing ? (
+                          <Pause
+                            size={18}
+                            fill="black"
+                            className="text-black"
+                          />
+                        ) : (
+                          <Play
+                            size={18}
+                            fill="black"
+                            className="text-black ml-0.5"
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <p
-                  className={`text-sm font-semibold truncate ${currentSong?.id === song.id ? "text-[#1db954]" : "text-white"}`}
-                >
-                  {song.title}
-                </p>
-                <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-                  {fmt(song.duration)}
-                </p>
-              </button>
-            ))}
+                  <p
+                    className={`text-[13px] font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+                  >
+                    {song.title}
+                  </p>
+                  <p className="text-[#888] text-[11px] mt-0.5">
+                    {fmt(song.duration)}
+                  </p>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Hiç şarkı yok */}
+      {/* Boş durum */}
       {songs.length === 0 && (
-        <div className="py-20 text-center px-6">
-          <Music2 size={48} className="text-[#535353] mx-auto mb-4" />
+        <div className="py-20 text-center px-5">
+          <Music2 size={48} className="text-[#333] mx-auto mb-4" />
           <p className="text-white font-bold text-xl mb-2">Henüz şarkı yok</p>
-          <p className="text-[#535353] text-sm">
+          <p className="text-[#888] text-sm">
             Bu sanatçı henüz şarkı oluşturmamış
           </p>
         </div>
       )}
-    </div>
-  );
-}
-
-/* ── Satır bileşeni ── */
-function SongRow({
-  song,
-  index,
-  songs,
-  isActive,
-  isPlaying,
-  onPlay,
-  onToggle,
-}: {
-  song: Song;
-  index: number;
-  songs: Song[];
-  isActive: boolean;
-  isPlaying: boolean;
-  onPlay: () => void;
-  onToggle: () => void;
-}) {
-  const fmt = (s?: number) => {
-    if (!s || isNaN(s)) return "--:--";
-    return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  };
-
-  return (
-    <div
-      className={`flex items-center gap-4 px-4 py-2 rounded-md transition-colors group ${
-        isActive ? "bg-[#ffffff12]" : "hover:bg-[#ffffff0d]"
-      }`}
-    >
-      {/* Index / wave */}
-      <div className="w-8 text-center flex-shrink-0">
-        {isActive ? (
-          <span className="flex items-end justify-center gap-[2px] h-4">
-            {[0, 0.15, 0.3].map((d, k) => (
-              <span
-                key={k}
-                className="wave-bar rounded-sm"
-                style={{
-                  width: "2px",
-                  height: "100%",
-                  animationDelay: `${d}s`,
-                }}
-              />
-            ))}
-          </span>
-        ) : (
-          <>
-            <span className="text-[#a7a7a7] text-sm group-hover:hidden">
-              {index}
-            </span>
-            <button
-              onClick={onPlay}
-              className="hidden group-hover:flex items-center justify-center w-full pressable"
-            >
-              <Play size={14} fill="white" className="text-white" />
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Cover */}
-      <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-[#282828]">
-        {song.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={song.imageUrl}
-            alt={song.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={14} className="text-[#535353]" />
-          </div>
-        )}
-      </div>
-
-      {/* Title */}
-      <button
-        onClick={isActive ? onToggle : onPlay}
-        className="flex-1 min-w-0 text-left pressable"
-      >
-        <p
-          className={`text-sm font-medium truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
-        >
-          {song.title}
-        </p>
-        <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-          {song.style?.split(",")[0] || "Hubeya"}
-        </p>
-      </button>
-
-      {/* Play count */}
-      {song.playCount != null && song.playCount > 0 && (
-        <span className="hidden sm:inline text-[#a7a7a7] text-sm tabular-nums flex-shrink-0 w-20 text-right">
-          {formatListenerCount(song.playCount)}
-        </span>
-      )}
-
-      {/* Duration */}
-      <span className="text-[#a7a7a7] text-sm tabular-nums flex-shrink-0">
-        {fmt(song.duration)}
-      </span>
     </div>
   );
 }

@@ -387,7 +387,7 @@ export default function LibraryPage() {
   if (!loading && status === "unauthenticated") {
     return (
       <div className="min-h-full bg-[#121212]">
-        <div className="bg-gradient-to-b from-[#3d3d3d] to-[#121212] pt-16 md:pt-20 px-6 pb-8">
+        <div className="bg-gradient-to-b from-[#3d3d3d] to-[#121212] pt-4 px-6 pb-8">
           <h1 className="text-white text-3xl font-black mb-1">Kütüphanem</h1>
           <p className="text-[#a7a7a7] text-sm">
             Albümlerin ve listeler burada
@@ -418,7 +418,7 @@ export default function LibraryPage() {
   if (loading) {
     return (
       <div className="min-h-full bg-[#121212]">
-        <div className="bg-gradient-to-b from-[#3d3d3d] to-[#121212] pt-16 md:pt-20 px-6 pb-8">
+        <div className="bg-gradient-to-b from-[#3d3d3d] to-[#121212] pt-4 px-6 pb-8">
           <div className="h-9 w-40 rounded-full shimmer mb-2" />
           <div className="h-4 w-24 rounded-full shimmer" />
         </div>
@@ -441,7 +441,7 @@ export default function LibraryPage() {
     <>
       <div className="min-h-full bg-[#121212]">
         {/* ── Hero ── */}
-        <div className="bg-gradient-to-b from-[#3d3d3d] to-[#121212] pt-16 md:pt-20 px-6 pb-6">
+        <div className="bg-gradient-to-b from-[#3d3d3d] to-[#121212] pt-4 px-6 pb-6">
           <div className="flex items-end justify-between">
             <div>
               <h1 className="text-white text-3xl font-black mb-1">

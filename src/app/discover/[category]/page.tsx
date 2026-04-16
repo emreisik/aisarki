@@ -5,82 +5,87 @@ import { useParams, useRouter } from "next/navigation";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import Link from "next/link";
-import { ArrowLeft, Play, Pause, Music2 } from "lucide-react";
+import { ArrowLeft, Play, Pause, Music2, Shuffle } from "lucide-react";
 
-/* ── Kategori tanımları (discover/page.tsx ile aynı) ── */
+/* ── Kategori tanımları ── */
 interface Category {
   id: string;
   label: string;
-  color: string;
+  gradient: [string, string];
   keywords: string[];
 }
 
 const CATEGORIES: Category[] = [
-  { id: "pop", label: "Pop", color: "#e91429", keywords: ["pop"] },
+  {
+    id: "pop",
+    label: "Pop",
+    gradient: ["#e91429", "#ff6a3d"],
+    keywords: ["pop"],
+  },
   {
     id: "turk",
     label: "Türk Müziği",
-    color: "#148a08",
+    gradient: ["#148a08", "#45c928"],
     keywords: ["türk", "türkçe", "anatolian", "arabesk"],
   },
   {
     id: "rock",
     label: "Rock",
-    color: "#e8115b",
+    gradient: ["#4a2c70", "#e8115b"],
     keywords: ["rock", "metal", "alternative"],
   },
   {
     id: "hiphop",
-    label: "Hip-Hop / Rap",
-    color: "#1e3264",
+    label: "Hip-Hop",
+    gradient: ["#1e3264", "#5b8def"],
     keywords: ["hip", "rap", "trap"],
   },
   {
     id: "romantik",
     label: "Romantik",
-    color: "#c62a2a",
+    gradient: ["#c62a2a", "#ff7eb3"],
     keywords: ["romantic", "romantik", "love", "aşk"],
   },
   {
     id: "dans",
-    label: "Dans",
-    color: "#8d67ab",
+    label: "Dance",
+    gradient: ["#5c2d82", "#c471ed"],
     keywords: ["dance", "dans", "edm", "electronic"],
   },
   {
     id: "cocuk",
-    label: "Çocuk Şarkıları",
-    color: "#e8a400",
+    label: "Çocuk",
+    gradient: ["#e8a400", "#ffe066"],
     keywords: ["child", "çocuk", "kid", "nursery"],
   },
   {
     id: "akustik",
     label: "Akustik",
-    color: "#477d5e",
+    gradient: ["#2d6a4f", "#74c69d"],
     keywords: ["acoustic", "akustik", "folk"],
   },
   {
     id: "nostalji",
     label: "Nostaljik",
-    color: "#5179a1",
+    gradient: ["#3a506b", "#8bbae8"],
     keywords: ["nostalji", "klasik", "retro", "vintage"],
   },
   {
     id: "motivasyon",
     label: "Motivasyon",
-    color: "#f05e22",
+    gradient: ["#f05e22", "#ffa751"],
     keywords: ["motivation", "motivasyon", "uplifting", "energetic"],
   },
   {
     id: "sakin",
-    label: "Dinlendirici",
-    color: "#27856a",
+    label: "Chill",
+    gradient: ["#27856a", "#6ee7b7"],
     keywords: ["calm", "chill", "sakin", "relaxing", "ambient"],
   },
   {
     id: "duygusal",
     label: "Duygusal",
-    color: "#9b1d8a",
+    gradient: ["#9b1d8a", "#e879f9"],
     keywords: ["sad", "duygusal", "emotional", "üzgün", "melanko"],
   },
 ];
@@ -88,57 +93,6 @@ const CATEGORIES: Category[] = [
 function fmt(s?: number) {
   if (!s || isNaN(s)) return "--:--";
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-}
-
-/* Albüm kapağından dominant renk */
-function useHeroColor(songs: Song[]) {
-  const [rgb, setRgb] = useState("30,30,40");
-  useEffect(() => {
-    const url = songs.find((s) => s.imageUrl)?.imageUrl;
-    if (!url) return;
-    let cancelled = false;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      if (cancelled) return;
-      try {
-        const size = 60;
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, size, size);
-        const d = ctx.getImageData(0, 0, size, size).data;
-        let r = 0,
-          g = 0,
-          b = 0,
-          n = 0;
-        for (let i = 0; i < d.length; i += 8) {
-          const br = (d[i] + d[i + 1] + d[i + 2]) / 3;
-          if (br > 20 && br < 235) {
-            r += d[i];
-            g += d[i + 1];
-            b += d[i + 2];
-            n++;
-          }
-        }
-        if (n > 0 && !cancelled) {
-          const dk = 0.5;
-          setRgb(
-            `${Math.floor((r / n) * dk)},${Math.floor((g / n) * dk)},${Math.floor((b / n) * dk)}`,
-          );
-        }
-      } catch {
-        /* CORS */
-      }
-    };
-    img.src = url;
-    return () => {
-      cancelled = true;
-    };
-  }, [songs]);
-  return rgb;
 }
 
 export default function CategoryPage() {
@@ -166,7 +120,6 @@ export default function CategoryPage() {
     fetchSongs();
   }, [fetchSongs]);
 
-  /* Kategori filtresi */
   const songs = cat
     ? allSongs.filter((s) => {
         const haystack = `${s.title} ${s.style ?? ""}`.toLowerCase();
@@ -195,71 +148,99 @@ export default function CategoryPage() {
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   })();
 
-  const featured = songs.slice(0, 6);
-  const heroRgb = useHeroColor(songs);
-  const catColor = cat?.color ?? "#1db954";
+  const featured = songs.slice(0, 8);
+  const color0 = cat?.gradient[0] ?? "#1db954";
+  const color1 = cat?.gradient[1] ?? "#1db954";
 
   if (!cat && !loading) {
     return (
-      <div className="min-h-full bg-[#121212] flex items-center justify-center">
+      <div className="min-h-full bg-[#0a0a0a] flex items-center justify-center">
         <p className="text-white">Kategori bulunamadı</p>
       </div>
     );
   }
 
-  const isPlaying =
+  const isCollectionPlaying =
     currentSong && songs.some((s) => s.id === currentSong.id) && playing;
 
+  const shufflePlay = () => {
+    if (songs.length === 0) return;
+    const shuffled = [...songs].sort(() => Math.random() - 0.5);
+    playSong(shuffled[0], shuffled);
+  };
+
   return (
-    <div className="min-h-full bg-[#121212]">
-      {/* ── Hero ── */}
+    <div className="min-h-full bg-[#0a0a0a]">
+      {/* ── Hero — Suno tarzı gradient ── */}
       <div
-        className="relative pt-14 md:pt-0 pb-6 overflow-hidden"
+        className="relative pb-8 overflow-hidden"
         style={{
-          background: `linear-gradient(180deg, ${catColor}cc 0%, rgb(${heroRgb}) 60%, #121212 100%)`,
-          minHeight: 220,
+          background: `linear-gradient(180deg, ${color0} 0%, ${color1}66 40%, #0a0a0a 100%)`,
+          minHeight: 260,
         }}
       >
+        {/* Bulanık blob'lar */}
+        <div
+          className="absolute w-[60%] h-[60%] rounded-full blur-3xl opacity-30"
+          style={{ background: color1, top: "-10%", right: "-10%" }}
+        />
+        <div
+          className="absolute w-[40%] h-[40%] rounded-full blur-3xl opacity-20"
+          style={{ background: color0, bottom: "10%", left: "5%" }}
+        />
+
         {/* Geri butonu */}
         <button
           onClick={() => router.back()}
-          className="absolute top-4 left-4 w-9 h-9 flex items-center justify-center rounded-full bg-black/30 pressable z-10"
+          className="absolute top-4 left-4 w-10 h-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-sm pressable z-10"
         >
           <ArrowLeft size={20} className="text-white" />
         </button>
 
-        <div className="px-5 pt-8 pb-2">
-          <h1 className="text-white text-4xl font-black">{cat?.label}</h1>
+        <div className="px-5 pt-14 pb-2 relative z-10">
+          <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">
+            Koleksiyon
+          </p>
+          <h1 className="text-white text-4xl md:text-5xl font-black leading-tight">
+            {cat?.label}
+          </h1>
+          <p className="text-white/50 text-sm mt-2">{songs.length} şarkı</p>
         </div>
       </div>
 
-      {/* ── Play all butonu ── */}
+      {/* ── Play + Shuffle butonları ── */}
       {songs.length > 0 && (
-        <div className="px-5 py-4 flex items-center gap-4">
+        <div className="px-5 py-4 flex items-center gap-3">
           <button
             onClick={() => {
-              if (isPlaying) togglePlay();
+              if (isCollectionPlaying) togglePlay();
               else playSong(songs[0], songs);
             }}
-            className="w-14 h-14 rounded-full bg-[#1db954] flex items-center justify-center pressable hover:scale-105 transition-transform shadow-xl"
+            className="w-12 h-12 rounded-full flex items-center justify-center pressable active:scale-95 transition-transform shadow-xl"
+            style={{ background: color0 }}
           >
-            {isPlaying ? (
-              <Pause size={26} fill="black" className="text-black" />
+            {isCollectionPlaying ? (
+              <Pause size={22} fill="black" className="text-black" />
             ) : (
-              <Play size={26} fill="black" className="text-black ml-1" />
+              <Play size={22} fill="black" className="text-black ml-0.5" />
             )}
           </button>
-          <p className="text-[#a7a7a7] text-sm">{songs.length} şarkı</p>
+          <button
+            onClick={shufflePlay}
+            className="w-12 h-12 rounded-full bg-[#1a1a1a] border border-[#222] flex items-center justify-center pressable active:scale-95 transition-transform"
+          >
+            <Shuffle size={18} className="text-white" />
+          </button>
         </div>
       )}
 
-      {/* ── Öne çıkan şarkılar ── */}
+      {/* ── Öne çıkan — yatay scroll ── */}
       {featured.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-white font-bold text-xl px-5 mb-3">
-            Öne çıkan şarkılar
+          <h2 className="text-white font-bold text-lg px-5 mb-3">
+            Öne çıkanlar
           </h2>
-          <div className="flex gap-4 overflow-x-auto scroll-area px-5 pb-2">
+          <div className="flex gap-3 overflow-x-auto scroll-area px-5 pb-1">
             {featured.map((song) => {
               const isActive = currentSong?.id === song.id;
               return (
@@ -268,9 +249,9 @@ export default function CategoryPage() {
                   onClick={() =>
                     isActive ? togglePlay() : playSong(song, songs)
                   }
-                  className="flex-shrink-0 w-40 pressable group text-left"
+                  className="flex-shrink-0 w-[130px] md:w-[154px] pressable group text-left"
                 >
-                  <div className="w-40 h-40 rounded-lg overflow-hidden bg-[#282828] mb-3 relative">
+                  <div className="w-full aspect-square rounded-xl overflow-hidden bg-[#1a1a1a] relative mb-2">
                     {song.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -280,11 +261,11 @@ export default function CategoryPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Music2 size={40} className="text-[#535353]" />
+                        <Music2 size={32} className="text-[#333]" />
                       </div>
                     )}
-                    <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform">
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end justify-end p-2.5">
+                      <div className="w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
                         {isActive && playing ? (
                           <Pause
                             size={18}
@@ -302,15 +283,13 @@ export default function CategoryPage() {
                     </div>
                   </div>
                   <p
-                    className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+                    className={`text-[13px] font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
                   >
                     {song.title}
                   </p>
-                  {song.creator && (
-                    <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-                      {song.creator.name}
-                    </p>
-                  )}
+                  <p className="text-[#666] text-[11px] truncate mt-0.5">
+                    {song.creator?.name || "Hubeya"}
+                  </p>
                 </button>
               );
             })}
@@ -321,15 +300,15 @@ export default function CategoryPage() {
       {/* ── Sanatçılar ── */}
       {artists.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-white font-bold text-xl px-5 mb-3">Sanatçılar</h2>
-          <div className="flex gap-4 overflow-x-auto scroll-area px-5 pb-2">
+          <h2 className="text-white font-bold text-lg px-5 mb-3">Sanatçılar</h2>
+          <div className="flex gap-4 overflow-x-auto scroll-area px-5 pb-1">
             {artists.map((artist) => (
               <Link
                 key={artist.username}
                 href={`/profile/${artist.username}`}
-                className="flex-shrink-0 w-32 pressable text-center group"
+                className="flex-shrink-0 w-[100px] pressable text-center"
               >
-                <div className="w-32 h-32 rounded-full overflow-hidden bg-[#282828] mx-auto mb-3 flex items-center justify-center">
+                <div className="w-[100px] h-[100px] rounded-full overflow-hidden bg-[#1a1a1a] mx-auto mb-2 flex items-center justify-center">
                   {artist.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -338,15 +317,15 @@ export default function CategoryPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-white text-3xl font-black">
+                    <span className="text-white text-2xl font-black">
                       {artist.name[0]?.toUpperCase()}
                     </span>
                   )}
                 </div>
-                <p className="text-white text-sm font-semibold truncate">
+                <p className="text-white text-xs font-semibold truncate">
                   {artist.name}
                 </p>
-                <p className="text-[#a7a7a7] text-xs mt-0.5">
+                <p className="text-[#666] text-[11px] mt-0.5">
                   {artist.count} şarkı
                 </p>
               </Link>
@@ -355,88 +334,80 @@ export default function CategoryPage() {
         </section>
       )}
 
-      {/* ── Tüm şarkılar ── */}
+      {/* ── Tüm şarkılar — liste ── */}
       {songs.length > 0 && (
         <section className="px-5 pb-10">
-          <h2 className="text-white font-bold text-xl mb-3">Tüm şarkılar</h2>
+          <h2 className="text-white font-bold text-lg mb-3">Tüm şarkılar</h2>
+          <div className="flex flex-col gap-0.5">
+            {songs.map((song, i) => {
+              const isActive = currentSong?.id === song.id;
+              return (
+                <button
+                  key={song.id}
+                  onClick={() =>
+                    isActive ? togglePlay() : playSong(song, songs)
+                  }
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group text-left pressable ${
+                    isActive ? "bg-[#ffffff10]" : "hover:bg-[#ffffff06]"
+                  }`}
+                >
+                  <span className="w-6 text-center text-[#555] text-xs font-semibold flex-shrink-0 group-hover:hidden">
+                    {i + 1}
+                  </span>
+                  <span className="w-6 text-center flex-shrink-0 hidden group-hover:flex items-center justify-center">
+                    {isActive && playing ? (
+                      <Pause size={12} fill="white" className="text-white" />
+                    ) : (
+                      <Play
+                        size={12}
+                        fill="white"
+                        className="text-white ml-0.5"
+                      />
+                    )}
+                  </span>
 
-          {loading ? (
-            <div className="grid grid-cols-2 gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded shimmer flex-shrink-0" />
-                  <div className="flex-1 flex flex-col gap-1.5">
-                    <div className="h-3 rounded-full shimmer" />
-                    <div className="h-2.5 w-2/3 rounded-full shimmer" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-              {songs.map((song) => {
-                const isActive = currentSong?.id === song.id;
-                return (
-                  <button
-                    key={song.id}
-                    onClick={() =>
-                      isActive ? togglePlay() : playSong(song, songs)
-                    }
-                    className="flex items-center gap-3 pressable group text-left min-w-0"
-                  >
-                    <div className="w-12 h-12 rounded-md flex-shrink-0 overflow-hidden bg-[#282828] relative">
-                      {song.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={song.imageUrl}
-                          alt={song.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Music2 size={16} className="text-[#535353]" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        {isActive && playing ? (
-                          <Pause
-                            size={14}
-                            fill="white"
-                            className="text-white"
-                          />
-                        ) : (
-                          <Play
-                            size={14}
-                            fill="white"
-                            className="text-white ml-0.5"
-                          />
-                        )}
+                  <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden bg-[#1a1a1a]">
+                    {song.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={song.imageUrl}
+                        alt={song.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Music2 size={14} className="text-[#333]" />
                       </div>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
-                      >
-                        {song.title}
-                      </p>
-                      <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-                        {song.creator?.name || fmt(song.duration)}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+                    >
+                      {song.title}
+                    </p>
+                    <p className="text-[#666] text-xs truncate mt-0.5">
+                      {song.creator?.name || "Hubeya"}
+                    </p>
+                  </div>
+
+                  <span className="text-[#555] text-xs tabular-nums flex-shrink-0">
+                    {fmt(song.duration)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </section>
       )}
 
       {/* Boş durum */}
       {!loading && songs.length === 0 && (
         <div className="py-20 text-center px-5">
-          <Music2 size={48} className="text-[#535353] mx-auto mb-4" />
+          <Music2 size={48} className="text-[#333] mx-auto mb-4" />
           <p className="text-white font-bold text-xl mb-2">Henüz şarkı yok</p>
-          <p className="text-[#535353] text-sm">
+          <p className="text-[#555] text-sm">
             Bu kategoride henüz şarkı oluşturulmamış
           </p>
         </div>

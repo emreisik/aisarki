@@ -80,7 +80,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-full bg-[#121212]">
       {/* Header */}
-      <div className="bg-gradient-to-b from-[#1a3a1a] to-[#121212] pt-16 md:pt-20 px-6 pb-6">
+      <div className="bg-gradient-to-b from-[#1a3a1a] to-[#121212] pt-4 px-6 pb-6">
         <div className="flex items-end gap-5">
           {/* Avatar */}
           <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-[#282828] flex-shrink-0 overflow-hidden shadow-2xl">
