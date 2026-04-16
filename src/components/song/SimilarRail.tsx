@@ -50,28 +50,25 @@ export default function SimilarRail({ songId, creatorName }: Props) {
 
   return (
     <div>
-      <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-3">
-        Benzer
-      </p>
-      {creatorName && (
-        <Link
-          href="#"
-          className="block text-[#1db954] text-sm font-semibold mb-3 hover:underline"
-        >
-          {creatorName} tarafından
-        </Link>
-      )}
-      <div className="flex flex-col">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest">
+          Benzer
+        </p>
+        {creatorName && (
+          <span className="text-[#1db954] text-xs font-semibold">
+            {creatorName}
+          </span>
+        )}
+      </div>
+
+      <div className="flex gap-3 overflow-x-auto scroll-area pb-2 -mx-1 px-1">
         {songs.map((s) => {
           const isActive = currentSong?.id === s.id;
           return (
-            <div
-              key={s.id}
-              className="group flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-colors"
-            >
+            <div key={s.id} className="flex-shrink-0 w-[140px]">
               <button
                 onClick={() => (isActive ? togglePlay() : playSong(s, songs))}
-                className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-[#282828] pressable"
+                className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#282828] group pressable"
               >
                 {s.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -82,22 +79,27 @@ export default function SimilarRail({ songId, creatorName }: Props) {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <Music2 size={16} className="text-[#535353]" />
+                    <Music2 size={24} className="text-[#535353]" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                   {isActive && playing ? (
-                    <Pause size={16} fill="white" className="text-white" />
+                    <Pause size={20} fill="white" className="text-white" />
                   ) : (
                     <Play
-                      size={16}
+                      size={20}
                       fill="white"
                       className="text-white ml-0.5"
                     />
                   )}
                 </div>
+                {isActive && playing && (
+                  <div className="absolute bottom-1.5 right-1.5 w-5 h-5 rounded-full bg-[#1db954] flex items-center justify-center">
+                    <span className="block w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+                  </div>
+                )}
               </button>
-              <Link href={`/song/${s.id}`} className="flex-1 min-w-0 block">
+              <Link href={`/song/${s.id}`} className="block mt-2">
                 <p
                   className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
                 >
@@ -106,7 +108,7 @@ export default function SimilarRail({ songId, creatorName }: Props) {
                 <p className="text-[#6a6a6a] text-xs truncate mt-0.5">
                   {s.style?.split(",")[0] || "Hubeya"}
                   {s.playCount != null && s.playCount > 0 && (
-                    <> · {formatListenerCount(s.playCount)} dinlenme</>
+                    <> · {formatListenerCount(s.playCount)}</>
                   )}
                 </p>
               </Link>

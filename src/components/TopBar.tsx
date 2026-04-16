@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { ChevronLeft, ChevronRight, User, LogOut, LogIn } from "lucide-react";
+import { ChevronLeft, User, LogOut, LogIn } from "lucide-react";
 import Link from "next/link";
 
 export default function TopBar() {
@@ -39,21 +39,7 @@ export default function TopBar() {
         scrolled ? "bg-[#121212]/95 backdrop-blur-md" : "bg-transparent"
       }`}
     >
-      {/* Navigation arrows */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => router.back()}
-          className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center hover:bg-black/60 transition-colors pressable"
-        >
-          <ChevronLeft size={18} className="text-white" />
-        </button>
-        <button
-          onClick={() => router.forward()}
-          className="w-8 h-8 rounded-full bg-black/40 flex items-center justify-center hover:bg-black/60 transition-colors pressable"
-        >
-          <ChevronRight size={18} className="text-white" />
-        </button>
-      </div>
+      <div />
 
       {/* Right side: user menu */}
       <div className="flex items-center gap-2">

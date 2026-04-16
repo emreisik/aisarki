@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Music2, Wand2 } from "lucide-react";
+import { Music2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -253,99 +253,57 @@ export default function SongClient({
 
   return (
     <div className="min-h-full bg-[#0a0a0a]">
-      {/* Arka plan gradient — hero arkasında */}
+      {/* Arka plan gradient */}
       <div
-        className="sticky top-0 -z-10 h-0"
-        style={{
-          background: `linear-gradient(180deg, rgb(${rgb}) 0%, rgba(${rgb},0.3) 30%, #0a0a0a 60%)`,
-        }}
-      />
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[480px] -z-10 opacity-80"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[600px] -z-10 opacity-80"
         style={{
           background: `linear-gradient(180deg, rgb(${rgb}) 0%, rgba(${rgb},0.3) 50%, rgba(10,10,10,0) 100%)`,
         }}
       />
 
-      {/* Top bar */}
-      <div className="sticky top-0 z-20 backdrop-blur bg-black/20">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 px-4 py-3 text-white hover:text-[#1db954] transition-colors pressable"
-        >
-          <ArrowLeft size={20} />
-          <span className="text-sm font-semibold">Geri</span>
-        </button>
-      </div>
+      {/* Tek kolon — app layout */}
+      <div className="mx-auto max-w-[640px] px-4 pb-28">
+        <SongHero
+          song={song}
+          isActive={isActive}
+          playing={playing}
+          onPlay={handlePlay}
+          onShare={handleShare}
+          onBack={() => router.back()}
+          onRemix={handleRemix}
+          copied={copied}
+          liked={liked}
+          likeBusy={likeBusy}
+          likeCount={likeCount}
+          onToggleLike={handleToggleLike}
+          isFollowing={isFollowing}
+          followBusy={followBusy}
+          onToggleFollow={handleToggleFollow}
+          canFollow={canFollow}
+          commentCount={commentCount}
+          rgb={rgb}
+        />
 
-      {/* İçerik — split layout */}
-      <div className="mx-auto max-w-[1400px] px-4 md:px-8 pb-28">
-        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-          {/* Sol kolon */}
-          <div className="flex-1 min-w-0">
-            <SongHero
-              song={song}
-              isActive={isActive}
-              playing={playing}
-              onPlay={handlePlay}
-              onShare={handleShare}
-              copied={copied}
-              liked={liked}
-              likeBusy={likeBusy}
-              onToggleLike={handleToggleLike}
-              isFollowing={isFollowing}
-              followBusy={followBusy}
-              onToggleFollow={handleToggleFollow}
-              canFollow={canFollow}
-              commentCount={commentCount}
-            />
-
-            {/* Mobile Remix — hero altına */}
-            <div className="lg:hidden mt-5">
-              <button
-                onClick={handleRemix}
-                className="w-full flex items-center justify-center gap-2 rounded-full bg-white/10 hover:bg-white/15 text-white font-bold py-3 transition-colors pressable"
-              >
-                <Wand2 size={18} /> Remix Yap
-              </button>
-            </div>
-
-            {/* Sözler */}
-            <div className="mt-8 pt-8 border-t border-white/5">
-              <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-4">
-                Sözler
-              </p>
-              <LyricsBlock text={song.prompt} />
-            </div>
-
-            {/* Yorumlar */}
-            <div className="mt-10 pt-8 border-t border-white/5">
-              <CommentsSection
-                songId={id}
-                songOwnerId={song.creator?.id}
-                onCountChange={setCommentCount}
-              />
-            </div>
-          </div>
-
-          {/* Sağ kolon — desktop only */}
-          <aside className="hidden lg:flex lg:w-[320px] flex-col flex-shrink-0">
-            <div className="sticky top-16">
-              <SimilarRail songId={id} creatorName={song.creator?.name} />
-
-              <button
-                onClick={handleRemix}
-                className="mt-6 w-full flex items-center justify-center gap-2 rounded-full bg-white/10 hover:bg-white/15 text-white font-bold py-3 transition-colors pressable"
-              >
-                <Wand2 size={18} /> Remix Yap
-              </button>
-            </div>
-          </aside>
+        {/* Sözler */}
+        <div className="mt-8 pt-8 border-t border-white/5">
+          <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-4">
+            Sözler
+          </p>
+          <LyricsBlock text={song.prompt} />
         </div>
 
-        {/* Mobile Similar — en sonda */}
-        <div className="lg:hidden mt-10 pt-8 border-t border-white/5">
+        {/* Benzer şarkılar */}
+        <div className="mt-10 pt-8 border-t border-white/5">
           <SimilarRail songId={id} creatorName={song.creator?.name} />
+        </div>
+
+        {/* Yorumlar */}
+        <div className="mt-10 pt-8 border-t border-white/5">
+          <CommentsSection
+            songId={id}
+            songOwnerId={song.creator?.id}
+            onCountChange={setCommentCount}
+          />
         </div>
       </div>
     </div>

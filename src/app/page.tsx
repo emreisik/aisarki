@@ -37,10 +37,12 @@ import {
   MapPin,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useSession } from "next-auth/react";
 import SongCard from "@/components/SongCard";
+import { useLikedIds } from "@/hooks/useLikedIds";
 
 /* ══════════════════════════════════════════════
    Tip tanımları
@@ -1461,9 +1463,15 @@ function TrackRow({
 export default function HomePage() {
   const { playSong, currentSong, setShowGate } = usePlayer();
   const { data: session } = useSession();
+  const { likedIds, toggleLiked } = useLikedIds();
+  const router = useRouter();
 
   const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [selectedCat, setSelectedCat] = useState<{
+    item: CategoryItem;
+    color: string;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/all-songs")
@@ -1634,6 +1642,8 @@ export default function HomePage() {
                   variant="row"
                   onPlay={(s) => playSong(s, feedSongs)}
                   isPlaying={currentSong?.id === song.id}
+                  liked={likedIds.has(song.id)}
+                  onToggleLike={toggleLiked}
                 />
               ))}
             </div>

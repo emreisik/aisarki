@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import SongCard from "@/components/SongCard";
 import { Song } from "@/types";
+import { useLikedIds } from "@/hooks/useLikedIds";
 import { LogOut, Music2, User, Settings } from "lucide-react";
 
 interface Stats {
@@ -23,6 +24,7 @@ export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { playSong, currentSong } = usePlayer();
+  const { likedIds, toggleLiked } = useLikedIds();
   const [songs, setSongs] = useState<Song[]>([]);
   const [stats, setStats] = useState<Stats>({
     followerCount: 0,
@@ -181,6 +183,8 @@ export default function ProfilePage() {
                   setSongs((prev) => prev.filter((x) => x.id !== s.id));
                 }}
                 variant="row"
+                liked={likedIds.has(song.id)}
+                onToggleLike={toggleLiked}
               />
             ))}
           </div>
