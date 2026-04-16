@@ -210,14 +210,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           durationListened: Math.floor(streamAccumMsRef.current / 1000),
           sessionId: anonSessionIdRef.current,
         };
-        fetch("/api/plays", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          keepalive: true,
-        }).catch(() => {
-          /* sessizce geç */
-        });
+        const send = (attempt: number) =>
+          fetch("/api/plays", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            keepalive: true,
+          })
+            .then((r) => {
+              if (!r.ok && attempt < 2) {
+                setTimeout(() => send(attempt + 1), 1500 * (attempt + 1));
+              }
+            })
+            .catch(() => {
+              if (attempt < 2) {
+                setTimeout(() => send(attempt + 1), 1500 * (attempt + 1));
+              }
+            });
+        send(0);
       }
     }, 1000);
     return () => {
