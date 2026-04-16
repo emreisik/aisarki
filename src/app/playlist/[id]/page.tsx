@@ -18,6 +18,7 @@ import {
   Pencil,
   X,
   Check,
+  List as ListIcon,
 } from "lucide-react";
 
 function fmt(s?: number) {
@@ -194,8 +195,19 @@ export default function PlaylistPage({
 
   const isAlbum = playlist.type === "album";
   const heroGradient = isAlbum
-    ? "linear-gradient(180deg, #0d3320 0%, #121212 50%)"
-    : "linear-gradient(180deg, #5038a0 0%, #121212 50%)";
+    ? "linear-gradient(180deg, #1a5a3a 0%, #0f2318 45%, #121212 100%)"
+    : "linear-gradient(180deg, #7e3aad 0%, #3a1d5c 45%, #121212 100%)";
+
+  // Şarkı sayısı + yaklaşık süre (Spotify tarzı: "50 şarkı, yaklaşık 3 sa")
+  const totalSecs = songs.reduce((a, s) => a + (s.duration ?? 0), 0);
+  const hrs = Math.floor(totalSecs / 3600);
+  const mins = Math.round((totalSecs % 3600) / 60);
+  const durationLabel =
+    hrs > 0
+      ? `yaklaşık ${hrs} sa${mins > 0 ? ` ${mins} dk` : ""}`
+      : mins > 0
+        ? `yaklaşık ${mins} dk`
+        : "";
 
   return (
     <div className="min-h-full pb-8">
@@ -230,21 +242,33 @@ export default function PlaylistPage({
           </div>
 
           {/* Info */}
-          <div className="flex flex-col gap-2 text-center md:text-left">
+          <div className="flex flex-col gap-3 text-center md:text-left flex-1 min-w-0">
             <p
               className="text-xs font-semibold uppercase tracking-widest"
-              style={{ color: isAlbum ? "#1db954" : "rgba(255,255,255,0.7)" }}
+              style={{ color: "rgba(255,255,255,0.85)" }}
             >
-              {isAlbum ? "Albüm" : "Çalma listesi"}
+              {playlist.isPublic
+                ? isAlbum
+                  ? "Açık Albüm"
+                  : "Açık Çalma Listesi"
+                : isAlbum
+                  ? "Özel Albüm"
+                  : "Özel Çalma Listesi"}
             </p>
             <div className="flex items-center gap-3 justify-center md:justify-start">
-              <h1 className="text-white text-4xl md:text-6xl font-black leading-none">
+              <h1
+                className="text-white font-black leading-none tracking-tight"
+                style={{
+                  fontSize: "clamp(2.5rem, 7vw, 6rem)",
+                  lineHeight: 1.02,
+                }}
+              >
                 {playlist.title}
               </h1>
               {isOwner && (
                 <button
                   onClick={openEdit}
-                  className="flex-shrink-0 p-2 rounded-full text-[#a7a7a7] hover:text-white hover:bg-white/10 transition-colors pressable mt-1"
+                  className="flex-shrink-0 p-2 rounded-full text-[#a7a7a7] hover:text-white hover:bg-white/10 transition-colors pressable mt-2"
                   title="Düzenle"
                 >
                   <Pencil size={18} />
@@ -252,22 +276,35 @@ export default function PlaylistPage({
               )}
             </div>
             {playlist.description && (
-              <p className="text-[#a7a7a7] text-sm">{playlist.description}</p>
+              <p className="text-white/70 text-sm max-w-2xl">
+                {playlist.description}
+              </p>
             )}
-            <p className="text-[#a7a7a7] text-sm">
-              {songs.length} şarkı
-              {songs.length > 0 && ` · ${totalDuration(songs)}`}
-            </p>
+            <div className="flex items-center gap-1.5 text-sm text-white/90 flex-wrap justify-center md:justify-start">
+              <span className="font-bold text-white">
+                {playlist.owner?.displayName ?? "Hubeya"}
+              </span>
+              {songs.length > 0 && (
+                <>
+                  <span className="text-white/60">·</span>
+                  <span className="text-white/80">
+                    {songs.length} şarkı
+                    {durationLabel && `, ${durationLabel}`}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Controls ── */}
-      <div className="px-6 py-6 bg-[#121212] flex items-center gap-6">
+      {/* ── Controls (Spotify tarzı: play + shuffle + add + more | queue/list) ── */}
+      <div className="px-6 py-6 bg-[#121212] flex items-center gap-5">
         {songs.length > 0 && (
           <button
             onClick={handlePlayAll}
             className="w-14 h-14 rounded-full bg-[#1db954] flex items-center justify-center pressable hover:scale-105 transition-transform shadow-xl"
+            title={isCurrentPlaylist && playing ? "Duraklat" : "Çal"}
           >
             {isCurrentPlaylist && playing ? (
               <Pause size={26} fill="black" className="text-black" />
@@ -277,19 +314,38 @@ export default function PlaylistPage({
           </button>
         )}
 
-        <button className="text-[#a7a7a7] hover:text-white transition-colors pressable">
-          <Shuffle size={24} />
+        <button
+          className="text-[#a7a7a7] hover:text-white transition-colors pressable"
+          title="Karıştır"
+        >
+          <Shuffle size={28} />
         </button>
 
         {isOwner && (
           <button
             onClick={() => setAddOpen(!addOpen)}
-            className="ml-auto flex items-center gap-2 text-[#a7a7a7] hover:text-white text-sm font-semibold transition-colors pressable border border-[#535353] hover:border-white rounded-full px-4 py-1.5"
+            className="w-10 h-10 rounded-full border-2 border-[#7a7a7a] text-[#7a7a7a] hover:text-white hover:border-white flex items-center justify-center transition-colors pressable"
+            title="Şarkı ekle"
           >
-            <Plus size={16} />
-            Şarkı ekle
+            <Plus size={20} />
           </button>
         )}
+
+        {isOwner && (
+          <button
+            onClick={openEdit}
+            className="text-[#a7a7a7] hover:text-white transition-colors pressable"
+            title="Diğer"
+          >
+            <MoreHorizontal size={28} />
+          </button>
+        )}
+
+        {/* Sağ taraf — "Liste" view mode (gelecek için placeholder) */}
+        <div className="ml-auto flex items-center gap-2 text-[#a7a7a7] text-sm">
+          <span className="hidden md:inline">Liste</span>
+          <ListIcon size={18} />
+        </div>
       </div>
 
       {/* ── Add song panel ── */}
@@ -441,24 +497,41 @@ export default function PlaylistPage({
           </div>
         ) : (
           <>
-            {/* Column headers */}
-            <div className="flex items-center gap-4 px-4 pb-2 border-b border-[#282828] mb-1 text-[#a7a7a7] text-xs uppercase tracking-widest">
-              <span className="w-8 text-center">#</span>
-              <span className="w-10 flex-shrink-0" />
-              <span className="flex-1">Başlık</span>
-              <Clock3 size={14} className="flex-shrink-0" />
-              {isOwner && <span className="w-8" />}
+            {/* Column headers — Spotify tarzı: # | Title | Album | Date added | ⏱ */}
+            <div
+              className="grid gap-4 px-4 pb-2 border-b border-[#282828] mb-2 text-[#a7a7a7] text-xs uppercase tracking-widest items-center"
+              style={{ gridTemplateColumns: "32px 1fr 1fr 140px 60px 32px" }}
+            >
+              <span className="text-center">#</span>
+              <span>Başlık</span>
+              <span className="hidden md:block">Albüm</span>
+              <span className="hidden lg:block">Eklenme</span>
+              <span className="text-right">
+                <Clock3 size={14} className="inline" />
+              </span>
+              <span />
             </div>
 
             {songs.map((song, i) => {
               const isActive = currentSong?.id === song.id;
+              const dateLabel = song.createdAt
+                ? new Date(song.createdAt).toLocaleDateString("tr-TR", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })
+                : "";
+              const albumLabel = song.title;
               return (
                 <div
                   key={song.id}
-                  className="flex items-center gap-4 px-4 py-2 rounded-md hover:bg-[#ffffff1a] transition-colors group"
+                  className="grid gap-4 px-4 py-2 rounded-md hover:bg-[#ffffff1a] transition-colors group items-center"
+                  style={{
+                    gridTemplateColumns: "32px 1fr 1fr 140px 60px 32px",
+                  }}
                 >
                   {/* Index / wave */}
-                  <div className="w-8 text-center flex-shrink-0">
+                  <div className="text-center">
                     {isActive ? (
                       <span className="flex items-end justify-center gap-[2px] h-4">
                         {[0, 0.15, 0.3].map((d, k) => (
@@ -488,45 +561,57 @@ export default function PlaylistPage({
                     )}
                   </div>
 
-                  {/* Cover */}
-                  <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-[#282828]">
-                    {song.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={song.imageUrl}
-                        alt={song.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Music2 size={14} className="text-[#535353]" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Title + style */}
+                  {/* Title col: cover + title + creator */}
                   <button
                     onClick={() => playSong(song, songs)}
-                    className="flex-1 min-w-0 text-left pressable"
+                    className="flex items-center gap-3 min-w-0 text-left pressable"
                   >
-                    <p
-                      className={`text-sm font-medium truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
-                    >
-                      {song.title}
-                    </p>
-                    <p className="text-[#a7a7a7] text-xs truncate">
-                      {song.style?.split(",")[0] || "Hubeya"}
-                    </p>
+                    <div className="w-10 h-10 rounded flex-shrink-0 overflow-hidden bg-[#282828]">
+                      {song.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={song.imageUrl}
+                          alt={song.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Music2 size={14} className="text-[#535353]" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+                      >
+                        {song.title}
+                      </p>
+                      <p className="text-[#a7a7a7] text-xs truncate">
+                        {song.creator?.name ||
+                          song.style?.split(",")[0] ||
+                          "Hubeya"}
+                      </p>
+                    </div>
                   </button>
 
+                  {/* Album */}
+                  <span className="hidden md:block text-[#a7a7a7] text-sm truncate">
+                    {albumLabel}
+                  </span>
+
+                  {/* Date added */}
+                  <span className="hidden lg:block text-[#a7a7a7] text-sm tabular-nums">
+                    {dateLabel}
+                  </span>
+
                   {/* Duration */}
-                  <span className="text-[#a7a7a7] text-sm tabular-nums flex-shrink-0">
+                  <span className="text-[#a7a7a7] text-sm tabular-nums text-right">
                     {fmt(song.duration)}
                   </span>
 
                   {/* Owner: context menu */}
-                  {isOwner && (
-                    <div className="relative w-8 flex-shrink-0">
+                  {isOwner ? (
+                    <div className="relative">
                       <button
                         onClick={() =>
                           setMenuSong(menuSong === song.id ? null : song.id)
@@ -547,6 +632,8 @@ export default function PlaylistPage({
                         </div>
                       )}
                     </div>
+                  ) : (
+                    <span />
                   )}
                 </div>
               );

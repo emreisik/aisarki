@@ -29,6 +29,7 @@ export interface Playlist {
   type: "playlist" | "album";
   songCount?: number;
   songs?: Song[];
+  owner?: { username: string; displayName: string };
   createdAt: string;
   updatedAt: string;
 }
