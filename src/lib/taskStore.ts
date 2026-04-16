@@ -68,6 +68,7 @@ async function ensureSchema() {
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS image_key TEXT`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS play_count INT NOT NULL DEFAULT 0`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS play_count_7d INT NOT NULL DEFAULT 0`,
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS like_count INT NOT NULL DEFAULT 0`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_title TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_message TEXT`,
@@ -99,6 +100,33 @@ async function ensureSchema() {
     sql`CREATE INDEX IF NOT EXISTS idx_song_plays_user_song ON song_plays (user_id, song_id, played_at DESC)`,
     sql`CREATE INDEX IF NOT EXISTS idx_song_plays_session_song ON song_plays (session_id, song_id, played_at DESC)`,
     sql`CREATE INDEX IF NOT EXISTS idx_song_plays_played_at ON song_plays (played_at DESC) WHERE counted_as_stream = TRUE`,
+  ]) {
+    try {
+      await stmt;
+    } catch {
+      /* zaten var */
+    }
+  }
+  // song_likes — Spotify tarzı beğeni sistemi
+  await sql`
+    CREATE TABLE IF NOT EXISTS song_likes (
+      user_id    TEXT NOT NULL,
+      song_id    TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, song_id)
+    )
+  `;
+  for (const stmt of [
+    sql`CREATE INDEX IF NOT EXISTS idx_song_likes_user_created ON song_likes (user_id, created_at DESC)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_song_likes_song ON song_likes (song_id)`,
+    // Hot path indexleri — discover/charts/feed/profile query'lerini hızlandırır
+    sql`CREATE INDEX IF NOT EXISTS idx_songs_listed ON songs (status, created_at DESC) WHERE audio_key IS NOT NULL`,
+    sql`CREATE INDEX IF NOT EXISTS idx_songs_owner ON songs (created_by, status, created_at DESC) WHERE audio_key IS NOT NULL`,
+    sql`CREATE INDEX IF NOT EXISTS idx_songs_top ON songs (play_count DESC, created_at DESC) WHERE status = 'complete' AND audio_key IS NOT NULL`,
+    sql`CREATE INDEX IF NOT EXISTS idx_songs_task ON songs (task_id)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows (follower_id, created_at DESC)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_follows_following ON follows (following_id)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_tasks_active ON tasks (status, created_at DESC) WHERE status IN ('processing', 'failed')`,
   ]) {
     try {
       await stmt;
@@ -328,6 +356,7 @@ function rowToSong(row: Record<string, unknown>): Song {
     duration: row.duration != null ? Number(row.duration) : undefined,
     status: row.status as Song["status"],
     playCount: row.play_count != null ? Number(row.play_count) : undefined,
+    likeCount: row.like_count != null ? Number(row.like_count) : undefined,
     createdAt:
       row.created_at instanceof Date
         ? row.created_at.toISOString()
@@ -445,36 +474,41 @@ export async function upsertSongs(
   if (songs.length === 0) return;
   await ensureSchema();
 
-  for (const s of songs) {
-    await sql`
-      INSERT INTO songs (id, title, style, prompt, audio_url, stream_url, image_url, duration, status, created_at, task_id, created_by)
-      VALUES (
-        ${s.id},
-        ${s.title},
-        ${s.style ?? null},
-        ${s.prompt ?? null},
-        ${s.audioUrl ?? null},
-        ${s.streamUrl ?? null},
-        ${s.imageUrl ?? null},
-        ${s.duration ?? null},
-        ${s.status},
-        ${s.createdAt},
-        ${taskId ?? null},
-        ${creatorId ?? null}
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        title      = EXCLUDED.title,
-        style      = COALESCE(EXCLUDED.style, songs.style),
-        prompt     = COALESCE(EXCLUDED.prompt, songs.prompt),
-        audio_url  = COALESCE(NULLIF(EXCLUDED.audio_url, ''), songs.audio_url),
-        stream_url = COALESCE(NULLIF(EXCLUDED.stream_url, ''), songs.stream_url),
-        image_url  = COALESCE(NULLIF(EXCLUDED.image_url, ''), songs.image_url),
-        duration   = COALESCE(EXCLUDED.duration, songs.duration),
-        status     = EXCLUDED.status,
-        task_id    = COALESCE(EXCLUDED.task_id, songs.task_id),
-        created_by = COALESCE(EXCLUDED.created_by, songs.created_by)
-    `;
-  }
+  // Paralel upsert — önceden sequential for-loop idi (N+1 latency). Neon
+  // HTTP serverless adapter her query'yi bağımsız HTTP çağrısı yapar; Promise.all
+  // ile 2 şarkı 2x hızlanır (typical case).
+  await Promise.all(
+    songs.map(
+      (s) => sql`
+        INSERT INTO songs (id, title, style, prompt, audio_url, stream_url, image_url, duration, status, created_at, task_id, created_by)
+        VALUES (
+          ${s.id},
+          ${s.title},
+          ${s.style ?? null},
+          ${s.prompt ?? null},
+          ${s.audioUrl ?? null},
+          ${s.streamUrl ?? null},
+          ${s.imageUrl ?? null},
+          ${s.duration ?? null},
+          ${s.status},
+          ${s.createdAt},
+          ${taskId ?? null},
+          ${creatorId ?? null}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title      = EXCLUDED.title,
+          style      = COALESCE(EXCLUDED.style, songs.style),
+          prompt     = COALESCE(EXCLUDED.prompt, songs.prompt),
+          audio_url  = COALESCE(NULLIF(EXCLUDED.audio_url, ''), songs.audio_url),
+          stream_url = COALESCE(NULLIF(EXCLUDED.stream_url, ''), songs.stream_url),
+          image_url  = COALESCE(NULLIF(EXCLUDED.image_url, ''), songs.image_url),
+          duration   = COALESCE(EXCLUDED.duration, songs.duration),
+          status     = EXCLUDED.status,
+          task_id    = COALESCE(EXCLUDED.task_id, songs.task_id),
+          created_by = COALESCE(EXCLUDED.created_by, songs.created_by)
+      `,
+    ),
+  );
 
   const completed = songs.filter((s) => s.status === "complete");
   if (completed.length > 0) {
@@ -609,6 +643,31 @@ export async function getFollowingCount(userId: string): Promise<number> {
   const rows =
     await sql`SELECT COUNT(*)::int AS n FROM follows WHERE follower_id = ${userId}`;
   return (rows[0]?.n as number) ?? 0;
+}
+
+/** Takip edilen sanatçıların son şarkıları (en yeni önce). */
+export async function getFollowFeed(
+  userId: string,
+  limit: number = 20,
+): Promise<Song[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT
+      s.*,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image
+    FROM songs s
+    JOIN follows f ON f.following_id = s.created_by
+    LEFT JOIN users u ON u.id::text = s.created_by
+    WHERE f.follower_id = ${userId}
+      AND s.status = 'complete'
+      AND s.audio_key IS NOT NULL
+    ORDER BY s.created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(rowToSong);
 }
 
 /* ── Play tracking (Spotify-style streams) ── */
@@ -758,6 +817,129 @@ export async function getTopSongs(limit: number = 50): Promise<Song[]> {
   return rows.map(rowToSong);
 }
 
+/** Kullanıcının son dinlediklerini (unique şarkılar, en son önce) getirir. */
+export async function getRecentPlays(
+  userId: string,
+  limit: number = 20,
+): Promise<Song[]> {
+  await ensureSchema();
+  const rows = await sql`
+    WITH last_plays AS (
+      SELECT DISTINCT ON (sp.song_id)
+        sp.song_id,
+        sp.played_at
+      FROM song_plays sp
+      WHERE sp.user_id = ${userId}
+        AND sp.counted_as_stream = TRUE
+      ORDER BY sp.song_id, sp.played_at DESC
+    )
+    SELECT
+      s.*,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image
+    FROM last_plays lp
+    JOIN songs s ON s.id = lp.song_id
+    LEFT JOIN users u ON u.id::text = s.created_by
+    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
+    ORDER BY lp.played_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(rowToSong);
+}
+
+/** Anonim session_id'ye göre son dinlenenler. */
+export async function getRecentAnonPlays(
+  sessionId: string,
+  limit: number = 20,
+): Promise<Song[]> {
+  await ensureSchema();
+  const rows = await sql`
+    WITH last_plays AS (
+      SELECT DISTINCT ON (sp.song_id)
+        sp.song_id,
+        sp.played_at
+      FROM song_plays sp
+      WHERE sp.session_id = ${sessionId}
+        AND sp.user_id IS NULL
+        AND sp.counted_as_stream = TRUE
+      ORDER BY sp.song_id, sp.played_at DESC
+    )
+    SELECT
+      s.*,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image
+    FROM last_plays lp
+    JOIN songs s ON s.id = lp.song_id
+    LEFT JOIN users u ON u.id::text = s.created_by
+    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
+    ORDER BY lp.played_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(rowToSong);
+}
+
+/**
+ * Spotify "Sizin için öneriler" — kullanıcının son dinlediği şarkılardan
+ * style token'larını çıkarır, en sık geçen 5 token ile benzer şarkılar döndürür.
+ * userId null ise popüler şarkılara düşer.
+ */
+export async function getRecommendations(
+  userId: string | null,
+  limit: number = 20,
+): Promise<Song[]> {
+  await ensureSchema();
+  if (!userId) return getTopSongs(limit);
+
+  const rows = await sql`
+    WITH recent AS (
+      SELECT sp.song_id
+      FROM song_plays sp
+      WHERE sp.user_id = ${userId}
+        AND sp.counted_as_stream = TRUE
+      ORDER BY sp.played_at DESC
+      LIMIT 50
+    ),
+    tokens AS (
+      SELECT LOWER(TRIM(t)) AS token, COUNT(*)::int AS freq
+      FROM recent r
+      JOIN songs s ON s.id = r.song_id
+      CROSS JOIN LATERAL unnest(string_to_array(COALESCE(s.style, ''), ',')) AS t
+      WHERE LENGTH(TRIM(t)) > 1
+      GROUP BY LOWER(TRIM(t))
+      ORDER BY freq DESC
+      LIMIT 5
+    ),
+    heard AS (
+      SELECT DISTINCT song_id FROM song_plays WHERE user_id = ${userId}
+    )
+    SELECT
+      s.*,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image
+    FROM songs s
+    LEFT JOIN users u ON u.id::text = s.created_by
+    WHERE s.status = 'complete'
+      AND s.audio_key IS NOT NULL
+      AND s.id NOT IN (SELECT song_id FROM heard)
+      AND EXISTS (
+        SELECT 1 FROM tokens t
+        WHERE LOWER(COALESCE(s.style, '')) LIKE '%' || t.token || '%'
+      )
+    ORDER BY s.play_count DESC, s.created_at DESC
+    LIMIT ${limit}
+  `;
+
+  // Hiç token bulunamadıysa (kullanıcı yeni) popüler listeye düş
+  if (rows.length === 0) return getTopSongs(limit);
+  return rows.map(rowToSong);
+}
+
 /** Cron: monthly_listeners (28 gün unique user+session), total_streams, play_count_7d denormalize. */
 export async function recomputeStats(): Promise<{
   usersUpdated: number;
@@ -808,4 +990,89 @@ export async function recomputeStats(): Promise<{
     usersUpdated: usersRes.length,
     songsUpdated: songsRes.length,
   };
+}
+
+/* ── Like sistemi (Spotify-style) ── */
+
+/** Toggle like for (userId, songId); songs.like_count denormalize edilir. */
+export async function toggleLike(
+  userId: string,
+  songId: string,
+): Promise<{ liked: boolean; likeCount: number }> {
+  await ensureSchema();
+  const existing = await sql`
+    SELECT 1 FROM song_likes
+    WHERE user_id = ${userId} AND song_id = ${songId}
+    LIMIT 1
+  `;
+  if (existing.length > 0) {
+    await sql`
+      DELETE FROM song_likes
+      WHERE user_id = ${userId} AND song_id = ${songId}
+    `;
+    const rows = await sql`
+      UPDATE songs SET like_count = GREATEST(like_count - 1, 0)
+      WHERE id = ${songId}
+      RETURNING like_count
+    `;
+    const lc = (rows[0]?.like_count as number) ?? 0;
+    return { liked: false, likeCount: lc };
+  }
+  await sql`
+    INSERT INTO song_likes (user_id, song_id)
+    VALUES (${userId}, ${songId})
+    ON CONFLICT DO NOTHING
+  `;
+  const rows = await sql`
+    UPDATE songs SET like_count = like_count + 1
+    WHERE id = ${songId}
+    RETURNING like_count
+  `;
+  const lc = (rows[0]?.like_count as number) ?? 0;
+  return { liked: true, likeCount: lc };
+}
+
+export async function isLiked(
+  userId: string,
+  songId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT 1 FROM song_likes
+    WHERE user_id = ${userId} AND song_id = ${songId}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+export async function getLikedSongs(
+  userId: string,
+  limit: number = 200,
+): Promise<Song[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT
+      s.*,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image
+    FROM song_likes sl
+    JOIN songs s ON s.id = sl.song_id
+    LEFT JOIN users u ON u.id::text = s.created_by
+    WHERE sl.user_id = ${userId}
+      AND s.status = 'complete'
+      AND s.audio_key IS NOT NULL
+    ORDER BY sl.created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map((r) => ({ ...rowToSong(r), liked: true }));
+}
+
+export async function getLikedSongIds(userId: string): Promise<Set<string>> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT song_id FROM song_likes WHERE user_id = ${userId}
+  `;
+  return new Set(rows.map((r) => r.song_id as string));
 }

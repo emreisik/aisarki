@@ -21,7 +21,6 @@ import {
   Calendar,
   PartyPopper,
   Star,
-  Moon,
   HeartCrack,
   CloudRain,
   Zap,
@@ -41,6 +40,7 @@ import Link from "next/link";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useSession } from "next-auth/react";
+import SongCard from "@/components/SongCard";
 
 /* ══════════════════════════════════════════════
    Tip tanımları
@@ -1353,6 +1353,31 @@ function PlaylistTile({ playlist }: { playlist: Playlist }) {
   );
 }
 
+function LikedShortcutTile() {
+  return (
+    <Link
+      href="/liked"
+      className="flex-shrink-0 w-[148px] bg-[#141414] hover:bg-[#1a1a1a] rounded-xl p-3 transition-colors group pressable"
+    >
+      <div
+        className="relative w-full aspect-square rounded-lg overflow-hidden mb-3 flex items-center justify-center"
+        style={{
+          background: "linear-gradient(135deg, #e11d48 0%, #7e22ce 100%)",
+        }}
+      >
+        <Heart size={40} fill="white" className="text-white drop-shadow" />
+        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
+          <Play size={13} fill="black" className="text-black ml-0.5" />
+        </div>
+      </div>
+      <p className="text-white text-xs font-semibold truncate mb-0.5">
+        Beğenilen Şarkılar
+      </p>
+      <p className="text-[#535353] text-[11px]">Çalma listesi</p>
+    </Link>
+  );
+}
+
 function TrackRow({
   song,
   index,
@@ -1466,6 +1491,49 @@ export default function HomePage() {
       .catch(() => {});
   }, []);
 
+  // ── Takip feed'i (login user'ın takip ettikleri) ──
+  const [feedSongs, setFeedSongs] = useState<Song[]>([]);
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setFeedSongs([]);
+      return;
+    }
+    fetch("/api/feed?limit=15")
+      .then((r) => r.json())
+      .then((d) => setFeedSongs(d.songs || []))
+      .catch(() => setFeedSongs([]));
+  }, [session?.user?.id]);
+
+  // ── Son dinlediklerin ──
+  const [recentPlays, setRecentPlays] = useState<Song[]>([]);
+  useEffect(() => {
+    let sid = "";
+    try {
+      sid = localStorage.getItem("hubeya_sid") ?? "";
+    } catch {
+      /* storage yok */
+    }
+    const headers: HeadersInit = {};
+    if (!session?.user && sid) headers["x-session-id"] = sid;
+    fetch("/api/recent-plays?limit=10", { headers })
+      .then((r) => r.json())
+      .then((d) => setRecentPlays(d.songs || []))
+      .catch(() => {});
+  }, [session?.user?.id]);
+
+  // ── Öneriler (Spotify "Sizin için") ──
+  const [recommendations, setRecommendations] = useState<Song[]>([]);
+  const [recsPersonalized, setRecsPersonalized] = useState(false);
+  useEffect(() => {
+    fetch("/api/recommendations?limit=15")
+      .then((r) => r.json())
+      .then((d) => {
+        setRecommendations(d.songs || []);
+        setRecsPersonalized(Boolean(d.personalized));
+      })
+      .catch(() => {});
+  }, [session?.user?.id]);
+
   // Saatlik selamlama
   const greeting = (() => {
     const h = new Date().getHours();
@@ -1542,12 +1610,34 @@ export default function HomePage() {
       </div>
 
       <div className="bg-[#0a0a0a] pb-8">
-        {playlists.length > 0 && (
+        {session?.user && (
           <Rail title="Çalma Listelerim">
+            <LikedShortcutTile />
             {playlists.map((pl) => (
               <PlaylistTile key={pl.id} playlist={pl} />
             ))}
           </Rail>
+        )}
+
+        {session?.user && feedSongs.length > 0 && (
+          <section className="mb-8">
+            <div className="px-6 mb-2">
+              <h2 className="text-white text-lg font-black">
+                Takip ettiklerinden
+              </h2>
+            </div>
+            <div className="px-2">
+              {feedSongs.map((song) => (
+                <SongCard
+                  key={song.id}
+                  song={song}
+                  variant="row"
+                  onPlay={(s) => playSong(s, feedSongs)}
+                  isPlaying={currentSong?.id === song.id}
+                />
+              ))}
+            </div>
+          </section>
         )}
 
         {moreSongs.length > 0 && (
@@ -1577,6 +1667,34 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* ══════════════════════════════════════════════
+          Son dinlediklerin
+      ══════════════════════════════════════════════ */}
+      {recentPlays.length > 0 && (
+        <div className="bg-[#121212] pt-2">
+          <DiscoverRail
+            title="Son dinlediklerin"
+            songs={recentPlays}
+            onPlay={(s) => playSong(s, recentPlays)}
+            currentSong={currentSong}
+          />
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════
+          Kişiye özel öneriler (Spotify "Sizin için öneriler")
+      ══════════════════════════════════════════════ */}
+      {recommendations.length > 0 && (
+        <div className="bg-[#121212] pt-2">
+          <DiscoverRail
+            title={recsPersonalized ? "Sana özel" : "Popüler öneriler"}
+            songs={recommendations}
+            onPlay={(s) => playSong(s, recommendations)}
+            currentSong={currentSong}
+          />
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════
           Spotify-tarzı keşif bölümleri

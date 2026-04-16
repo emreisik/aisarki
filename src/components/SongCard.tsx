@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Play, Music2, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { useState } from "react";
+import {
+  Play,
+  Music2,
+  Loader2,
+  MoreHorizontal,
+  Trash2,
+  Heart,
+} from "lucide-react";
 import { Song } from "@/types";
 import { formatListenerCount } from "@/lib/formatNumber";
 
@@ -12,6 +20,10 @@ interface SongCardProps {
   onDelete?: (song: Song) => void;
   isPlaying?: boolean;
   variant?: "grid" | "row";
+  /** undefined → like butonu gizlenir. true/false → gösterilir. */
+  liked?: boolean;
+  /** Tıklandığında çağrılır; parent optimistic state'i senkronlar. */
+  onToggleLike?: (song: Song, nextLiked: boolean) => void;
 }
 
 function fmtDur(s?: number) {
@@ -48,6 +60,40 @@ function WaveBars({ color = "white" }: { color?: string }) {
   );
 }
 
+/** Optimistic like button — tıklanınca hemen UI değişir, sonra API. */
+function useLikeToggle(
+  song: Song,
+  initial: boolean | undefined,
+  onToggleLike?: (song: Song, next: boolean) => void,
+) {
+  const [liked, setLiked] = useState<boolean>(!!initial);
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (busy) return;
+    const next = !liked;
+    setLiked(next);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/likes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ songId: song.id }),
+      });
+      if (!res.ok) throw new Error("fail");
+      const data = await res.json();
+      setLiked(!!data.liked);
+      onToggleLike?.(song, !!data.liked);
+    } catch {
+      setLiked(!next); // revert
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { liked, toggle };
+}
+
 export default function SongCard({
   song,
   onPlay,
@@ -55,8 +101,12 @@ export default function SongCard({
   onDelete,
   isPlaying,
   variant = "grid",
+  liked: likedProp,
+  onToggleLike,
 }: SongCardProps) {
   const ready = song.status === "complete" && song.audioUrl;
+  const showLike = likedProp !== undefined;
+  const { liked, toggle } = useLikeToggle(song, likedProp, onToggleLike);
 
   if (variant === "row") {
     return (
@@ -124,6 +174,23 @@ export default function SongCard({
               {formatListenerCount(song.playCount)}
             </span>
           )}
+          {showLike && ready && (
+            <button
+              onClick={toggle}
+              aria-label={liked ? "Beğenmekten vazgeç" : "Beğen"}
+              className="p-1 pressable transition-colors"
+            >
+              <Heart
+                size={16}
+                className={
+                  liked
+                    ? "text-[#1db954]"
+                    : "text-[#535353] hover:text-white transition-colors"
+                }
+                fill={liked ? "#1db954" : "none"}
+              />
+            </button>
+          )}
           {song.duration && !isPlaying && (
             <span className="text-[#535353] text-xs tabular-nums">
               {fmtDur(song.duration)}
@@ -175,6 +242,25 @@ export default function SongCard({
               <Music2 size={28} className="text-[#535353]" />
             )}
           </div>
+        )}
+
+        {/* Like button (top-right overlay) */}
+        {showLike && ready && (
+          <button
+            onClick={toggle}
+            aria-label={liked ? "Beğenmekten vazgeç" : "Beğen"}
+            className={`absolute top-2 right-2 w-8 h-8 rounded-full backdrop-blur-sm flex items-center justify-center transition-all pressable ${
+              liked
+                ? "bg-black/40 opacity-100"
+                : "bg-black/40 opacity-0 group-hover:opacity-100"
+            }`}
+          >
+            <Heart
+              size={15}
+              className={liked ? "text-[#1db954]" : "text-white"}
+              fill={liked ? "#1db954" : "none"}
+            />
+          </button>
         )}
 
         {/* Playing overlay */}
