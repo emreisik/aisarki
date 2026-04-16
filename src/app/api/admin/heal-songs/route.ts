@@ -8,6 +8,35 @@ import {
 } from "@/lib/bunnyStorage";
 import { updateSongAudioKey, updateSongImageKey } from "@/lib/taskStore";
 
+const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
+const SUNO_BASE = "https://api.sunoapi.org";
+
+interface SunoSong {
+  id: string;
+  audio_url?: string;
+  source_audio_url?: string;
+  audioUrl?: string;
+  image_url?: string;
+  source_image_url?: string;
+  imageUrl?: string;
+  duration?: number;
+}
+
+async function fetchTaskSongs(taskId: string): Promise<SunoSong[]> {
+  if (!SUNO_API_KEY) return [];
+  try {
+    const res = await fetch(
+      `${SUNO_BASE}/api/v1/generate/record-info?taskId=${taskId}`,
+      { headers: { Authorization: `Bearer ${SUNO_API_KEY}` } },
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data?.data?.response?.sunoData as SunoSong[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Güvenlik ağı — audio_key'i null olup audio_url'i dolu olan şarkıları Bunny'e
  * yükler. Callback/polling bir sebeple kaçırırsa bu endpoint periyodik
@@ -37,13 +66,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Bunny config eksik" }, { status: 500 });
   }
 
-  // Audio_key'i null ama audio_url'i dolu şarkıları bul (max 30 per call)
+  // audio_key'i olmayan tüm şarkılar (max 30 per call)
+  // İki senaryo:
+  //   (a) audio_url var → direkt Bunny'e yükle
+  //   (b) audio_url null → Suno record-info'dan çek (task_id varsa)
   const rows = await sql`
-    SELECT id, audio_url, image_url, image_key
+    SELECT id, audio_url, image_url, image_key, task_id, duration
     FROM songs
     WHERE audio_key IS NULL
-      AND audio_url IS NOT NULL
-      AND audio_url != ''
     ORDER BY created_at DESC
     LIMIT 30
   `;
@@ -56,35 +86,75 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Response'u hemen dön, işi after()'a bırak
+  // task_id'ye göre grupla — aynı task için tek Suno çağrısı yeter
+  const byTask = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const tid = (r.task_id as string) || "__no_task__";
+    if (!byTask.has(tid)) byTask.set(tid, []);
+    byTask.get(tid)!.push(r);
+  }
+
   after(async () => {
     let ok = 0;
     let fail = 0;
-    for (const r of rows) {
-      const id = r.id as string;
-      const audioUrl = r.audio_url as string;
-      const imageUrl = r.image_url as string | null;
-      if (typeof audioUrl === "string" && audioUrl.startsWith("http")) {
-        try {
-          const key = await uploadAudioFromUrl(audioUrl, `${id}.mp3`);
-          if (key) {
-            await updateSongAudioKey(id, key);
-            ok++;
-          } else fail++;
-        } catch {
+    for (const [taskId, taskRows] of byTask) {
+      const needsSuno = taskRows.every(
+        (r) => !r.audio_url || r.audio_url === "",
+      );
+      const sunoSongs =
+        needsSuno && taskId !== "__no_task__"
+          ? await fetchTaskSongs(taskId)
+          : [];
+
+      for (const r of taskRows) {
+        const id = r.id as string;
+        let audioSource = r.audio_url as string | null;
+        let imageSource = r.image_url as string | null;
+        let duration = r.duration as number | null;
+
+        if (!audioSource || audioSource === "") {
+          const s = sunoSongs.find((x) => x.id === id);
+          if (s) {
+            audioSource =
+              s.source_audio_url || s.audio_url || s.audioUrl || null;
+            imageSource =
+              s.source_image_url || s.image_url || s.imageUrl || imageSource;
+            duration = typeof s.duration === "number" ? s.duration : duration;
+          }
+        }
+
+        if (typeof audioSource === "string" && audioSource.startsWith("http")) {
+          try {
+            const key = await uploadAudioFromUrl(audioSource, `${id}.mp3`);
+            if (key) {
+              await updateSongAudioKey(id, key);
+              // audio_url ve duration da güncelle (daha sonra başka yer okuduğunda kullanılır)
+              await sql`
+                UPDATE songs
+                SET audio_url = COALESCE(NULLIF(audio_url, ''), ${audioSource}),
+                    duration = COALESCE(duration, ${duration})
+                WHERE id = ${id}
+              `;
+              ok++;
+            } else fail++;
+          } catch {
+            fail++;
+          }
+        } else {
           fail++;
         }
-      }
-      if (
-        !r.image_key &&
-        typeof imageUrl === "string" &&
-        imageUrl.startsWith("http")
-      ) {
-        try {
-          const key = await uploadImageFromUrl(imageUrl, `${id}.jpg`);
-          if (key) await updateSongImageKey(id, key);
-        } catch {
-          /* image opsiyonel */
+
+        if (
+          !r.image_key &&
+          typeof imageSource === "string" &&
+          imageSource.startsWith("http")
+        ) {
+          try {
+            const key = await uploadImageFromUrl(imageSource, `${id}.jpg`);
+            if (key) await updateSongImageKey(id, key);
+          } catch {
+            /* image opsiyonel */
+          }
         }
       }
     }
@@ -96,4 +166,18 @@ export async function POST(request: NextRequest) {
     queued: rows.length,
     message: "İşlem arka planda başlatıldı",
   });
+}
+
+// Railway/cron-job.org gibi sistemler GET yollar — token query param ile
+export async function GET(request: NextRequest) {
+  const token = new URL(request.url).searchParams.get("token");
+  if (ADMIN_TOKEN && token !== ADMIN_TOKEN) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // Aynı POST mantığını çağır — request'i manuel kopyalamak yerine direkt header'ı fake'le
+  const fakePost = new Request(request.url, {
+    method: "POST",
+    headers: { "x-admin-token": ADMIN_TOKEN },
+  });
+  return POST(fakePost as NextRequest);
 }
