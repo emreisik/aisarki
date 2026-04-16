@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Play, Pause, Music2, Clock3, UserCheck, UserPlus } from "lucide-react";
+import { formatListenerCount } from "@/lib/formatNumber";
 
 interface PublicUser {
   id: string;
@@ -15,12 +16,19 @@ interface PublicUser {
   createdAt: string;
 }
 
+interface UserStats {
+  monthlyListeners: number;
+  totalStreams: number;
+  songCount: number;
+}
+
 interface ProfileData {
   user: PublicUser;
   songs: Song[];
   followerCount: number;
   followingCount: number;
   isFollowing: boolean;
+  stats?: UserStats;
 }
 
 function fmt(s?: number) {
@@ -248,7 +256,15 @@ export default function ArtistPage() {
               {user.displayName}
             </h1>
             <p className="text-white/60 text-sm">@{user.username}</p>
-            <div className="flex items-center gap-4 text-sm text-white/60 mt-1">
+            {data.stats && data.stats.monthlyListeners > 0 && (
+              <p className="text-white text-sm mt-1">
+                <span className="font-bold">
+                  {formatListenerCount(data.stats.monthlyListeners)}
+                </span>{" "}
+                <span className="text-white/70">aylık dinleyici</span>
+              </p>
+            )}
+            <div className="flex items-center gap-4 text-sm text-white/60 mt-1 flex-wrap">
               <span>
                 <span className="text-white font-bold">
                   {fmtCount(followerCount)}
@@ -265,6 +281,14 @@ export default function ArtistPage() {
                 <span className="text-white font-bold">{songs.length}</span>{" "}
                 şarkı
               </span>
+              {data.stats && data.stats.totalStreams > 0 && (
+                <span>
+                  <span className="text-white font-bold">
+                    {formatListenerCount(data.stats.totalStreams)}
+                  </span>{" "}
+                  dinlenme
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -498,6 +522,13 @@ function SongRow({
           {song.style?.split(",")[0] || "Hubeya"}
         </p>
       </button>
+
+      {/* Play count */}
+      {song.playCount != null && song.playCount > 0 && (
+        <span className="hidden sm:inline text-[#a7a7a7] text-sm tabular-nums flex-shrink-0 w-20 text-right">
+          {formatListenerCount(song.playCount)}
+        </span>
+      )}
 
       {/* Duration */}
       <span className="text-[#a7a7a7] text-sm tabular-nums flex-shrink-0">

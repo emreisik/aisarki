@@ -66,11 +66,39 @@ async function ensureSchema() {
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS created_by TEXT`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS audio_key TEXT`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS image_key TEXT`,
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS play_count INT NOT NULL DEFAULT 0`,
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS play_count_7d INT NOT NULL DEFAULT 0`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_title TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_message TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS payload JSONB`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS endpoint TEXT`,
+    sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_listeners INT NOT NULL DEFAULT 0`,
+    sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS total_streams INT NOT NULL DEFAULT 0`,
+  ]) {
+    try {
+      await stmt;
+    } catch {
+      /* zaten var */
+    }
+  }
+  // song_plays tablosu — her stream event'i burada
+  await sql`
+    CREATE TABLE IF NOT EXISTS song_plays (
+      id                SERIAL PRIMARY KEY,
+      song_id           TEXT NOT NULL,
+      user_id           TEXT,
+      session_id        TEXT,
+      duration_listened INT NOT NULL DEFAULT 0,
+      counted_as_stream BOOLEAN NOT NULL DEFAULT FALSE,
+      played_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  for (const stmt of [
+    sql`CREATE INDEX IF NOT EXISTS idx_song_plays_song_played ON song_plays (song_id, played_at DESC)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_song_plays_user_song ON song_plays (user_id, song_id, played_at DESC)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_song_plays_session_song ON song_plays (session_id, song_id, played_at DESC)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_song_plays_played_at ON song_plays (played_at DESC) WHERE counted_as_stream = TRUE`,
   ]) {
     try {
       await stmt;
@@ -299,6 +327,7 @@ function rowToSong(row: Record<string, unknown>): Song {
     imageUrl,
     duration: row.duration != null ? Number(row.duration) : undefined,
     status: row.status as Song["status"],
+    playCount: row.play_count != null ? Number(row.play_count) : undefined,
     createdAt:
       row.created_at instanceof Date
         ? row.created_at.toISOString()
@@ -580,4 +609,203 @@ export async function getFollowingCount(userId: string): Promise<number> {
   const rows =
     await sql`SELECT COUNT(*)::int AS n FROM follows WHERE follower_id = ${userId}`;
   return (rows[0]?.n as number) ?? 0;
+}
+
+/* ── Play tracking (Spotify-style streams) ── */
+
+export interface RecordPlayInput {
+  songId: string;
+  userId?: string | null;
+  sessionId?: string | null;
+  durationListened: number;
+}
+
+/** 30sn+ dinleme = stream. Aynı user/session + song son 1 saatte tekrar sayılmaz. */
+export async function recordPlay(
+  input: RecordPlayInput,
+): Promise<{ counted: boolean; playCount: number }> {
+  await ensureSchema();
+  const { songId, userId, sessionId, durationListened } = input;
+  const isStream = durationListened >= 30;
+
+  const whoClause =
+    userId != null
+      ? { field: "user_id", value: userId }
+      : sessionId != null
+        ? { field: "session_id", value: sessionId }
+        : null;
+
+  // Dedup: aynı dinleyici son 1 saatte stream kaydettiyse, sadece play_count artırma
+  let alreadyStreamed = false;
+  if (isStream && whoClause) {
+    const recent =
+      whoClause.field === "user_id"
+        ? await sql`
+            SELECT 1 FROM song_plays
+            WHERE song_id = ${songId}
+              AND user_id = ${whoClause.value}
+              AND counted_as_stream = TRUE
+              AND played_at > NOW() - INTERVAL '1 hour'
+            LIMIT 1
+          `
+        : await sql`
+            SELECT 1 FROM song_plays
+            WHERE song_id = ${songId}
+              AND session_id = ${whoClause.value}
+              AND counted_as_stream = TRUE
+              AND played_at > NOW() - INTERVAL '1 hour'
+            LIMIT 1
+          `;
+    alreadyStreamed = recent.length > 0;
+  }
+
+  const countAsStream = isStream && !alreadyStreamed;
+
+  await sql`
+    INSERT INTO song_plays (song_id, user_id, session_id, duration_listened, counted_as_stream)
+    VALUES (${songId}, ${userId ?? null}, ${sessionId ?? null}, ${durationListened}, ${countAsStream})
+  `;
+
+  if (countAsStream) {
+    const rows = await sql`
+      UPDATE songs
+      SET play_count = play_count + 1,
+          play_count_7d = play_count_7d + 1
+      WHERE id = ${songId}
+      RETURNING play_count
+    `;
+    const pc = (rows[0]?.play_count as number) ?? 0;
+    return { counted: true, playCount: pc };
+  }
+
+  const rows =
+    await sql`SELECT play_count FROM songs WHERE id = ${songId} LIMIT 1`;
+  return { counted: false, playCount: (rows[0]?.play_count as number) ?? 0 };
+}
+
+export interface UserStats {
+  monthlyListeners: number;
+  totalStreams: number;
+  songCount: number;
+}
+
+export async function getUserStats(userId: string): Promise<UserStats> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT
+      COALESCE(u.monthly_listeners, 0)::int AS monthly_listeners,
+      COALESCE(u.total_streams, 0)::int     AS total_streams,
+      (SELECT COUNT(*)::int FROM songs s
+         WHERE s.created_by = ${userId}
+           AND s.status = 'complete'
+           AND s.audio_key IS NOT NULL) AS song_count
+    FROM users u
+    WHERE u.id = ${userId}
+    LIMIT 1
+  `;
+  const r = rows[0];
+  return {
+    monthlyListeners: (r?.monthly_listeners as number) ?? 0,
+    totalStreams: (r?.total_streams as number) ?? 0,
+    songCount: (r?.song_count as number) ?? 0,
+  };
+}
+
+/** Son N gün stream'e göre top şarkılar. */
+export async function getTrendingSongs(
+  days: number = 7,
+  limit: number = 50,
+): Promise<Song[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT
+      s.*,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image,
+      COUNT(sp.id)::int AS trend_count
+    FROM songs s
+    LEFT JOIN users u ON u.id::text = s.created_by
+    LEFT JOIN song_plays sp
+      ON sp.song_id = s.id
+     AND sp.counted_as_stream = TRUE
+     AND sp.played_at > NOW() - (${days}::text || ' days')::interval
+    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
+    GROUP BY s.id, u.id
+    ORDER BY trend_count DESC, s.created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(rowToSong);
+}
+
+/** Lifetime play_count'a göre top şarkılar. */
+export async function getTopSongs(limit: number = 50): Promise<Song[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT
+      s.*,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image
+    FROM songs s
+    LEFT JOIN users u ON u.id::text = s.created_by
+    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
+    ORDER BY s.play_count DESC, s.created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(rowToSong);
+}
+
+/** Cron: monthly_listeners (28 gün unique user+session), total_streams, play_count_7d denormalize. */
+export async function recomputeStats(): Promise<{
+  usersUpdated: number;
+  songsUpdated: number;
+}> {
+  await ensureSchema();
+
+  // users.monthly_listeners — 28 gün unique dinleyici (user_id veya session_id)
+  const usersRes = await sql`
+    WITH user_listeners AS (
+      SELECT
+        s.created_by AS user_id,
+        COUNT(DISTINCT COALESCE(sp.user_id, sp.session_id)) AS n
+      FROM songs s
+      JOIN song_plays sp ON sp.song_id = s.id
+      WHERE sp.counted_as_stream = TRUE
+        AND sp.played_at > NOW() - INTERVAL '28 days'
+        AND s.created_by IS NOT NULL
+      GROUP BY s.created_by
+    ),
+    user_totals AS (
+      SELECT created_by AS user_id, COALESCE(SUM(play_count), 0)::int AS total
+      FROM songs
+      WHERE created_by IS NOT NULL
+      GROUP BY created_by
+    )
+    UPDATE users u
+    SET monthly_listeners = COALESCE((SELECT n FROM user_listeners WHERE user_id = u.id)::int, 0),
+        total_streams     = COALESCE((SELECT total FROM user_totals WHERE user_id = u.id), 0)
+    RETURNING u.id
+  `;
+
+  // songs.play_count_7d — son 7 gün stream sayısı
+  const songsRes = await sql`
+    WITH s7 AS (
+      SELECT song_id, COUNT(*)::int AS n
+      FROM song_plays
+      WHERE counted_as_stream = TRUE
+        AND played_at > NOW() - INTERVAL '7 days'
+      GROUP BY song_id
+    )
+    UPDATE songs s
+    SET play_count_7d = COALESCE((SELECT n FROM s7 WHERE song_id = s.id), 0)
+    RETURNING s.id
+  `;
+
+  return {
+    usersUpdated: usersRes.length,
+    songsUpdated: songsRes.length,
+  };
 }

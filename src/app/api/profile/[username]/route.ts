@@ -5,6 +5,7 @@ import {
   getUserSongs,
   getFollowerCount,
   getFollowingCount,
+  getUserStats,
   isFollowing as checkIsFollowing,
 } from "@/lib/taskStore";
 
@@ -24,16 +25,16 @@ export async function GET(
       );
     }
 
-    const [songs, followerCount, followingCount, following] = await Promise.all(
-      [
+    const [songs, followerCount, followingCount, following, stats] =
+      await Promise.all([
         getUserSongs(user.id),
         getFollowerCount(user.id),
         getFollowingCount(user.id),
         session?.user?.id
           ? checkIsFollowing(session.user.id, user.id)
           : Promise.resolve(false),
-      ],
-    );
+        getUserStats(user.id),
+      ]);
 
     return NextResponse.json({
       user,
@@ -41,6 +42,7 @@ export async function GET(
       followerCount,
       followingCount,
       isFollowing: following,
+      stats,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

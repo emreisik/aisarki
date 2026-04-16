@@ -76,6 +76,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   repeatRef.current = repeat;
   playerOpenRef.current = playerOpen;
 
+  // ── Stream tracking (Spotify: 30sn+ = 1 stream) ──
+  const streamAccumMsRef = useRef(0);
+  const streamLastTickRef = useRef<number | null>(null);
+  const streamSentRef = useRef<string | null>(null); // song.id — aynı şarkıda 2. kez gönderme
+  const anonSessionIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const KEY = "hubeya_sid";
+      let sid = localStorage.getItem(KEY);
+      if (!sid) {
+        sid =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem(KEY, sid);
+      }
+      anonSessionIdRef.current = sid;
+    } catch {
+      /* storage erişimi yoksa null kalır */
+    }
+  }, []);
+
   // Sayfa yenilendiğinde çalındığı yerden geri yüklemek için
   const restoreTimeRef = useRef(0);
   const playlistRef = useRef<Song[]>([]);
@@ -148,6 +171,64 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         .catch(() => setPlaying(false));
     }
   }, [currentSong?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Şarkı değişince stream counter sıfırla ──
+  useEffect(() => {
+    streamAccumMsRef.current = 0;
+    streamLastTickRef.current = null;
+    streamSentRef.current = null;
+  }, [currentSong?.id]);
+
+  // ── playing state → tick mantığı ──
+  // Çalarken her saniye birikimi artır; 30sn eşiğinde /api/plays'e gönder.
+  useEffect(() => {
+    if (!currentSong?.id) return;
+    if (!playing) {
+      // Duraklatıldı: son tick'i hesaba kat ve bırak
+      if (streamLastTickRef.current != null) {
+        streamAccumMsRef.current += Date.now() - streamLastTickRef.current;
+        streamLastTickRef.current = null;
+      }
+      return;
+    }
+    streamLastTickRef.current = Date.now();
+    const id = setInterval(() => {
+      if (!currentSong?.id) return;
+      const now = Date.now();
+      const last = streamLastTickRef.current ?? now;
+      streamAccumMsRef.current += now - last;
+      streamLastTickRef.current = now;
+
+      // 30sn eşiği aşıldıysa ve henüz gönderilmediyse POST et
+      if (
+        streamAccumMsRef.current >= 30_000 &&
+        streamSentRef.current !== currentSong.id
+      ) {
+        streamSentRef.current = currentSong.id;
+        const payload = {
+          songId: currentSong.id,
+          durationListened: Math.floor(streamAccumMsRef.current / 1000),
+          sessionId: anonSessionIdRef.current,
+        };
+        fetch("/api/plays", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        }).catch(() => {
+          /* sessizce geç */
+        });
+      }
+    }, 1000);
+    return () => {
+      clearInterval(id);
+      // Unmount/change: birikimi sonlandır
+      if (streamLastTickRef.current != null) {
+        streamAccumMsRef.current += Date.now() - streamLastTickRef.current;
+        streamLastTickRef.current = null;
+      }
+    };
+  }, [playing, currentSong?.id]);
 
   // ── Audio error handler: stream henüz hazır değilse retry ──
   const handleAudioError = useCallback(() => {

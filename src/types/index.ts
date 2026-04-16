@@ -15,6 +15,8 @@ export interface Song {
   imageUrl?: string;
   duration?: number;
   status: "pending" | "processing" | "complete" | "error";
+  /** Lifetime stream sayısı (30sn+ dinleme = 1 stream) */
+  playCount?: number;
   createdAt: string;
   creator?: SongCreator;
 }

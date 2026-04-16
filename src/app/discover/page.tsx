@@ -16,7 +16,10 @@ import {
   MoreHorizontal,
   ListPlus,
   Trash2,
+  TrendingUp,
+  Flame,
 } from "lucide-react";
+import { formatListenerCount } from "@/lib/formatNumber";
 
 /* ── Kategoriler ── */
 interface Category {
@@ -108,6 +111,8 @@ export default function DiscoverPage() {
   const router = useRouter();
 
   const [songs, setSongs] = useState<Song[]>([]);
+  const [trending, setTrending] = useState<Song[]>([]);
+  const [topCharts, setTopCharts] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -116,10 +121,16 @@ export default function DiscoverPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const res = await fetch("/api/discover-songs");
-      if (!res.ok) return;
-      const data: { songs: Song[] } = await res.json();
-      setSongs(data.songs ?? []);
+      const [all, trend, top] = await Promise.all([
+        fetch("/api/discover-songs").then((r) => (r.ok ? r.json() : null)),
+        fetch("/api/charts/trending?days=7&limit=20").then((r) =>
+          r.ok ? r.json() : null,
+        ),
+        fetch("/api/charts/top?limit=20").then((r) => (r.ok ? r.json() : null)),
+      ]);
+      setSongs(all?.songs ?? []);
+      setTrending(trend?.songs ?? []);
+      setTopCharts(top?.songs ?? []);
     } finally {
       setLoading(false);
     }
@@ -202,36 +213,170 @@ export default function DiscoverPage() {
 
       {/* ── Kategoriler (arama yokken) ── */}
       {!isSearching ? (
-        <div className="px-4 pb-6">
-          <h2 className="text-white font-bold text-base mb-3 px-2">
-            Tüm kategoriler
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => router.push(`/discover/${cat.id}`)}
-                className="relative h-24 rounded-xl overflow-hidden pressable text-left"
-                style={{ backgroundColor: cat.color }}
-              >
-                <span className="absolute top-3 left-3 text-white font-bold text-base leading-tight">
-                  {cat.label}
-                </span>
-                {/* Dekoratif köşe görseli */}
-                <div
-                  className="absolute -bottom-2 -right-2 w-16 h-16 rounded-lg opacity-70 rotate-12"
-                  style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
-                />
-                <div
-                  className="absolute -bottom-1 -right-1 w-12 h-12 rounded-lg opacity-50 rotate-6 flex items-center justify-center"
-                  style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+        <>
+          {/* Bu hafta trend */}
+          {trending.length > 0 && (
+            <div className="px-4 pb-6">
+              <div className="flex items-center gap-2 mb-3 px-2">
+                <Flame size={18} className="text-[#f59e0b]" />
+                <h2 className="text-white font-bold text-base">
+                  Bu hafta trend
+                </h2>
+              </div>
+              <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2">
+                {trending.slice(0, 10).map((song, i) => {
+                  const isActive = currentSong?.id === song.id;
+                  return (
+                    <button
+                      key={song.id}
+                      onClick={() =>
+                        isActive ? togglePlay() : playSong(song, trending)
+                      }
+                      className="flex-shrink-0 w-36 text-left pressable group"
+                    >
+                      <div className="relative w-36 h-36 rounded-lg overflow-hidden bg-[#282828] mb-2">
+                        {song.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={song.imageUrl}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Music2 size={28} className="text-[#535353]" />
+                          </div>
+                        )}
+                        <div className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white text-xs font-black">
+                          {i + 1}
+                        </div>
+                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-end justify-end p-2 transition-opacity">
+                          <div className="w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg">
+                            {isActive && playing ? (
+                              <Pause
+                                size={16}
+                                fill="black"
+                                className="text-black"
+                              />
+                            ) : (
+                              <Play
+                                size={16}
+                                fill="black"
+                                className="text-black ml-0.5"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <p
+                        className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+                      >
+                        {song.title}
+                      </p>
+                      <p className="text-[#535353] text-xs tabular-nums mt-0.5">
+                        {formatListenerCount(song.playCount ?? 0)} dinlenme
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* En çok dinlenenler */}
+          {topCharts.length > 0 && (
+            <div className="px-4 pb-6">
+              <div className="flex items-center gap-2 mb-3 px-2">
+                <TrendingUp size={18} className="text-[#1db954]" />
+                <h2 className="text-white font-bold text-base">
+                  En çok dinlenenler
+                </h2>
+              </div>
+              <div className="flex flex-col">
+                {topCharts.slice(0, 10).map((song, i) => {
+                  const isActive = currentSong?.id === song.id;
+                  return (
+                    <div
+                      key={song.id}
+                      className={`flex items-center gap-3 px-2 py-2 rounded-md transition-colors group ${
+                        isActive ? "bg-[#ffffff12]" : "hover:bg-[#ffffff0d]"
+                      }`}
+                    >
+                      <span className="w-6 text-center text-[#a7a7a7] text-sm font-bold flex-shrink-0">
+                        {i + 1}
+                      </span>
+                      <div className="w-11 h-11 rounded-md flex-shrink-0 overflow-hidden bg-[#282828]">
+                        {song.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={song.imageUrl}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Music2 size={16} className="text-[#535353]" />
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() =>
+                          isActive ? togglePlay() : playSong(song, topCharts)
+                        }
+                        className="flex-1 min-w-0 text-left pressable"
+                      >
+                        <p
+                          className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+                        >
+                          {song.title}
+                        </p>
+                        <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
+                          {song.creator?.name ||
+                            song.style?.split(",")[0] ||
+                            "Hubeya"}
+                        </p>
+                      </button>
+                      <span className="hidden sm:inline text-[#a7a7a7] text-xs tabular-nums flex-shrink-0">
+                        {formatListenerCount(song.playCount ?? 0)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="px-4 pb-6">
+            <h2 className="text-white font-bold text-base mb-3 px-2">
+              Tüm kategoriler
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => router.push(`/discover/${cat.id}`)}
+                  className="relative h-24 rounded-xl overflow-hidden pressable text-left"
+                  style={{ backgroundColor: cat.color }}
                 >
-                  <Music2 size={20} className="text-white/80" />
-                </div>
-              </button>
-            ))}
+                  <span className="absolute top-3 left-3 text-white font-bold text-base leading-tight">
+                    {cat.label}
+                  </span>
+                  {/* Dekoratif köşe görseli */}
+                  <div
+                    className="absolute -bottom-2 -right-2 w-16 h-16 rounded-lg opacity-70 rotate-12"
+                    style={{ backgroundColor: "rgba(0,0,0,0.25)" }}
+                  />
+                  <div
+                    className="absolute -bottom-1 -right-1 w-12 h-12 rounded-lg opacity-50 rotate-6 flex items-center justify-center"
+                    style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
+                  >
+                    <Music2 size={20} className="text-white/80" />
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        </>
       ) : (
         /* ── Arama / kategori sonuçları ── */
         <div className="px-4 pb-8">

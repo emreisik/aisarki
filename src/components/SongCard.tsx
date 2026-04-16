@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Play, Music2, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 import { Song } from "@/types";
+import { formatListenerCount } from "@/lib/formatNumber";
 
 interface SongCardProps {
   song: Song;
@@ -118,6 +119,11 @@ export default function SongCard({
 
         {/* Right */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {song.playCount != null && song.playCount > 0 && !isPlaying && (
+            <span className="text-[#535353] text-xs tabular-nums">
+              {formatListenerCount(song.playCount)}
+            </span>
+          )}
           {song.duration && !isPlaying && (
             <span className="text-[#535353] text-xs tabular-nums">
               {fmtDur(song.duration)}
@@ -216,6 +222,11 @@ export default function SongCard({
         ) : (
           <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
             {song.style?.split(",")[0] || "Hubeya"}
+          </p>
+        )}
+        {song.playCount != null && song.playCount > 0 && (
+          <p className="text-[#535353] text-[11px] tabular-nums mt-0.5">
+            {formatListenerCount(song.playCount)} dinlenme
           </p>
         )}
       </div>
