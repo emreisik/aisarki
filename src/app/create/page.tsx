@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { Song } from "@/types";
 import MusicGenerator from "@/components/MusicGenerator";
@@ -263,7 +263,9 @@ export default function CreatePage() {
         </p>
 
         {/* Form */}
-        <MusicGenerator onTaskStarted={handleTaskStarted} />
+        <Suspense fallback={null}>
+          <MusicGenerator onTaskStarted={handleTaskStarted} />
+        </Suspense>
 
         {/* Son üretimler */}
         {hasActivity && (
