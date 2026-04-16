@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkAdminToken } from "@/lib/adminAuth";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
 
-// Sadece development veya admin için — production'da kaldırılabilir
+/** Debug endpoint — Suno record-info proxy. Production'da admin token zorunlu. */
 export async function GET(request: NextRequest) {
+  // Production: admin token şart. Development: serbest (debug için).
+  if (process.env.NODE_ENV === "production") {
+    const authz = checkAdminToken(request);
+    if (!authz.ok) {
+      return NextResponse.json(
+        { error: authz.error },
+        { status: authz.status },
+      );
+    }
+  }
+
   const { searchParams } = new URL(request.url);
   const taskId = searchParams.get("taskId");
 
@@ -20,7 +32,7 @@ export async function GET(request: NextRequest) {
     const timeout = setTimeout(() => controller.abort(), 20000);
 
     const res = await fetch(
-      `${SUNO_BASE_URL}/api/v1/generate/record-info?taskId=${taskId}`,
+      `${SUNO_BASE_URL}/api/v1/generate/record-info?taskId=${encodeURIComponent(taskId)}`,
       {
         headers: { Authorization: `Bearer ${SUNO_API_KEY}` },
         cache: "no-store",

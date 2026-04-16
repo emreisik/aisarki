@@ -41,6 +41,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Konu gereklidir" }, { status: 400 });
   }
 
+  if (body.topic.length > 2000 || (body.customNotes?.length ?? 0) > 2000) {
+    return NextResponse.json(
+      { error: "Konu veya notlar çok uzun (max 2000 karakter)" },
+      { status: 400 },
+    );
+  }
+
   // KB ile zenginleştir: sanatçı/yöre/makam ID'lerinden detaylı context çek
   const artist =
     body.artistId && body.artistId in ARTIST_PRESETS

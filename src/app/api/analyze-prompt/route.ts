@@ -5,13 +5,22 @@ interface AnalyzeRequest {
   prompt: string;
 }
 
+const MAX_PROMPT_LENGTH = 2000;
+
 export async function POST(request: NextRequest) {
   try {
     const body: AnalyzeRequest = await request.json();
-    if (!body.prompt?.trim()) {
+    const prompt = body.prompt?.trim() ?? "";
+    if (!prompt) {
       return NextResponse.json({ error: "Prompt gereklidir" }, { status: 400 });
     }
-    const analysis = await analyzePrompt(body.prompt);
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `Prompt en fazla ${MAX_PROMPT_LENGTH} karakter olmalı` },
+        { status: 400 },
+      );
+    }
+    const analysis = await analyzePrompt(prompt);
     if (!analysis) {
       return NextResponse.json({ error: "Analiz yapılamadı" }, { status: 500 });
     }

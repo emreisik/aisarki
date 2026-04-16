@@ -27,16 +27,34 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (password.length < 6) {
+  if (typeof email !== "string" || email.length > 200) {
+    return NextResponse.json({ error: "Geçersiz email" }, { status: 400 });
+  }
+
+  if (typeof password !== "string" || password.length < 10) {
     return NextResponse.json(
-      { error: "Şifre en az 6 karakter olmalıdır" },
+      { error: "Şifre en az 10 karakter olmalıdır" },
       { status: 400 },
     );
+  }
+
+  if (password.length > 200) {
+    return NextResponse.json({ error: "Şifre çok uzun" }, { status: 400 });
   }
 
   if (!/^[a-z0-9_]{3,20}$/.test(username)) {
     return NextResponse.json(
       { error: "Kullanıcı adı 3-20 karakter, sadece harf/rakam/alt çizgi" },
+      { status: 400 },
+    );
+  }
+
+  if (
+    displayName &&
+    (typeof displayName !== "string" || displayName.length > 80)
+  ) {
+    return NextResponse.json(
+      { error: "Görünen ad en fazla 80 karakter" },
       { status: 400 },
     );
   }

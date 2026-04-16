@@ -7,6 +7,7 @@ import {
   isBunnyConfigured,
 } from "@/lib/bunnyStorage";
 import { updateSongAudioKey, updateSongImageKey } from "@/lib/taskStore";
+import { checkAdminToken } from "@/lib/adminAuth";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE = "https://api.sunoapi.org";
@@ -50,17 +51,10 @@ async function fetchTaskSongs(taskId: string): Promise<SunoSong[]> {
 
 export const maxDuration = 60;
 
-const ADMIN_TOKEN = process.env.ADMIN_HEAL_TOKEN ?? "";
-
 export async function POST(request: NextRequest) {
-  if (!ADMIN_TOKEN) {
-    return NextResponse.json(
-      { error: "ADMIN_HEAL_TOKEN env eksik" },
-      { status: 500 },
-    );
-  }
-  if (request.headers.get("x-admin-token") !== ADMIN_TOKEN) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authz = checkAdminToken(request);
+  if (!authz.ok) {
+    return NextResponse.json({ error: authz.error }, { status: authz.status });
   }
   if (!isBunnyConfigured()) {
     return NextResponse.json({ error: "Bunny config eksik" }, { status: 500 });
@@ -168,16 +162,8 @@ export async function POST(request: NextRequest) {
   });
 }
 
-// Railway/cron-job.org gibi sistemler GET yollar — token query param ile
+// Cron'lar GET yollar. Token yine header'dan (Authorization veya x-admin-token) —
+// query param kabul edilmez (browser history + access log leak).
 export async function GET(request: NextRequest) {
-  const token = new URL(request.url).searchParams.get("token");
-  if (ADMIN_TOKEN && token !== ADMIN_TOKEN) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  // Aynı POST mantığını çağır — request'i manuel kopyalamak yerine direkt header'ı fake'le
-  const fakePost = new Request(request.url, {
-    method: "POST",
-    headers: { "x-admin-token": ADMIN_TOKEN },
-  });
-  return POST(fakePost as NextRequest);
+  return POST(request);
 }
