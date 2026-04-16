@@ -233,17 +233,25 @@ export async function GET(request: NextRequest) {
   if (songs && songs.length > 0) {
     const complete = songs.filter((s) => s.status === "complete");
 
-    if (complete.length > 0 && complete.length === songs.length) {
-      // Tüm şarkılar hazır
+    // En az bir varyant çalınabilir hale geldiyse complete dön — kullanıcı
+    // ikinci varyantı beklemeden ilkini dinlesin. Tümü tamamsa task'ı
+    // DB'de de complete markala; yoksa polling bir sonraki varyant için
+    // arka planda devam etsin (frontend bu noktada polling'i durduruyor,
+    // yeni varyant bir sonraki all-songs pull'da kendiliğinden gelir).
+    if (complete.length > 0) {
       setTaskSongs(taskId, songs);
-      markTaskComplete(taskId).catch(() => {});
-      console.log(
-        `[songs] All ${complete.length} songs complete for taskId=${taskId}`,
-      );
+      if (complete.length === songs.length) {
+        markTaskComplete(taskId).catch(() => {});
+        console.log(
+          `[songs] All ${complete.length} songs complete for taskId=${taskId}`,
+        );
+      } else {
+        console.log(
+          `[songs] Partial complete ${complete.length}/${songs.length} — returning available, task kept as processing`,
+        );
+      }
       return NextResponse.json({ status: "complete", songs: complete });
     }
-    // Kısmen hazır — devam et
-    console.log(`[songs] Partial: ${complete.length}/${songs.length} complete`);
   }
 
   // 3) DB fallback — callback geldi ama farklı instance'a gitti olabilir
