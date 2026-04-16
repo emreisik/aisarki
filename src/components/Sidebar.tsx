@@ -76,19 +76,9 @@ export default function Sidebar({ activePage = "home" }: SidebarProps) {
         </div>
 
         <div className="px-4 pb-4 mt-auto">
-          <Link
-            href="#"
-            className="text-[#b3b3b3] hover:text-white text-xs hover:underline"
-          >
-            Çerezler
-          </Link>
-          {" · "}
-          <Link
-            href="#"
-            className="text-[#b3b3b3] hover:text-white text-xs hover:underline"
-          >
-            Gizlilik
-          </Link>
+          <span className="text-[#6a6a6a] text-[11px]">
+            © {new Date().getFullYear()} Hubeya
+          </span>
         </div>
       </div>
     </aside>

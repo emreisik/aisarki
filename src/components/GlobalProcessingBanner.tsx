@@ -1,23 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { usePlayer } from "@/contexts/PlayerContext";
-import ProcessingBanner, { ProcessingTask } from "./ProcessingBanner";
+import { Music2, AlertCircle } from "lucide-react";
+
+interface TaskInfo {
+  taskId: string;
+  failed: boolean;
+}
 
 /**
- * Global üretim banner'ı — sayfa değişse de kaybolmaz.
- * /api/all-songs'tan her 5 saniyede bir processing tasks çeker.
- * Mobile'da MiniPlayer ve BottomNav'ın üstünde, desktop'ta Sidebar yanında üstte.
+ * Minimal ikonik üretim göstergesi — sayfa değişse de kaybolmaz.
+ * Tıklanınca /create'e gider, detaylı panel orada.
  */
 export default function GlobalProcessingBanner() {
   const { data: session } = useSession();
   const { currentSong } = usePlayer();
   const pathname = usePathname();
-  const [tasks, setTasks] = useState<ProcessingTask[]>([]);
+  const router = useRouter();
+  const [tasks, setTasks] = useState<TaskInfo[]>([]);
 
-  // /create sayfasında inline panel var, floating banner'ı gizle
   const hideOnCreate = pathname === "/create";
 
   useEffect(() => {
@@ -31,29 +35,16 @@ export default function GlobalProcessingBanner() {
         const res = await fetch("/api/all-songs", { cache: "no-store" });
         const data = await res.json();
         if (cancelled) return;
-        const list: Array<{
-          taskId: string;
-          prompt: string;
-          startedAt: string;
-          status?: "processing" | "failed";
-          imageUrl?: string;
-          title?: string;
-          errorTitle?: string;
-          errorMessage?: string;
-        }> = data.processing ?? [];
+        const list: Array<{ taskId: string; status?: string }> =
+          data.processing ?? [];
         setTasks(
           list.map((t) => ({
             taskId: t.taskId,
-            title: t.title || t.prompt?.slice(0, 50) || "Şarkı",
-            startedAt: t.startedAt,
-            imageUrl: t.imageUrl,
             failed: t.status === "failed",
-            errorTitle: t.errorTitle,
-            errorMessage: t.errorMessage,
           })),
         );
       } catch {
-        /* sessizce geç */
+        /* sessizce */
       }
     };
     fetchTasks();
@@ -64,62 +55,62 @@ export default function GlobalProcessingBanner() {
     };
   }, [session?.user]);
 
-  const handleDismissFailed = async (taskId: string) => {
-    // UI'dan hemen kaldır
-    setTasks((prev) => prev.filter((t) => t.taskId !== taskId));
-    // Backend'den de sil
-    try {
-      await fetch(`/api/processing-tasks/${taskId}`, { method: "DELETE" });
-    } catch {
-      /* sessizce geç */
-    }
-  };
-
-  const [retryingTaskId, setRetryingTaskId] = useState<string | null>(null);
-  const handleRetry = async (taskId: string) => {
-    if (retryingTaskId) return;
-    setRetryingTaskId(taskId);
-    try {
-      const res = await fetch(`/api/tasks/${taskId}/retry`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (res.ok) {
-        // Eski failed task'ı UI'dan kaldır
-        setTasks((prev) => prev.filter((t) => t.taskId !== taskId));
-      } else {
-        // Hata — kullanıcıya bildir (basit alert yeterli)
-        alert(data.error || "Yeniden başlatılamadı");
-      }
-    } catch {
-      alert("Bağlantı hatası");
-    } finally {
-      setRetryingTaskId(null);
-    }
-  };
-
   if (hideOnCreate) return null;
   if (tasks.length === 0) return null;
 
+  const failed = tasks.filter((t) => t.failed);
+  const processing = tasks.filter((t) => !t.failed);
+  const hasFailure = failed.length > 0;
+  const allFailed = processing.length === 0 && failed.length > 0;
+
   // Mobil: MiniPlayer ve BottomNav'ın üstünde; desktop: alt player bar üstünde
   const mobileBottom = currentSong
-    ? "calc(76px + env(safe-area-inset-bottom, 0px) + 8px + 70px)" // bottom nav + mini player
-    : "calc(76px + env(safe-area-inset-bottom, 0px) + 12px)"; // sadece bottom nav
+    ? "calc(76px + env(safe-area-inset-bottom, 0px) + 8px + 70px)"
+    : "calc(76px + env(safe-area-inset-bottom, 0px) + 16px)";
+
+  const label = allFailed
+    ? `${failed.length} şarkı başarısız — kontrol et`
+    : hasFailure
+      ? `${processing.length} üretiliyor, ${failed.length} başarısız`
+      : `${processing.length} şarkı üretiliyor`;
 
   return (
-    <div
-      className="fixed left-2 right-2 md:left-auto md:right-4 md:w-[380px] z-40 pointer-events-none"
-      style={{ bottom: mobileBottom }}
-    >
-      <div className="pointer-events-auto">
-        <ProcessingBanner
-          tasks={tasks}
-          onDismissFailed={handleDismissFailed}
-          onCancel={handleDismissFailed}
-          onRetry={handleRetry}
-          retryingTaskId={retryingTaskId}
-        />
-      </div>
+    <div className="fixed right-4 z-40" style={{ bottom: mobileBottom }}>
+      <button
+        type="button"
+        onClick={() => router.push("/create")}
+        aria-label={label}
+        title={label}
+        className={`group relative flex items-center justify-center w-12 h-12 rounded-full shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/40 ${
+          allFailed
+            ? "bg-red-500/90 hover:bg-red-500"
+            : "bg-gradient-to-br from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400"
+        }`}
+      >
+        {/* Pulse halka — sadece aktif üretim varsa */}
+        {!allFailed && (
+          <span className="absolute inset-0 rounded-full bg-violet-500 animate-ping opacity-40" />
+        )}
+
+        {allFailed ? (
+          <AlertCircle size={20} className="relative text-white" />
+        ) : (
+          <Music2 size={20} className="relative text-white animate-pulse" />
+        )}
+
+        {/* Sayı rozeti (1'den fazla veya karışık durum) */}
+        {tasks.length > 1 && (
+          <span
+            className={`absolute -top-1 -right-1 min-w-[20px] h-5 rounded-full text-xs font-bold flex items-center justify-center px-1 border border-black/40 ${
+              hasFailure && !allFailed
+                ? "bg-red-500 text-white"
+                : "bg-white text-black"
+            }`}
+          >
+            {tasks.length}
+          </span>
+        )}
+      </button>
     </div>
   );
 }

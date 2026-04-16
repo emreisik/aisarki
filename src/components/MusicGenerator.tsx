@@ -321,7 +321,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
     // Validasyon
     if (customMode) {
       if (!style.trim()) {
-        setError("Style of Music alanı zorunludur");
+        setError("Müzik Tarzı alanı zorunludur");
         return;
       }
       if (!title.trim()) {
@@ -422,7 +422,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             color: tab === "music" ? "white" : "#7a7a7a",
           }}
         >
-          Music Generation
+          Müzik
         </button>
         <button
           type="button"
@@ -439,7 +439,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             color: tab === "sounds" ? "white" : "#7a7a7a",
           }}
         >
-          Sounds Generation
+          Ses
         </button>
       </div>
 
@@ -462,9 +462,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
                 style={{ left: customMode ? "18px" : "2px" }}
               />
             </span>
-            <span className="text-white text-sm font-semibold">
-              Custom Mode
-            </span>
+            <span className="text-white text-sm font-semibold">Özel Mod</span>
           </label>
 
           {/* Model selector */}
@@ -506,7 +504,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
       ) : (
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a2a]">
           <span className="text-[#6a6a6a] text-xs">
-            Sounds üretimi sadece V5 destekler
+            Ses üretimi sadece V5 destekler
           </span>
           <span
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1e1e1e] border border-[#3a3a3a] text-white text-sm font-semibold"
@@ -529,7 +527,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
                 <textarea
                   value={soundPrompt}
                   onChange={(e) => setSoundPrompt(e.target.value)}
-                  placeholder="Enter prompt"
+                  placeholder="Nasıl bir ses olsun yaz..."
                   rows={6}
                   maxLength={500}
                   className="w-full bg-[#1e1e1e] border-2 border-[#3a3a3a] rounded-xl px-4 py-3 pr-16 text-white text-base placeholder-[#6a6a6a] resize-none focus:outline-none focus:border-[#7c3aed] transition-colors leading-relaxed"
@@ -543,7 +541,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             {/* Grab Lyrics toggle */}
             <label className="flex items-center justify-between cursor-pointer select-none bg-[#1e1e1e] border-2 border-[#3a3a3a] rounded-xl px-4 py-3">
               <span className="text-white text-sm font-semibold">
-                Grab Lyrics
+                Sözleri Al
               </span>
               <span
                 className="relative w-10 h-6 rounded-full transition-colors"
@@ -565,7 +563,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             {/* Sound Key dropdown */}
             <div className="flex flex-col gap-1.5 bg-[#1e1e1e] border-2 border-[#3a3a3a] rounded-xl px-4 py-3">
               <label className="text-white text-sm font-semibold">
-                Sound Key
+                Ses Anahtarı
               </label>
               <div className="relative">
                 <button
@@ -606,7 +604,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             {/* Sound Loop toggle */}
             <label className="flex items-center justify-between cursor-pointer select-none bg-[#1e1e1e] border-2 border-[#3a3a3a] rounded-xl px-4 py-3">
               <span className="text-white text-sm font-semibold">
-                Sound Loop
+                Döngülü Ses
               </span>
               <span
                 className="relative w-10 h-6 rounded-full transition-colors"
@@ -628,7 +626,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             {/* Sound Tempo */}
             <div className="flex flex-col gap-1.5 bg-[#1e1e1e] border-2 border-[#3a3a3a] rounded-xl px-4 py-3">
               <label className="text-white text-sm font-semibold">
-                Sound Tempo
+                Ses Temposu
               </label>
               <input
                 type="number"
@@ -646,10 +644,10 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
         {tab === "music" &&
           (customMode ? (
             <>
-              {/* Title */}
+              {/* Başlık */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[#a7a7a7] text-xs font-semibold uppercase tracking-wider">
-                  Title
+                  Başlık
                 </label>
                 <input
                   type="text"
@@ -661,11 +659,11 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
                 />
               </div>
 
-              {/* Style of Music */}
+              {/* Müzik Tarzı */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[#a7a7a7] text-xs font-semibold uppercase tracking-wider">
-                    Style of Music
+                    Müzik Tarzı
                   </label>
                   <button
                     type="button"
@@ -691,7 +689,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
                     ref={styleTextareaRef}
                     value={style}
                     onChange={(e) => setStyle(e.target.value)}
-                    placeholder="Traditional Turkish folk music from Sivas region, sorrowful authentic male vocal, long-air intro, emotional bağlama lead..."
+                    placeholder="Sivas yöresinden geleneksel Türk halk müziği, hüzünlü otantik erkek vokal, uzun hava giriş, duygusal bağlama solo..."
                     rows={6}
                     maxLength={STYLE_MAX}
                     className="w-full bg-[#1e1e1e] border-2 border-[#3a3a3a] rounded-xl px-4 py-3 pr-16 text-white text-sm placeholder-[#6a6a6a] resize-none focus:outline-none focus:border-[#7c3aed] transition-colors leading-relaxed"
@@ -723,7 +721,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
                   />
                 </span>
                 <span className="text-white text-sm font-semibold">
-                  Instrumental
+                  Enstrümantal
                 </span>
                 <span className="text-[#6a6a6a] text-xs">
                   (vokal olmadan sadece enstrümental)
@@ -735,7 +733,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[#a7a7a7] text-xs font-semibold uppercase tracking-wider">
-                      Lyrics
+                      Sözler
                     </label>
                     <button
                       type="button"
@@ -843,7 +841,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
                   />
                 </span>
                 <span className="text-white text-sm font-semibold">
-                  Instrumental
+                  Enstrümantal
                 </span>
               </label>
             </div>
@@ -856,7 +854,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
           </div>
         )}
 
-        {/* Generate Music butonu */}
+        {/* Üret butonu */}
         <button
           onClick={handleGenerate}
           disabled={loading}
@@ -875,7 +873,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
               Başlatılıyor...
             </span>
           ) : (
-            "Generate Music"
+            "Şarkı Oluştur"
           )}
         </button>
       </div>
