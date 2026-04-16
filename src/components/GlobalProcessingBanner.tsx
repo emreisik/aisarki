@@ -109,6 +109,7 @@ export default function GlobalProcessingBanner() {
         <ProcessingBanner
           tasks={tasks}
           onDismissFailed={handleDismissFailed}
+          onCancel={handleDismissFailed}
           onRetry={handleRetry}
           retryingTaskId={retryingTaskId}
         />

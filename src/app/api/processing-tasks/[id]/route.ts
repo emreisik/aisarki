@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { dismissFailedTask } from "@/lib/taskStore";
+import { cancelTask } from "@/lib/taskStore";
 
+/** Task'ı iptal et — processing veya failed fark etmez. */
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -11,6 +12,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
-  await dismissFailedTask(id, session.user.id);
+  await cancelTask(id, session.user.id);
   return NextResponse.json({ ok: true });
 }

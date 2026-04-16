@@ -250,6 +250,25 @@ export async function dismissFailedTask(
   }
 }
 
+/** Processing veya failed fark etmeksizin sahibi task'ı siler (kullanıcı iptali). */
+export async function cancelTask(
+  taskId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    await sql`
+      DELETE FROM tasks
+      WHERE task_id = ${taskId}
+        AND created_by = ${userId}
+    `;
+    // In-memory cache'ten de sil
+    taskStore.delete(taskId);
+  } catch (e) {
+    console.error("[db] cancelTask hatası:", e);
+  }
+}
+
 /* ── DB helpers ── */
 
 function rowToSong(row: Record<string, unknown>): Song {
