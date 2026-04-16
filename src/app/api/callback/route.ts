@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import {
   setTaskSongs,
   markTaskComplete,
@@ -8,11 +9,14 @@ import {
 } from "@/lib/taskStore";
 import { sendPushToUser } from "@/lib/pushNotification";
 import {
-  uploadAudioInBackground,
-  uploadImageInBackground,
+  uploadAudioFromUrl,
+  uploadImageFromUrl,
   isBunnyConfigured,
 } from "@/lib/bunnyStorage";
 import { Song } from "@/types";
+
+// Vercel serverless function timeout — Bunny upload + Suno fetch için yeterli
+export const maxDuration = 60;
 
 interface RawSong {
   id: string;
@@ -138,34 +142,54 @@ export async function POST(request: NextRequest) {
 
     // ── Bunny Storage'a kalıcı indirme ──
     // Suno dosyaları 15 gün sonra silinir + stream URL'leri dakikalar içinde expire eder.
-    // Callback'te source_audio_url geldiğinde arka planda Bunny'e yükle, DB'ye key yaz.
+    // Next.js 15+ `after()` API: response dönse bile upload işi serverless function
+    // kesilmeden tamamlanır (fire-and-forget Promise'ler Vercel'de kesilebiliyor).
     if (isBunnyConfigured()) {
-      for (const s of songs) {
-        const src = rawSongs.find((r) => r.id === s.id);
-        if (!src) continue;
-        const longLivedAudio =
-          src.source_audio_url || src.audio_url || src.audioUrl;
-        if (longLivedAudio) {
-          uploadAudioInBackground(
-            longLivedAudio,
-            `${s.id}.mp3`,
-            async (key) => {
-              await updateSongAudioKey(s.id, key);
-            },
-          );
+      const uploadJobs = songs
+        .map((s) => {
+          const src = rawSongs.find((r) => r.id === s.id);
+          if (!src) return null;
+          return {
+            id: s.id,
+            audioUrl:
+              src.source_audio_url || src.audio_url || src.audioUrl || "",
+            imageUrl:
+              src.source_image_url || src.image_url || src.imageUrl || "",
+          };
+        })
+        .filter(
+          (j): j is { id: string; audioUrl: string; imageUrl: string } => !!j,
+        );
+
+      after(async () => {
+        for (const job of uploadJobs) {
+          if (job.audioUrl) {
+            try {
+              const key = await uploadAudioFromUrl(
+                job.audioUrl,
+                `${job.id}.mp3`,
+              );
+              if (key) await updateSongAudioKey(job.id, key);
+            } catch (e) {
+              console.warn(`[after][bunny] audio fail ${job.id}:`, e);
+            }
+          }
+          if (job.imageUrl) {
+            try {
+              const key = await uploadImageFromUrl(
+                job.imageUrl,
+                `${job.id}.jpg`,
+              );
+              if (key) await updateSongImageKey(job.id, key);
+            } catch (e) {
+              console.warn(`[after][bunny] image fail ${job.id}:`, e);
+            }
+          }
         }
-        const longLivedImage =
-          src.source_image_url || src.image_url || src.imageUrl;
-        if (longLivedImage) {
-          uploadImageInBackground(
-            longLivedImage,
-            `${s.id}.jpg`,
-            async (key) => {
-              await updateSongImageKey(s.id, key);
-            },
-          );
-        }
-      }
+        console.log(
+          `[after][bunny] ${uploadJobs.length} şarkı Bunny upload tamamlandı`,
+        );
+      });
     }
 
     // Tüm şarkılar tamamlandıysa DB'de task'ı complete olarak işaretle

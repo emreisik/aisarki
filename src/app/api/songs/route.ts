@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import {
   getTaskSongs,
   setTaskSongs,
@@ -8,11 +9,14 @@ import {
   updateSongImageKey,
 } from "@/lib/taskStore";
 import {
-  uploadAudioInBackground,
-  uploadImageInBackground,
+  uploadAudioFromUrl,
+  uploadImageFromUrl,
   isBunnyConfigured,
 } from "@/lib/bunnyStorage";
 import { Song } from "@/types";
+
+// Vercel timeout koruması — Suno fetch + Bunny upload için
+export const maxDuration = 60;
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
@@ -159,27 +163,49 @@ async function fetchFromSunoApi(taskId: string): Promise<Song[] | null> {
  * Local dev fallback: callback gelmese bile polling sırasında Bunny upload
  * tetikle. Çift çalışması sorun değil — Bunny PUT idempotent (aynı path'e
  * overwrite), aynı audio_key iki kez set edilse de sorun yok.
+ *
+ * after() kullanarak response dönse bile serverless function kesilmez.
  */
 function maybeTriggerBunnyUpload(songs: Song[], rawArr: RawSunoSong[]) {
   if (!isBunnyConfigured()) return;
-  for (const song of songs) {
-    const raw = rawArr.find((r) => r.id === song.id);
-    if (!raw) continue;
-    const longLivedAudio =
-      raw.source_audio_url || raw.audio_url || raw.audioUrl;
-    if (longLivedAudio && longLivedAudio.startsWith("http")) {
-      uploadAudioInBackground(longLivedAudio, `${song.id}.mp3`, async (key) => {
-        await updateSongAudioKey(song.id, key);
-      });
+  const jobs = songs
+    .map((song) => {
+      const raw = rawArr.find((r) => r.id === song.id);
+      if (!raw) return null;
+      const audioUrl =
+        raw.source_audio_url || raw.audio_url || raw.audioUrl || "";
+      const imageUrl =
+        raw.source_image_url || raw.image_url || raw.imageUrl || "";
+      if (!audioUrl.startsWith("http") && !imageUrl.startsWith("http"))
+        return null;
+      return { id: song.id, audioUrl, imageUrl };
+    })
+    .filter(
+      (j): j is { id: string; audioUrl: string; imageUrl: string } => !!j,
+    );
+  if (jobs.length === 0) return;
+
+  after(async () => {
+    for (const job of jobs) {
+      if (job.audioUrl.startsWith("http")) {
+        try {
+          const key = await uploadAudioFromUrl(job.audioUrl, `${job.id}.mp3`);
+          if (key) await updateSongAudioKey(job.id, key);
+        } catch (e) {
+          console.warn(`[after][songs][bunny] audio fail ${job.id}:`, e);
+        }
+      }
+      if (job.imageUrl.startsWith("http")) {
+        try {
+          const key = await uploadImageFromUrl(job.imageUrl, `${job.id}.jpg`);
+          if (key) await updateSongImageKey(job.id, key);
+        } catch (e) {
+          console.warn(`[after][songs][bunny] image fail ${job.id}:`, e);
+        }
+      }
     }
-    const longLivedImage =
-      raw.source_image_url || raw.image_url || raw.imageUrl;
-    if (longLivedImage && longLivedImage.startsWith("http")) {
-      uploadImageInBackground(longLivedImage, `${song.id}.jpg`, async (key) => {
-        await updateSongImageKey(song.id, key);
-      });
-    }
-  }
+    console.log(`[after][songs][bunny] ${jobs.length} şarkı upload tamam`);
+  });
 }
 
 export async function GET(request: NextRequest) {
