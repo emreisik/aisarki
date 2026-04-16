@@ -41,7 +41,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Content area — ml-[280px] on desktop, relative container */}
       <div className="h-full md:ml-[280px] relative">
         {/* Scroll area — full height, no top header */}
-        <div id="main-scroll" className="h-full overflow-y-auto scroll-area">
+        <div
+          id="main-scroll"
+          className="h-full overflow-y-auto scroll-area"
+          style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+        >
           {children}
           <BottomSpacer />
         </div>
