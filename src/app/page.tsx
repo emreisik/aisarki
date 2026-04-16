@@ -40,8 +40,6 @@ import {
 import Link from "next/link";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
-import MusicGenerator from "@/components/MusicGenerator";
-import { ProcessingTask } from "@/components/ProcessingBanner";
 import { useSession } from "next-auth/react";
 
 /* ══════════════════════════════════════════════
@@ -1441,45 +1439,14 @@ export default function HomePage() {
 
   const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [generatedSongs, setGeneratedSongs] = useState<Song[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [activeItem, setActiveItem] = useState<{
-    item: CategoryItem;
-    color: string;
-  } | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [prompt, setPrompt] = useState("");
-  const activePolls = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/all-songs")
       .then((r) => r.json())
       .then((d) => {
-        const songs = d.songs || [];
-        setAllSongs(songs);
-        setGeneratedSongs(songs);
-        // Sayfa yenilenince processing task'ları geri yükle
-        const tasks: Array<{ taskId: string }> = d.processing || [];
-        tasks.forEach(({ taskId }) => {
-          const tempId = `task-resume-${taskId}`;
-          setGeneratedSongs((prev) =>
-            prev.some((s) => s.id === tempId)
-              ? prev
-              : [
-                  {
-                    id: tempId,
-                    title: "Oluşturuluyor...",
-                    status: "processing" as const,
-                    createdAt: new Date().toISOString(),
-                  },
-                  ...prev,
-                ],
-          );
-          pollForSongsFromDB(taskId, tempId);
-        });
+        setAllSongs(d.songs || []);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -1487,203 +1454,6 @@ export default function HomePage() {
       .then((r) => r.json())
       .then((d) => setPlaylists(d.playlists || []));
   }, [session?.user?.id]);
-
-  const handleSongsAdded = useCallback((newSongs: Song[]) => {
-    if (newSongs.length === 0) {
-      setGeneratedSongs((prev) =>
-        prev.filter((s) => !s.id.startsWith("temp-")),
-      );
-      return;
-    }
-    setGeneratedSongs((prev) => {
-      const updated = [...prev];
-      newSongs.forEach((ns) => {
-        const idx = updated.findIndex((s) => s.id === ns.id);
-        if (idx >= 0) updated[idx] = ns;
-        else updated.unshift(ns);
-      });
-      return updated;
-    });
-  }, []);
-
-  // Sayfa yenilenince DB'den gelen processing task'lar için polling
-  function pollForSongsFromDB(taskId: string, tempId: string) {
-    if (activePolls.current.has(taskId)) return;
-    activePolls.current.add(taskId);
-    let attempts = 0;
-    const MAX_ATTEMPTS = 60; // 5 dakika
-    const poll = async () => {
-      if (attempts++ >= MAX_ATTEMPTS) {
-        activePolls.current.delete(taskId);
-        setGeneratedSongs((prev) =>
-          prev.map((s) =>
-            s.id === tempId
-              ? {
-                  ...s,
-                  title: "Zaman aşımı — tekrar dene",
-                  status: "processing" as const,
-                }
-              : s,
-          ),
-        );
-        return;
-      }
-      try {
-        const res = await fetch(`/api/songs?taskId=${taskId}`);
-        const data = await res.json();
-        if (data.status === "complete" && data.songs?.length > 0) {
-          activePolls.current.delete(taskId);
-          setGeneratedSongs((prev) => prev.filter((s) => s.id !== tempId));
-          setAllSongs((prev) => {
-            const ids = new Set(prev.map((s) => s.id));
-            return [
-              ...(data.songs as Song[]).filter((s) => !ids.has(s.id)),
-              ...prev,
-            ];
-          });
-        } else {
-          setTimeout(poll, 5000);
-        }
-      } catch {
-        setTimeout(poll, 8000);
-      }
-    };
-    setTimeout(poll, 5000);
-  }
-
-  const pollForSongs = useCallback((taskId: string, tempIds: string[]) => {
-    if (activePolls.current.has(taskId)) return;
-    activePolls.current.add(taskId);
-    let attempts = 0;
-    const MAX_ATTEMPTS = 60; // 5 dakika
-    const poll = async () => {
-      if (attempts++ >= MAX_ATTEMPTS) {
-        activePolls.current.delete(taskId);
-        // Timeout — temp şarkıları "zaman aşımı" olarak işaretle
-        setGeneratedSongs((prev) =>
-          prev.map((s) =>
-            tempIds.includes(s.id)
-              ? {
-                  ...s,
-                  title: "Zaman aşımı — tekrar dene",
-                  status: "processing" as const,
-                }
-              : s,
-          ),
-        );
-        return;
-      }
-      try {
-        const res = await fetch(`/api/songs?taskId=${taskId}`);
-        const data = await res.json();
-        // SADECE audioUrl (Bunny CDN) gelen şarkıları tamamlandı say
-        const playable = ((data.songs as Song[]) ?? []).filter(
-          (s) => s.audioUrl,
-        );
-        if (
-          data.status === "complete" &&
-          playable.length > 0 &&
-          playable.length >= (data.songs?.length ?? 1)
-        ) {
-          activePolls.current.delete(taskId);
-          // Banner'dan kaldır
-          setProcessingTasks((prev) => prev.filter((t) => t.taskId !== taskId));
-          // Tüm temp girişleri kaldır, gerçek şarkıları başa ekle
-          setGeneratedSongs((prev) => {
-            const withoutTemps = prev.filter((s) => !tempIds.includes(s.id));
-            const ids = new Set(withoutTemps.map((s) => s.id));
-            const fresh = playable.filter((s) => !ids.has(s.id));
-            return [...fresh, ...withoutTemps];
-          });
-          setAllSongs((prev) => {
-            const ids = new Set(prev.map((s) => s.id));
-            return [...playable.filter((s) => !ids.has(s.id)), ...prev];
-          });
-        } else {
-          setTimeout(poll, 5000);
-        }
-      } catch {
-        setTimeout(poll, 8000);
-      }
-    };
-    setTimeout(poll, 5000);
-  }, []);
-
-  const handleGenerate = async (p: string) => {
-    const trimmed = p.trim();
-    if (!trimmed || loading) return;
-    if (!session?.user) {
-      setShowGate(true);
-      return;
-    }
-    setActiveItem(null);
-    setError("");
-    setLoading(true);
-    const tempSongs: Song[] = [1, 2].map((i) => ({
-      id: `temp-${Date.now()}-${i}`,
-      title: trimmed.slice(0, 40),
-      status: "processing" as const,
-      createdAt: new Date().toISOString(),
-    }));
-    handleSongsAdded(tempSongs);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: trimmed,
-          customMode: false,
-          instrumental: false,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.data?.taskId) {
-        setError(data.error || data.msg || "Hata oluştu");
-        handleSongsAdded([]);
-        return;
-      }
-      pollForSongs(
-        data.data.taskId,
-        tempSongs.map((s) => s.id),
-      );
-    } catch {
-      setError("Bağlantı hatası");
-      handleSongsAdded([]);
-    } finally {
-      setLoading(false);
-      setPrompt("");
-    }
-  };
-
-  // MusicGenerator callback — taskId alınınca processing banner görünür
-  // (state /api/all-songs polling üzerinden besleniyor); polling sadece DB'de audio_key
-  // gelene kadar bekler, ardından completedSongs'a ekler.
-  const handleTaskStarted = useCallback(
-    (
-      taskId: string,
-      promptText: string,
-      titleText: string,
-      _streamUrl?: string,
-      _songId?: string,
-    ) => {
-      setError("");
-      // Banner'ı hemen göster (polling next iter'a kadar boş kalmasın)
-      setProcessingTasks((prev) => {
-        if (prev.some((t) => t.taskId === taskId)) return prev;
-        return [
-          {
-            taskId,
-            title: titleText || promptText.slice(0, 50),
-            startedAt: new Date().toISOString(),
-          },
-          ...prev,
-        ];
-      });
-      // Şarkılar audio_key sahibi olduğunda discover/playlist gibi listelerde otomatik belirir.
-      pollForSongs(taskId, []);
-    },
-    [pollForSongs],
-  );
 
   const moreSongs = allSongs.slice(0, 18);
 
@@ -1695,43 +1465,6 @@ export default function HomePage() {
       .then((d) => setDiscoverSongs(d.songs || []))
       .catch(() => {});
   }, []);
-
-  // ── Üretim sürecindeki taskları takip et (her 5sn poll) ──
-  const [processingTasks, setProcessingTasks] = useState<ProcessingTask[]>([]);
-  useEffect(() => {
-    if (!session?.user) return;
-    let cancelled = false;
-    const fetchTasks = async () => {
-      try {
-        const res = await fetch("/api/all-songs", { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        const tasks: Array<{
-          taskId: string;
-          prompt: string;
-          startedAt: string;
-          imageUrl?: string;
-          title?: string;
-        }> = data.processing ?? [];
-        setProcessingTasks(
-          tasks.map((t) => ({
-            taskId: t.taskId,
-            title: t.title || t.prompt?.slice(0, 50) || "Şarkı",
-            startedAt: t.startedAt,
-            imageUrl: t.imageUrl,
-          })),
-        );
-      } catch {
-        /* sessizce geç */
-      }
-    };
-    fetchTasks();
-    const id = setInterval(fetchTasks, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [session?.user]);
 
   // Saatlik selamlama
   const greeting = (() => {
@@ -1768,33 +1501,44 @@ export default function HomePage() {
 
   return (
     <div className="min-h-full">
-      {/* Modal */}
-      {activeItem && (
-        <PromptModal
-          item={activeItem.item}
-          color={activeItem.color}
-          onClose={() => setActiveItem(null)}
-          onGenerate={handleGenerate}
-        />
-      )}
-
-      {/* ── Hero: Şarkını Yap — MusicGenerator ön planda ── */}
+      {/* ── Hero: Şarkı üretimi /create sayfasında — buradan yönlendirme ── */}
       <div
-        className="pt-10 pb-6 px-4 md:px-6"
+        className="pt-10 pb-8 px-4 md:px-6"
         style={{
           background:
-            "linear-gradient(180deg, #0f1f15 0%, #0a1510 40%, #0a0a0a 100%)",
+            "linear-gradient(180deg, #1a0e2e 0%, #0e1a2e 40%, #0a0a0a 100%)",
         }}
       >
-        <div className="mb-4">
-          <h1 className="text-white text-2xl md:text-3xl font-black tracking-tight">
-            Şarkını Yap
-          </h1>
-          <p className="text-[#a7a7a7] text-sm mt-1">
-            AI ile saniyeler içinde özgün şarkılar oluştur
-          </p>
-        </div>
-        <MusicGenerator onTaskStarted={handleTaskStarted} />
+        <Link
+          href="/create"
+          className="group block relative overflow-hidden rounded-2xl border-2 border-[#a78bfa]/30 hover:border-[#a78bfa] bg-gradient-to-br from-[#2a1550] via-[#1a0e35] to-[#0d0820] p-6 md:p-8 pressable transition-colors shadow-[0_0_40px_rgba(167,139,250,0.15)]"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-[#a78bfa] text-xs font-bold uppercase tracking-widest">
+                {greeting}
+              </p>
+              <h1 className="text-white text-2xl md:text-4xl font-black mt-1 leading-tight">
+                Şarkını oluştur
+              </h1>
+              <p className="text-white/70 text-sm mt-2">
+                AI ile saniyeler içinde özgün Türkçe şarkılar yap
+              </p>
+              <span className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#a78bfa] to-[#7c3aed] text-white font-bold text-sm shadow-lg group-hover:scale-105 transition-transform">
+                🎵 Oluşturmaya başla
+              </span>
+            </div>
+            <div
+              className="hidden sm:flex w-24 h-24 md:w-28 md:h-28 rounded-2xl items-center justify-center flex-shrink-0 text-5xl md:text-6xl"
+              style={{
+                background:
+                  "linear-gradient(135deg, rgba(167,139,250,0.3), rgba(124,58,237,0.15))",
+              }}
+            >
+              🎼
+            </div>
+          </div>
+        </Link>
       </div>
 
       <div className="bg-[#0a0a0a] pb-8">
@@ -1819,7 +1563,7 @@ export default function HomePage() {
           </Rail>
         )}
 
-        {allSongs.length === 0 && generatedSongs.length === 0 && (
+        {allSongs.length === 0 && (
           <div className="px-6 pt-6">
             <div className="rounded-2xl border border-[#141414] p-8 text-center">
               <Music2 size={28} className="text-[#1e1e1e] mx-auto mb-3" />
