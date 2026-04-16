@@ -17,6 +17,8 @@ export interface Song {
   status: "pending" | "processing" | "complete" | "error";
   /** Lifetime stream sayısı (30sn+ dinleme = 1 stream) */
   playCount?: number;
+  /** Son 7 gün stream sayısı (trending sıralama sinyali) */
+  playCount7d?: number;
   /** Toplam beğeni sayısı (song_likes tablosundan denormalize) */
   likeCount?: number;
   /** O anki kullanıcı bu şarkıyı beğendi mi? (opsiyonel, frontend için) */

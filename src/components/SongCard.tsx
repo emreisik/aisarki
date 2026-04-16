@@ -2,16 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import {
-  Play,
-  Music2,
-  Loader2,
-  MoreHorizontal,
-  Trash2,
-  Heart,
-} from "lucide-react";
+import { Play, Music2, Loader2, Heart } from "lucide-react";
 import { Song } from "@/types";
 import { formatListenerCount } from "@/lib/formatNumber";
+import SongMenu from "./SongMenu";
 
 interface SongCardProps {
   song: Song;
@@ -196,24 +190,12 @@ export default function SongCard({
               {fmtDur(song.duration)}
             </span>
           )}
-          {onDelete ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(song);
-              }}
-              className="p-1 pressable text-[#535353] hover:text-red-400 transition-colors"
-            >
-              <Trash2 size={16} />
-            </button>
-          ) : (
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="p-1 pressable"
-            >
-              <MoreHorizontal size={18} className="text-[#535353]" />
-            </button>
-          )}
+          <SongMenu
+            song={song}
+            onDelete={onDelete}
+            iconClassName="text-[#535353] hover:text-white"
+            iconSize={18}
+          />
         </div>
       </div>
     );
@@ -222,11 +204,11 @@ export default function SongCard({
   // Grid variant
   return (
     <div
-      className="group pressable rounded-xl overflow-hidden bg-[#111] active:opacity-80"
+      className="group pressable rounded-xl bg-[#111] active:opacity-80"
       onClick={() => (onDetail ? onDetail(song) : ready && onPlay(song))}
     >
       {/* Cover */}
-      <div className="relative aspect-square bg-[#222]">
+      <div className="relative aspect-square bg-[#222] rounded-t-xl overflow-hidden">
         {song.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -310,11 +292,23 @@ export default function SongCard({
             {song.style?.split(",")[0] || "Hubeya"}
           </p>
         )}
-        {song.playCount != null && song.playCount > 0 && (
-          <p className="text-[#535353] text-[11px] tabular-nums mt-0.5">
-            {formatListenerCount(song.playCount)} dinlenme
-          </p>
-        )}
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          {song.playCount != null && song.playCount > 0 ? (
+            <p className="text-[#535353] text-[11px] tabular-nums">
+              {formatListenerCount(song.playCount)} dinlenme
+            </p>
+          ) : (
+            <span />
+          )}
+          {song.status === "complete" && song.audioUrl && (
+            <SongMenu
+              song={song}
+              onDelete={onDelete}
+              iconClassName="text-[#535353] hover:text-white"
+              iconSize={16}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

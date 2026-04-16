@@ -369,6 +369,8 @@ function rowToSong(row: Record<string, unknown>): Song {
     duration: row.duration != null ? Number(row.duration) : undefined,
     status: row.status as Song["status"],
     playCount: row.play_count != null ? Number(row.play_count) : undefined,
+    playCount7d:
+      row.play_count_7d != null ? Number(row.play_count_7d) : undefined,
     likeCount: row.like_count != null ? Number(row.like_count) : undefined,
     commentCount:
       row.comment_count != null ? Number(row.comment_count) : undefined,
