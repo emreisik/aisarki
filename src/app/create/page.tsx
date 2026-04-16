@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Song } from "@/types";
 import MusicGenerator from "@/components/MusicGenerator";
-import { ProcessingTask } from "@/components/ProcessingBanner";
+import ProcessingBanner, {
+  ProcessingTask,
+} from "@/components/ProcessingBanner";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Music2, ListPlus, Play, Pause, Clock3 } from "lucide-react";
 
@@ -359,31 +361,50 @@ export default function CreatePage() {
     pollingRef.current.set(taskId, timer);
   }, []);
 
-  // On mount: load processing tasks from DB
+  // Mount + periyodik (5sn) — processing + failed task'ları çek
   useEffect(() => {
-    fetch("/api/all-songs")
-      .then((r) => r.json())
-      .then((d) => {
-        if (!mountedRef.current) return;
+    let cancelled = false;
+    const fetchTasks = async () => {
+      try {
+        const res = await fetch("/api/all-songs", { cache: "no-store" });
+        const d = await res.json();
+        if (cancelled || !mountedRef.current) return;
         const tasks: Array<{
           taskId: string;
           prompt: string;
           startedAt: string;
+          status?: "processing" | "failed";
           imageUrl?: string;
           title?: string;
+          errorTitle?: string;
+          errorMessage?: string;
         }> = d.processing ?? [];
-        if (tasks.length > 0) {
-          setProcessingTasks(
-            tasks.map((t) => ({
-              taskId: t.taskId,
-              title: t.title || t.prompt?.slice(0, 50) || "Şarkı",
-              startedAt: t.startedAt,
-              imageUrl: t.imageUrl,
-            })),
-          );
-        }
-      })
-      .catch(() => {});
+        // Mevcut completed olanları koru; processing/failed'leri güncelle
+        setProcessingTasks((prev) => {
+          // prev içinde sadece polling'de eklenen local state olabilir, DB'den geleni tercih et
+          const next = tasks.map((t) => ({
+            taskId: t.taskId,
+            title: t.title || t.prompt?.slice(0, 50) || "Şarkı",
+            startedAt: t.startedAt,
+            imageUrl: t.imageUrl,
+            failed: t.status === "failed",
+            errorTitle: t.errorTitle,
+            errorMessage: t.errorMessage,
+            // Local attempt sayısını koru (polling tracking için)
+            attempts: prev.find((p) => p.taskId === t.taskId)?.attempts,
+          }));
+          return next;
+        });
+      } catch {
+        /* sessizce geç */
+      }
+    };
+    fetchTasks();
+    const id = setInterval(fetchTasks, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
 
   // Start polling for each task
@@ -431,6 +452,39 @@ export default function CreatePage() {
     [router],
   );
 
+  const handleDismissFailed = useCallback(async (taskId: string) => {
+    setProcessingTasks((prev) => prev.filter((t) => t.taskId !== taskId));
+    try {
+      await fetch(`/api/processing-tasks/${taskId}`, { method: "DELETE" });
+    } catch {
+      /* sessizce geç */
+    }
+  }, []);
+
+  const [retryingTaskId, setRetryingTaskId] = useState<string | null>(null);
+  const handleRetry = useCallback(
+    async (taskId: string) => {
+      if (retryingTaskId) return;
+      setRetryingTaskId(taskId);
+      try {
+        const res = await fetch(`/api/tasks/${taskId}/retry`, {
+          method: "POST",
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setProcessingTasks((prev) => prev.filter((t) => t.taskId !== taskId));
+        } else {
+          alert(data.error || "Yeniden başlatılamadı");
+        }
+      } catch {
+        alert("Bağlantı hatası");
+      } finally {
+        setRetryingTaskId(null);
+      }
+    },
+    [retryingTaskId],
+  );
+
   const hasActivity = processingTasks.length > 0 || completedSongs.length > 0;
 
   return (
@@ -449,27 +503,49 @@ export default function CreatePage() {
           <MusicGenerator onTaskStarted={handleTaskStarted} />
         </div>
 
-        {/* Right column: completed only (processing yukarıya taşındı) */}
-        {completedSongs.length > 0 && (
-          <div className="w-full md:flex-1 md:min-w-0">
+        {/* Right column: processing + completed + empty state */}
+        <div className="w-full md:flex-1 md:min-w-0 flex flex-col gap-4">
+          {/* Processing/failed inline panel — kullanıcı sonucu burada alacak */}
+          {processingTasks.length > 0 && (
+            <div>
+              <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-3">
+                Üretim Süreci
+              </p>
+              <ProcessingBanner
+                tasks={processingTasks}
+                onDismissFailed={handleDismissFailed}
+                onCancel={handleDismissFailed}
+                onRetry={handleRetry}
+                retryingTaskId={retryingTaskId}
+              />
+              <p className="text-[#6a6a6a] text-xs mt-3 flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#1db954] animate-pulse" />
+                Şarkın burada hazır olduğunda dinleyebileceksin — diğer
+                sayfalara da sonra eklenir
+              </p>
+            </div>
+          )}
+
+          {/* Tamamlananlar */}
+          {completedSongs.length > 0 && (
             <CompletedSection
               songs={completedSongs}
               onPlay={handlePlay}
               currentSongId={currentSong?.id}
               onAddToPlaylist={handleAddToPlaylist}
             />
-          </div>
-        )}
+          )}
 
-        {/* Empty state — no activity */}
-        {!hasActivity && (
-          <div className="hidden md:flex flex-col items-center justify-center flex-1 py-16 text-center">
-            <Music2 size={40} className="text-[#535353] mb-3" />
-            <p className="text-[#535353] text-sm">
-              Oluşturduğun şarkılar burada görünür
-            </p>
-          </div>
-        )}
+          {/* Empty state — no activity */}
+          {!hasActivity && (
+            <div className="hidden md:flex flex-col items-center justify-center py-16 text-center">
+              <Music2 size={40} className="text-[#535353] mb-3" />
+              <p className="text-[#535353] text-sm">
+                Oluşturduğun şarkılar burada görünür
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import ProcessingBanner, { ProcessingTask } from "./ProcessingBanner";
@@ -13,7 +14,11 @@ import ProcessingBanner, { ProcessingTask } from "./ProcessingBanner";
 export default function GlobalProcessingBanner() {
   const { data: session } = useSession();
   const { currentSong } = usePlayer();
+  const pathname = usePathname();
   const [tasks, setTasks] = useState<ProcessingTask[]>([]);
+
+  // /create sayfasında inline panel var, floating banner'ı gizle
+  const hideOnCreate = pathname === "/create";
 
   useEffect(() => {
     if (!session?.user) {
@@ -93,6 +98,7 @@ export default function GlobalProcessingBanner() {
     }
   };
 
+  if (hideOnCreate) return null;
   if (tasks.length === 0) return null;
 
   // Mobil: MiniPlayer ve BottomNav'ın üstünde; desktop: alt player bar üstünde
