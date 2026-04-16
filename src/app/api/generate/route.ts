@@ -27,9 +27,12 @@ if (!SUNO_API_KEY && process.env.NODE_ENV === "production") {
 }
 
 function getCallbackUrl(request: NextRequest): string {
-  // Use APP_URL env if set (production), otherwise derive from request origin
-  if (process.env.APP_URL) {
-    return `${process.env.APP_URL}/api/callback`;
+  // APP_URL env varsa kullan; Railway/Vercel dashboard'da yanlışlıkla
+  // newline/whitespace/trailing slash gelebiliyor — savunmacı normalize et.
+  const raw = process.env.APP_URL?.trim();
+  if (raw) {
+    const base = raw.replace(/\/+$/, "");
+    return `${base}/api/callback`;
   }
   const { origin } = new URL(request.url);
   return `${origin}/api/callback`;

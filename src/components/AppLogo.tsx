@@ -13,7 +13,7 @@ function HIcon({ px }: { px: number }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/hubera-svg.png"
+      src="/test.png"
       alt="Hubeya"
       width={px}
       height={px}

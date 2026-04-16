@@ -16,7 +16,7 @@ export async function POST(
 
   // Playlist sahibi mi?
   const pl =
-    await sql`SELECT id FROM playlists WHERE id = ${id} AND user_id = ${session.user.id} LIMIT 1`;
+    await sql`SELECT id FROM playlists WHERE id = ${id}::uuid AND user_id = ${session.user.id}::uuid LIMIT 1`;
   if (pl.length === 0) {
     return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
   }
@@ -24,26 +24,26 @@ export async function POST(
   // En yüksek pozisyonu bul
   const pos = await sql`
     SELECT COALESCE(MAX(position), -1) + 1 as next_pos
-    FROM playlist_songs WHERE playlist_id = ${id}
+    FROM playlist_songs WHERE playlist_id = ${id}::uuid
   `;
   const nextPos = pos[0].next_pos as number;
 
   await sql`
     INSERT INTO playlist_songs (playlist_id, song_id, position)
-    VALUES (${id}, ${songId}, ${nextPos})
+    VALUES (${id}::uuid, ${songId}, ${nextPos})
     ON CONFLICT (playlist_id, song_id) DO NOTHING
   `;
 
-  await sql`UPDATE playlists SET updated_at = NOW() WHERE id = ${id}`;
+  await sql`UPDATE playlists SET updated_at = NOW() WHERE id = ${id}::uuid`;
 
   // Cover güncelle (ilk şarkının görseli)
   await sql`
     UPDATE playlists SET cover_url = (
       SELECT s.image_url FROM playlist_songs ps
       JOIN songs s ON s.id = ps.song_id
-      WHERE ps.playlist_id = ${id} AND s.image_url IS NOT NULL
+      WHERE ps.playlist_id = ${id}::uuid AND s.image_url IS NOT NULL
       ORDER BY ps.position ASC LIMIT 1
-    ) WHERE id = ${id}
+    ) WHERE id = ${id}::uuid
   `;
 
   return NextResponse.json({ ok: true });
@@ -62,13 +62,13 @@ export async function DELETE(
   const { songId } = await req.json();
 
   const pl =
-    await sql`SELECT id FROM playlists WHERE id = ${id} AND user_id = ${session.user.id} LIMIT 1`;
+    await sql`SELECT id FROM playlists WHERE id = ${id}::uuid AND user_id = ${session.user.id}::uuid LIMIT 1`;
   if (pl.length === 0) {
     return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
   }
 
-  await sql`DELETE FROM playlist_songs WHERE playlist_id = ${id} AND song_id = ${songId}`;
-  await sql`UPDATE playlists SET updated_at = NOW() WHERE id = ${id}`;
+  await sql`DELETE FROM playlist_songs WHERE playlist_id = ${id}::uuid AND song_id = ${songId}`;
+  await sql`UPDATE playlists SET updated_at = NOW() WHERE id = ${id}::uuid`;
 
   return NextResponse.json({ ok: true });
 }

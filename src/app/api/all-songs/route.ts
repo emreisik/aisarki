@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getAllSongs, getProcessingTasks } from "@/lib/taskStore";
 import { auth } from "@/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -10,8 +10,11 @@ export async function GET() {
     }
 
     const userId = session.user.id;
+    const limitParam = req.nextUrl.searchParams.get("limit");
+    const limit = limitParam ? Math.min(Number(limitParam) || 0, 200) : 0;
+
     const [songs, processing] = await Promise.all([
-      getAllSongs(userId),
+      getAllSongs(userId, limit),
       getProcessingTasks(userId),
     ]);
     return NextResponse.json({ songs, processing });

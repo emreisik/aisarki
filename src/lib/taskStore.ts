@@ -427,8 +427,13 @@ export async function getSongsByTaskId(taskId: string): Promise<Song[]> {
   return rows.map(rowToSong);
 }
 
-export async function getAllSongs(userId?: string): Promise<Song[]> {
+export async function getAllSongs(
+  userId?: string,
+  limit?: number,
+): Promise<Song[]> {
   await ensureSchema();
+  // Neon HTTP adapter LIMIT değerini template literal'da kabul ediyor; 0 = limitsiz
+  const lim = limit && limit > 0 ? limit : 10000;
   const rows = userId
     ? await sql`
         SELECT
@@ -442,6 +447,7 @@ export async function getAllSongs(userId?: string): Promise<Song[]> {
         WHERE s.created_by = ${userId}
           AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
         ORDER BY s.created_at DESC
+        LIMIT ${lim}
       `
     : await sql`
         SELECT
@@ -454,6 +460,7 @@ export async function getAllSongs(userId?: string): Promise<Song[]> {
         LEFT JOIN users u ON u.id::text = s.created_by
         WHERE (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
         ORDER BY s.created_at DESC
+        LIMIT ${lim}
       `;
   return rows.map(rowToSong);
 }
@@ -616,19 +623,19 @@ export async function toggleFollow(
   await ensureSchema();
   const existing = await sql`
     SELECT 1 FROM follows
-    WHERE follower_id = ${followerId} AND following_id = ${followingId}
+    WHERE follower_id::text = ${followerId} AND following_id::text = ${followingId}
     LIMIT 1
   `;
   if (existing.length > 0) {
     await sql`
       DELETE FROM follows
-      WHERE follower_id = ${followerId} AND following_id = ${followingId}
+      WHERE follower_id::text = ${followerId} AND following_id::text = ${followingId}
     `;
     return false; // artık takip etmiyor
   } else {
     await sql`
       INSERT INTO follows (follower_id, following_id)
-      VALUES (${followerId}, ${followingId})
+      VALUES (${followerId}::uuid, ${followingId}::uuid)
       ON CONFLICT DO NOTHING
     `;
     return true; // artık takip ediyor
@@ -642,7 +649,7 @@ export async function isFollowing(
   await ensureSchema();
   const rows = await sql`
     SELECT 1 FROM follows
-    WHERE follower_id = ${followerId} AND following_id = ${followingId}
+    WHERE follower_id::text = ${followerId} AND following_id::text = ${followingId}
     LIMIT 1
   `;
   return rows.length > 0;
@@ -651,14 +658,14 @@ export async function isFollowing(
 export async function getFollowerCount(userId: string): Promise<number> {
   await ensureSchema();
   const rows =
-    await sql`SELECT COUNT(*)::int AS n FROM follows WHERE following_id = ${userId}`;
+    await sql`SELECT COUNT(*)::int AS n FROM follows WHERE following_id::text = ${userId}`;
   return (rows[0]?.n as number) ?? 0;
 }
 
 export async function getFollowingCount(userId: string): Promise<number> {
   await ensureSchema();
   const rows =
-    await sql`SELECT COUNT(*)::int AS n FROM follows WHERE follower_id = ${userId}`;
+    await sql`SELECT COUNT(*)::int AS n FROM follows WHERE follower_id::text = ${userId}`;
   return (rows[0]?.n as number) ?? 0;
 }
 
@@ -676,9 +683,9 @@ export async function getFollowFeed(
       u.username     AS creator_username,
       u.avatar_url   AS creator_image
     FROM songs s
-    JOIN follows f ON f.following_id = s.created_by
+    JOIN follows f ON f.following_id::text = s.created_by
     LEFT JOIN users u ON u.id::text = s.created_by
-    WHERE f.follower_id = ${userId}
+    WHERE f.follower_id::text = ${userId}
       AND s.status = 'complete'
       AND s.audio_key IS NOT NULL
     ORDER BY s.created_at DESC
@@ -776,7 +783,7 @@ export async function getUserStats(userId: string): Promise<UserStats> {
            AND s.status = 'complete'
            AND s.audio_key IS NOT NULL) AS song_count
     FROM users u
-    WHERE u.id = ${userId}
+    WHERE u.id::text = ${userId}
     LIMIT 1
   `;
   const r = rows[0];
@@ -984,8 +991,8 @@ export async function recomputeStats(): Promise<{
       GROUP BY created_by
     )
     UPDATE users u
-    SET monthly_listeners = COALESCE((SELECT n FROM user_listeners WHERE user_id = u.id)::int, 0),
-        total_streams     = COALESCE((SELECT total FROM user_totals WHERE user_id = u.id), 0)
+    SET monthly_listeners = COALESCE((SELECT n FROM user_listeners WHERE user_id = u.id::text)::int, 0),
+        total_streams     = COALESCE((SELECT total FROM user_totals WHERE user_id = u.id::text), 0)
     RETURNING u.id
   `;
 

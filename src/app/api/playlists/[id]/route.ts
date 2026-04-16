@@ -13,7 +13,7 @@ export async function GET(
     SELECT p.*, u.username, u.display_name
     FROM playlists p
     JOIN users u ON u.id = p.user_id
-    WHERE p.id = ${id}
+    WHERE p.id = ${id}::uuid
     LIMIT 1
   `;
   if (rows.length === 0) {
@@ -24,7 +24,7 @@ export async function GET(
     SELECT s.*, ps.position, ps.added_at
     FROM playlist_songs ps
     JOIN songs s ON s.id = ps.song_id
-    WHERE ps.playlist_id = ${id} AND s.audio_key IS NOT NULL
+    WHERE ps.playlist_id = ${id}::uuid AND s.audio_key IS NOT NULL
     ORDER BY ps.position ASC, ps.added_at ASC
   `;
 
@@ -84,7 +84,7 @@ export async function PUT(
   await sql`
     UPDATE playlists
     SET title = ${title}, description = ${description ?? null}, updated_at = NOW()
-    WHERE id = ${id} AND user_id = ${session.user.id}
+    WHERE id = ${id}::uuid AND user_id = ${session.user.id}::uuid
   `;
 
   return NextResponse.json({ ok: true });
@@ -104,7 +104,7 @@ export async function DELETE(
   // Önce sahibi olduğumuzu doğrula (404/403 ayrımı için)
   const owns = await sql`
     SELECT 1 FROM playlists
-    WHERE id = ${id} AND user_id = ${session.user.id}
+    WHERE id = ${id}::uuid AND user_id = ${session.user.id}::uuid
     LIMIT 1
   `;
   if (owns.length === 0) {
@@ -115,8 +115,8 @@ export async function DELETE(
   }
 
   // Orphan kayıtları temizle, sonra playlist'i sil
-  await sql`DELETE FROM playlist_songs WHERE playlist_id = ${id}`;
-  await sql`DELETE FROM playlists WHERE id = ${id} AND user_id = ${session.user.id}`;
+  await sql`DELETE FROM playlist_songs WHERE playlist_id = ${id}::uuid`;
+  await sql`DELETE FROM playlists WHERE id = ${id}::uuid AND user_id = ${session.user.id}::uuid`;
 
   return NextResponse.json({ ok: true });
 }

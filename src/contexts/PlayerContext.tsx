@@ -117,8 +117,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const { song, playlist: pl, index, time, isOpen } = JSON.parse(raw);
-      // Sadece kalıcı audioUrl (Bunny CDN) varsa oynatabilir
-      if (!song?.audioUrl) return;
+      // audioUrl (Bunny CDN) veya streamUrl (Suno geçici) — ikisinden biri yeterli
+      if (!song?.audioUrl && !song?.streamUrl) return;
 
       restoreTimeRef.current = time ?? 0;
       setCurrentSong(song);
@@ -132,8 +132,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // ── Şarkı değişince yükle ──
   useEffect(() => {
     if (!audioRef.current) return;
-    // Sadece kalıcı audioUrl (Bunny CDN) — stream URL fallback yok (duration sorununu önler)
-    const playableUrl = currentSong?.audioUrl;
+    // audioUrl (Bunny CDN) öncelikli; yoksa streamUrl (Suno geçici) ile çal.
+    // Duration Infinity/NaN gelirse handleTimeUpdate fallback ediyor (satır 441-445).
+    const playableUrl = currentSong?.audioUrl || currentSong?.streamUrl;
     if (!playableUrl) return;
 
     const savedTime = restoreTimeRef.current;
@@ -152,6 +153,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     audioRef.current.src = playableUrl;
     audioRef.current.load();
+
+    // audioUrl (Bunny) yoksa callback sırasında upload kaçmış — self-heal tetikle.
+    // Sessizce arka planda çalışır, sonraki yüklemede kalıcı URL hazır olur.
+    if (!currentSong?.audioUrl && currentSong?.id) {
+      fetch(`/api/song/${currentSong.id}/heal`, {
+        method: "POST",
+        keepalive: true,
+      }).catch(() => {});
+    }
 
     if (savedTime > 1) {
       // Geri yükleme: pozisyona seek et, ama çalma
@@ -435,6 +445,27 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ── Audio metadata yüklenince DB'deki NULL duration'ı geri yaz ──
+  // Suno "first" callback'te duration NULL gelebiliyor; burada öğrenince sunucuya bildiriyoruz.
+  const durationSyncedRef = useRef<string | null>(null);
+  const handleLoadedMetadata = useCallback(() => {
+    const song = currentSongRef.current;
+    if (!song?.id) return;
+    if (song.duration && song.duration > 0) return;
+    if (durationSyncedRef.current === song.id) return;
+
+    const d = audioRef.current?.duration;
+    if (!Number.isFinite(d) || !d || d <= 0) return;
+
+    durationSyncedRef.current = song.id;
+    fetch(`/api/song/${song.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ duration: Math.round(d) }),
+      keepalive: true,
+    }).catch(() => {});
+  }, []);
+
   const handleTimeUpdate = useCallback(() => {
     const t = audioRef.current?.currentTime ?? 0;
     const audioD = audioRef.current?.duration ?? 0;
@@ -566,6 +597,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
         onDurationChange={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
         onEnded={handleEnded}
         onError={handleAudioError}
         playsInline

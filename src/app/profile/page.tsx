@@ -57,6 +57,11 @@ export default function ProfilePage() {
             })
         : Promise.resolve(),
     ]).finally(() => setLoading(false));
+
+    // Callback'in kaçırdığı şarkıları arka planda Bunny'ye taşı (idempotent).
+    fetch("/api/songs/heal", { method: "POST", keepalive: true }).catch(
+      () => {},
+    );
   }, [status]);
 
   if (status === "loading" || status === "unauthenticated") {

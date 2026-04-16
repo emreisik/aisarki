@@ -46,7 +46,7 @@ export async function GET() {
     SELECT p.*, COUNT(ps.song_id)::int as song_count
     FROM playlists p
     LEFT JOIN playlist_songs ps ON ps.playlist_id = p.id
-    WHERE p.user_id = ${session.user.id}
+    WHERE p.user_id::text = ${session.user.id}
     GROUP BY p.id
     ORDER BY p.updated_at DESC
   `;
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
   const rows = await sql`
     INSERT INTO playlists (user_id, title, description, is_public, type)
-    VALUES (${session.user.id}, ${title.trim()}, ${description ?? null}, true, ${collectionType})
+    VALUES (${session.user.id}::uuid, ${title.trim()}, ${description ?? null}, true, ${collectionType})
     RETURNING *
   `;
 
