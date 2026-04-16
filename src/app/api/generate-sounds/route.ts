@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { saveProcessingTask } from "@/lib/taskStore";
+import { saveProcessingTask, markTaskFailed } from "@/lib/taskStore";
+import { translateSunoError } from "@/lib/sunoErrors";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
@@ -112,12 +113,23 @@ export async function POST(request: NextRequest) {
     if (!response.ok || data.code !== 200) {
       const rawMsg: string =
         data.message || data.error || data.msg || "Ses üretimi başlatılamadı";
+      const translated = translateSunoError(data.code, rawMsg);
       if (taskId) {
         saveProcessingTask(taskId, prompt.trim(), session.user.id).catch((e) =>
           console.error("[db] saveProcessingTask hatası:", e),
         );
+        markTaskFailed(taskId, translated.title, translated.message).catch(
+          () => {},
+        );
       }
-      return NextResponse.json({ error: rawMsg }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: `${translated.title}: ${translated.message}`,
+          errorTitle: translated.title,
+          errorCode: data.code,
+        },
+        { status: 400 },
+      );
     }
 
     if (taskId) {

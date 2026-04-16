@@ -3,10 +3,12 @@ import { after } from "next/server";
 import {
   setTaskSongs,
   markTaskComplete,
+  markTaskFailed,
   getTaskCreatedBy,
   updateSongAudioKey,
   updateSongImageKey,
 } from "@/lib/taskStore";
+import { translateSunoError, extractSunoError } from "@/lib/sunoErrors";
 import { sendPushToUser } from "@/lib/pushNotification";
 import {
   uploadAudioFromUrl,
@@ -105,6 +107,34 @@ export async function POST(request: NextRequest) {
 
     if (!taskId) {
       console.warn("taskId yok, atlanıyor");
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Suno hata kodu yakalama ──
+    // Callback'te code != 200 veya data.status = failed gelirse task'ı failed yap
+    const sunoError = extractSunoError(body);
+    if (sunoError) {
+      const translated = translateSunoError(sunoError.code, sunoError.message);
+      console.warn(
+        `[callback] Suno error code=${sunoError.code} → ${translated.title}: ${translated.message}`,
+      );
+      markTaskFailed(taskId, translated.title, translated.message).catch(
+        () => {},
+      );
+
+      // Kullanıcıya push bildirimi gönder (varsa)
+      getTaskCreatedBy(taskId)
+        .then((userId) => {
+          if (!userId) return;
+          return sendPushToUser(userId, {
+            title: translated.title,
+            body: translated.message,
+            url: "/create",
+            tag: `song-failed-${taskId}`,
+          });
+        })
+        .catch(() => {});
+
       return NextResponse.json({ ok: true });
     }
 

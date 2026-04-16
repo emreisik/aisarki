@@ -30,8 +30,11 @@ export default function GlobalProcessingBanner() {
           taskId: string;
           prompt: string;
           startedAt: string;
+          status?: "processing" | "failed";
           imageUrl?: string;
           title?: string;
+          errorTitle?: string;
+          errorMessage?: string;
         }> = data.processing ?? [];
         setTasks(
           list.map((t) => ({
@@ -39,6 +42,9 @@ export default function GlobalProcessingBanner() {
             title: t.title || t.prompt?.slice(0, 50) || "Şarkı",
             startedAt: t.startedAt,
             imageUrl: t.imageUrl,
+            failed: t.status === "failed",
+            errorTitle: t.errorTitle,
+            errorMessage: t.errorMessage,
           })),
         );
       } catch {
@@ -53,6 +59,17 @@ export default function GlobalProcessingBanner() {
     };
   }, [session?.user]);
 
+  const handleDismissFailed = async (taskId: string) => {
+    // UI'dan hemen kaldır
+    setTasks((prev) => prev.filter((t) => t.taskId !== taskId));
+    // Backend'den de sil
+    try {
+      await fetch(`/api/processing-tasks/${taskId}`, { method: "DELETE" });
+    } catch {
+      /* sessizce geç */
+    }
+  };
+
   if (tasks.length === 0) return null;
 
   // Mobil: MiniPlayer ve BottomNav'ın üstünde; desktop: alt player bar üstünde
@@ -66,7 +83,7 @@ export default function GlobalProcessingBanner() {
       style={{ bottom: mobileBottom }}
     >
       <div className="pointer-events-auto">
-        <ProcessingBanner tasks={tasks} />
+        <ProcessingBanner tasks={tasks} onDismissFailed={handleDismissFailed} />
       </div>
     </div>
   );

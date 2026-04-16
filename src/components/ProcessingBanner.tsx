@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 
 export interface ProcessingTask {
   taskId: string;
@@ -9,6 +9,8 @@ export interface ProcessingTask {
   attempts?: number;
   failed?: boolean;
   imageUrl?: string;
+  errorTitle?: string;
+  errorMessage?: string;
 }
 
 export default function ProcessingBanner({
@@ -125,41 +127,41 @@ export default function ProcessingBanner({
         </div>
       )}
 
-      {failedTasks.length > 0 && (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-3 flex flex-col gap-2">
-          <p className="text-red-400 text-sm font-semibold">
-            Oluşturma zaman aşımına uğradı
-          </p>
-          {failedTasks.map((t) => (
-            <div
-              key={t.taskId}
-              className="flex items-center justify-between gap-2"
-            >
-              <p className="text-[#a7a7a7] text-xs truncate flex-1">
-                {t.title}
-              </p>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <a
-                  href={`/api/debug-task?taskId=${t.taskId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#a7a7a7] hover:text-white text-xs underline"
-                >
-                  Detay
-                </a>
-                {onDismissFailed && (
-                  <button
-                    onClick={() => onDismissFailed(t.taskId)}
-                    className="text-[#535353] hover:text-red-400 text-xs transition-colors"
-                  >
-                    Kapat
-                  </button>
-                )}
-              </div>
+      {failedTasks.map((t) => (
+        <div
+          key={t.taskId}
+          className="rounded-2xl border border-red-500/40 bg-gradient-to-br from-[#2a0d0d] to-[#1a0808] shadow-[0_0_30px_rgba(239,68,68,0.15)] overflow-hidden"
+        >
+          <div className="h-1 w-full bg-gradient-to-r from-red-500 via-red-400 to-red-500" />
+          <div className="px-4 py-4 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle size={18} className="text-red-400" />
             </div>
-          ))}
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-sm font-bold">
+                {t.errorTitle || "Şarkı oluşturulamadı"}
+              </p>
+              <p className="text-red-200/80 text-xs mt-1 leading-relaxed">
+                {t.errorMessage ||
+                  "Şarkı üretimi tamamlanamadı. Kredilerin iade edildi, lütfen tekrar dene."}
+              </p>
+              {t.title && (
+                <p className="text-[#7a7a7a] text-[11px] mt-2 italic truncate">
+                  &ldquo;{t.title}&rdquo;
+                </p>
+              )}
+              {onDismissFailed && (
+                <button
+                  onClick={() => onDismissFailed(t.taskId)}
+                  className="mt-3 text-xs font-semibold text-red-300 hover:text-white border border-red-500/40 hover:border-red-500 hover:bg-red-500/10 rounded-full px-3 py-1 transition-colors pressable"
+                >
+                  Tamam, kapat
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }

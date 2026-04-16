@@ -67,6 +67,8 @@ async function ensureSchema() {
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS audio_key TEXT`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS image_key TEXT`,
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by TEXT`,
+    sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_title TEXT`,
+    sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS error_message TEXT`,
   ]) {
     try {
       await stmt;
@@ -101,6 +103,26 @@ export async function markTaskComplete(taskId: string): Promise<void> {
   }
 }
 
+export async function markTaskFailed(
+  taskId: string,
+  errorTitle: string,
+  errorMessage: string,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    await sql`
+      UPDATE tasks
+      SET status = 'failed',
+          error_title = ${errorTitle},
+          error_message = ${errorMessage}
+      WHERE task_id = ${taskId}
+    `;
+    console.log(`[db] task ${taskId} → failed: ${errorTitle}`);
+  } catch (e) {
+    console.error("[db] markTaskFailed hatası:", e);
+  }
+}
+
 export async function getTaskCreatedBy(taskId: string): Promise<string | null> {
   try {
     await ensureSchema();
@@ -116,9 +138,12 @@ export interface ProcessingTask {
   taskId: string;
   prompt: string;
   startedAt: string;
+  status: "processing" | "failed";
   // Suno callback "first" aşamasında geçici cover image gelir — UI blur'lu gösterir
   imageUrl?: string;
   title?: string;
+  errorTitle?: string;
+  errorMessage?: string;
 }
 
 export async function getProcessingTasks(
@@ -128,23 +153,22 @@ export async function getProcessingTasks(
     await ensureSchema();
     const rows = userId
       ? await sql`
-          SELECT task_id, prompt, created_at
+          SELECT task_id, prompt, created_at, status, error_title, error_message
           FROM tasks
-          WHERE status = 'processing'
+          WHERE status IN ('processing', 'failed')
             AND created_at > NOW() - INTERVAL '2 hours'
             AND created_by = ${userId}
           ORDER BY created_at DESC
         `
       : await sql`
-          SELECT task_id, prompt, created_at
+          SELECT task_id, prompt, created_at, status, error_title, error_message
           FROM tasks
-          WHERE status = 'processing'
+          WHERE status IN ('processing', 'failed')
             AND created_at > NOW() - INTERVAL '2 hours'
           ORDER BY created_at DESC
         `;
     return rows.map((r) => {
       const taskId = r.task_id as string;
-      // In-memory cache'ten geçici cover image al (callback first aşamasında geldi)
       const cached = taskStore.get(taskId);
       const firstWithImage = cached?.find((s) => s.imageUrl);
       return {
@@ -154,12 +178,32 @@ export async function getProcessingTasks(
           r.created_at instanceof Date
             ? r.created_at.toISOString()
             : (r.created_at as string),
+        status: (r.status as "processing" | "failed") ?? "processing",
         imageUrl: firstWithImage?.imageUrl,
         title: cached?.[0]?.title,
+        errorTitle: (r.error_title as string) ?? undefined,
+        errorMessage: (r.error_message as string) ?? undefined,
       };
     });
   } catch {
     return [];
+  }
+}
+
+export async function dismissFailedTask(
+  taskId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    await sql`
+      DELETE FROM tasks
+      WHERE task_id = ${taskId}
+        AND status = 'failed'
+        AND created_by = ${userId}
+    `;
+  } catch (e) {
+    console.error("[db] dismissFailedTask hatası:", e);
   }
 }
 

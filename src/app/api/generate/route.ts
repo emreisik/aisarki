@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GenerateRequest, SunoApiResponse } from "@/types";
-import { saveProcessingTask } from "@/lib/taskStore";
+import { saveProcessingTask, markTaskFailed } from "@/lib/taskStore";
 import { auth } from "@/auth";
+import { translateSunoError } from "@/lib/sunoErrors";
 import {
   ARTIST_PRESETS,
   GENRES,
@@ -171,7 +172,6 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok || data.code !== 200) {
       console.log("Suno reject:", JSON.stringify(data));
-      // Suno bazen hatayı farklı field'larda döndürüyor
       const rawData = data as unknown as Record<string, unknown>;
       const rawMsg: string =
         (rawData.message as string) ||
@@ -179,25 +179,26 @@ export async function POST(request: NextRequest) {
         data.msg ||
         "Müzik oluşturulamadı";
 
-      // Hata mesajlarını Türkçeye çevir
-      let userMsg = rawMsg;
-      if (rawMsg.toLowerCase().includes("artist name")) {
-        userMsg = `Prompt'ta sanatçı adı tespit edildi. Lütfen şu kelimeyi değiştir: "${rawMsg.match(/artist name (\w+)/i)?.[1] ?? ""}". Farklı bir ifade kullan.`;
-      } else if (rawMsg.toLowerCase().includes("copyrighted")) {
-        userMsg =
-          "Şarkı üretilmedi: Telif hakkı korumalı içerik tespit edildi. Lütfen söz veya özellikleri değiştir ve tekrar deneyin.";
-      }
+      // Suno hata kodunu Türkçe kullanıcı mesajına çevir
+      const translated = translateSunoError(data.code, rawMsg);
+      const userMsg = `${translated.title}: ${translated.message}`;
 
-      // Error durumunda bile taskId varsa kaydet (partial failure case)
+      // Error durumunda taskId varsa kaydet + failed olarak işaretle
       if (taskId) {
         const session = await auth();
         const userId = session?.user?.id ?? undefined;
         saveProcessingTask(taskId, finalPrompt, userId).catch((e) =>
           console.error("[db] saveProcessingTask hatası (error case):", e),
         );
+        markTaskFailed(taskId, translated.title, translated.message).catch(
+          () => {},
+        );
       }
 
-      return NextResponse.json({ error: userMsg }, { status: 400 });
+      return NextResponse.json(
+        { error: userMsg, errorTitle: translated.title, errorCode: data.code },
+        { status: 400 },
+      );
     }
 
     // Başarılı case'de taskId'yi DB'ye kaydet
