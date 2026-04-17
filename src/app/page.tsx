@@ -41,7 +41,6 @@ import { useRouter } from "next/navigation";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useSession } from "next-auth/react";
-import SongCard from "@/components/SongCard";
 import { useLikedIds } from "@/hooks/useLikedIds";
 
 /* ══════════════════════════════════════════════
@@ -1298,33 +1297,41 @@ function CategoryCarousel({
 }
 
 /* ══════════════════════════════════════════════
-   Yardımcı componentler
+   Yardımcı componentler — minimal app design
 ══════════════════════════════════════════════ */
-function fmt(s?: number) {
-  if (!s || isNaN(s)) return "--:--";
-  return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-}
 
-function Rail({
+/* ── Yatay scroll section ── */
+function Section({
   title,
   children,
+  href,
 }: {
   title: string;
   children: React.ReactNode;
+  href?: string;
 }) {
   return (
-    <section className="mb-8">
-      <div className="px-6 mb-3">
-        <h2 className="text-white text-lg font-black">{title}</h2>
+    <section className="mb-6">
+      <div className="flex items-center justify-between px-5 mb-3">
+        <h2 className="text-white text-[17px] font-bold">{title}</h2>
+        {href && (
+          <Link
+            href={href}
+            className="text-[#888] text-[12px] font-semibold pressable"
+          >
+            Tümü
+          </Link>
+        )}
       </div>
-      <div className="flex gap-3 overflow-x-auto scroll-area px-6 pb-2">
+      <div className="flex gap-3 overflow-x-auto scroll-area px-5 pb-1">
         {children}
       </div>
     </section>
   );
 }
 
-function SongTile({
+/* ── Şarkı kartı — minimal, temiz ── */
+function SongCard2({
   song,
   onPlay,
   isPlaying,
@@ -1336,171 +1343,97 @@ function SongTile({
   return (
     <button
       onClick={onPlay}
-      className="flex-shrink-0 w-[148px] bg-[#141414] hover:bg-[#1a1a1a] rounded-xl p-3 transition-colors text-left group pressable"
+      className="flex-shrink-0 w-[130px] text-left pressable"
     >
-      <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#1e1e1e] mb-3">
+      <div className="w-[130px] h-[130px] rounded-lg overflow-hidden bg-[#1a1a1a] mb-2 relative">
         {song.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={song.imageUrl}
             alt={song.title}
             className="w-full h-full object-cover"
-          /> // eslint-disable-line @next/next/no-img-element
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={26} className="text-[#2a2a2a]" />
+            <Music2 size={24} className="text-[#333]" />
           </div>
         )}
-        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
-          {isPlaying ? (
-            <Pause size={13} fill="black" className="text-black" />
-          ) : (
-            <Play size={13} fill="black" className="text-black ml-0.5" />
-          )}
-        </div>
+        {isPlaying && (
+          <div className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-[#1db954] flex items-center justify-center">
+            <span className="flex items-end justify-center gap-[1.5px] h-2.5">
+              {[0, 0.12, 0.24].map((d, k) => (
+                <span
+                  key={k}
+                  className="wave-bar"
+                  style={{
+                    width: "2px",
+                    height: "100%",
+                    animationDelay: `${d}s`,
+                  }}
+                />
+              ))}
+            </span>
+          </div>
+        )}
       </div>
       <p
-        className={`text-xs font-semibold truncate mb-0.5 ${isPlaying ? "text-[#1db954]" : "text-white"}`}
+        className={`text-[13px] font-semibold truncate ${isPlaying ? "text-[#1db954]" : "text-white"}`}
       >
         {song.title}
       </p>
-      <p className="text-[#535353] text-[11px] truncate">
-        {song.style?.split(",")[0] || "Hubeya"}
+      <p className="text-[#666] text-[11px] truncate mt-0.5">
+        {song.creator?.name || song.style?.split(",")[0] || "Hubeya"}
       </p>
     </button>
   );
 }
 
-function PlaylistTile({ playlist }: { playlist: Playlist }) {
+/* ── Playlist kartı — minimal ── */
+function PlaylistCard({ playlist }: { playlist: Playlist }) {
   return (
     <Link
       href={`/playlist/${playlist.id}`}
-      className="flex-shrink-0 w-[148px] bg-[#141414] hover:bg-[#1a1a1a] rounded-xl p-3 transition-colors group pressable"
+      className="flex-shrink-0 w-[130px] pressable"
     >
-      <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-[#1e1e1e] mb-3">
+      <div className="w-[130px] h-[130px] rounded-lg overflow-hidden bg-[#1a1a1a] mb-2">
         {playlist.coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={playlist.coverUrl}
             alt={playlist.title}
             className="w-full h-full object-cover"
-          /> // eslint-disable-line @next/next/no-img-element
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#450af5] to-[#c4efd9]">
-            <ListMusic size={30} className="text-white" />
+            <ListMusic size={24} className="text-white/80" />
           </div>
         )}
-        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
-          <Play size={13} fill="black" className="text-black ml-0.5" />
-        </div>
       </div>
-      <p className="text-white text-xs font-semibold truncate mb-0.5">
+      <p className="text-[13px] font-semibold text-white truncate">
         {playlist.title}
       </p>
-      <p className="text-[#535353] text-[11px]">
+      <p className="text-[#666] text-[11px] mt-0.5">
         {playlist.songCount ?? 0} şarkı
       </p>
     </Link>
   );
 }
 
-function LikedShortcutTile() {
+/* ── Beğenilenler kısayol kartı ── */
+function LikedCard() {
   return (
-    <Link
-      href="/liked"
-      className="flex-shrink-0 w-[148px] bg-[#141414] hover:bg-[#1a1a1a] rounded-xl p-3 transition-colors group pressable"
-    >
+    <Link href="/liked" className="flex-shrink-0 w-[130px] pressable">
       <div
-        className="relative w-full aspect-square rounded-lg overflow-hidden mb-3 flex items-center justify-center"
-        style={{
-          background: "linear-gradient(135deg, #e11d48 0%, #7e22ce 100%)",
-        }}
+        className="w-[130px] h-[130px] rounded-lg overflow-hidden mb-2 flex items-center justify-center"
+        style={{ background: "linear-gradient(135deg, #e11d48, #7e22ce)" }}
       >
-        <Heart size={40} fill="white" className="text-white drop-shadow" />
-        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all">
-          <Play size={13} fill="black" className="text-black ml-0.5" />
-        </div>
+        <Heart size={32} fill="white" className="text-white" />
       </div>
-      <p className="text-white text-xs font-semibold truncate mb-0.5">
-        Beğenilen Şarkılar
+      <p className="text-[13px] font-semibold text-white truncate">
+        Beğenilenler
       </p>
-      <p className="text-[#535353] text-[11px]">Çalma listesi</p>
+      <p className="text-[#666] text-[11px] mt-0.5">Çalma listesi</p>
     </Link>
-  );
-}
-
-function TrackRow({
-  song,
-  index,
-  onPlay,
-  isPlaying,
-}: {
-  song: Song;
-  index: number;
-  onPlay: () => void;
-  isPlaying: boolean;
-}) {
-  return (
-    <button
-      onClick={onPlay}
-      className="w-full flex items-center gap-4 px-4 py-2 rounded-lg hover:bg-[#ffffff08] transition-colors group text-left pressable"
-    >
-      <div className="w-7 text-center flex-shrink-0">
-        {isPlaying ? (
-          <span className="flex items-end justify-center gap-[2px] h-4">
-            {[0, 0.15, 0.3].map((d, i) => (
-              <span
-                key={i}
-                className="wave-bar rounded-sm"
-                style={{
-                  width: "2px",
-                  height: "100%",
-                  animationDelay: `${d}s`,
-                }}
-              />
-            ))}
-          </span>
-        ) : (
-          <>
-            <span className="text-[#535353] text-xs group-hover:hidden">
-              {index + 1}
-            </span>
-            <Play
-              size={12}
-              fill="white"
-              className="text-white hidden group-hover:block mx-auto"
-            />
-          </>
-        )}
-      </div>
-      <div className="w-9 h-9 rounded-lg flex-shrink-0 overflow-hidden bg-[#1e1e1e]">
-        {song.imageUrl ? (
-          <img
-            src={song.imageUrl}
-            alt={song.title}
-            className="w-full h-full object-cover"
-          /> // eslint-disable-line @next/next/no-img-element
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={12} className="text-[#2a2a2a]" />
-          </div>
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p
-          className={`text-sm font-medium truncate ${isPlaying ? "text-[#1db954]" : "text-white"}`}
-        >
-          {song.title}
-        </p>
-        <p className="text-[#535353] text-xs truncate">
-          {song.style?.split(",")[0] || "Hubeya"}
-        </p>
-      </div>
-      {song.status === "processing" && (
-        <span className="w-3.5 h-3.5 border-2 border-[#535353] border-t-transparent rounded-full animate-spin flex-shrink-0" />
-      )}
-      <span className="text-[#535353] text-xs tabular-nums flex-shrink-0">
-        {song.status === "complete" ? fmt(song.duration) : "—"}
-      </span>
-    </button>
   );
 }
 
@@ -1623,34 +1556,65 @@ export default function HomePage() {
   })();
 
   return (
-    <div className="min-h-full">
-      {/* ── Şarkını Oluştur — native app section ── */}
-      <div
-        className="pt-4 pb-6"
-        style={{
-          background:
-            "linear-gradient(180deg, #1a0e2e 0%, #0e1a2e 50%, #0a0a0a 100%)",
-        }}
-      >
-        {/* Başlık + serbest oluşturma linki */}
-        <div className="px-5 mb-5">
-          <p className="text-[#a78bfa] text-[10px] font-bold uppercase tracking-[0.15em]">
-            {greeting}
-          </p>
-          <div className="flex items-end justify-between mt-1">
-            <h1 className="text-white text-[22px] font-black leading-tight">
-              Şarkını oluştur
-            </h1>
-            <Link
-              href="/create"
-              className="text-[#a78bfa] text-xs font-semibold pressable"
-            >
-              Serbest mod &rarr;
-            </Link>
+    <div className="min-h-full bg-[#0a0a0a]">
+      {/* ── Üst: Selamlama + Oluştur ── */}
+      <div className="pt-4 pb-2 px-5">
+        <div className="flex items-center justify-between">
+          <h1 className="text-white text-[22px] font-bold">{greeting}</h1>
+          <Link
+            href="/create"
+            className="text-[13px] text-[#b3b3b3] font-medium pressable"
+          >
+            Serbest mod
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Hızlı erişim grid — Spotify tarzı ── */}
+      {discoverSongs.length > 0 && (
+        <div className="px-4 pt-2 pb-4">
+          <div className="grid grid-cols-2 gap-2">
+            {discoverSongs.slice(0, 4).map((song) => {
+              const active = currentSong?.id === song.id;
+              return (
+                <button
+                  key={song.id}
+                  onClick={() => playSong(song, discoverSongs)}
+                  className={`flex items-center gap-3 h-[48px] rounded overflow-hidden pressable ${
+                    active ? "bg-[#ffffff18]" : "bg-[#ffffff0a]"
+                  }`}
+                >
+                  <div className="w-[48px] h-[48px] flex-shrink-0 overflow-hidden bg-[#1a1a1a]">
+                    {song.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={song.imageUrl}
+                        alt={song.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Music2 size={16} className="text-[#333]" />
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    className={`text-[13px] font-semibold truncate pr-3 ${active ? "text-[#1db954]" : "text-white"}`}
+                  >
+                    {song.title}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
+      )}
 
-        {/* Kategori carousel */}
+      {/* ── Kategori carousel ── */}
+      <div className="pb-4">
+        <div className="px-5 mb-3">
+          <h2 className="text-white text-[17px] font-bold">Şarkını oluştur</h2>
+        </div>
         <CategoryCarousel
           groups={CATEGORY_GROUPS}
           onSelect={(item, color) => setSelectedCat({ item, color })}
@@ -1670,289 +1634,104 @@ export default function HomePage() {
         />
       )}
 
-      <div className="bg-[#0a0a0a] pb-8">
-        {session?.user && (
-          <Rail title="Çalma Listelerim">
-            <LikedShortcutTile />
-            {playlists.map((pl) => (
-              <PlaylistTile key={pl.id} playlist={pl} />
-            ))}
-          </Rail>
-        )}
+      {/* ── Kitaplık ── */}
+      {session?.user && (
+        <Section title="Kitaplığın" href="/playlists">
+          <LikedCard />
+          {playlists.map((pl) => (
+            <PlaylistCard key={pl.id} playlist={pl} />
+          ))}
+        </Section>
+      )}
 
-        {session?.user && feedSongs.length > 0 && (
-          <section className="mb-8">
-            <div className="px-6 mb-2">
-              <h2 className="text-white text-lg font-black">
-                Takip ettiklerinden
-              </h2>
-            </div>
-            <div className="px-2">
-              {feedSongs.map((song) => (
-                <SongCard
-                  key={song.id}
-                  song={song}
-                  variant="row"
-                  onPlay={(s) => playSong(s, feedSongs)}
-                  isPlaying={currentSong?.id === song.id}
-                  liked={likedIds.has(song.id)}
-                  onToggleLike={toggleLiked}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {moreSongs.length > 0 && (
-          <Rail title="Son Şarkılar">
-            {moreSongs.map((song) => (
-              <SongTile
-                key={song.id}
-                song={song}
-                onPlay={() => playSong(song, allSongs)}
-                isPlaying={currentSong?.id === song.id}
-              />
-            ))}
-          </Rail>
-        )}
-
-        {allSongs.length === 0 && (
-          <div className="px-6 pt-6">
-            <div className="rounded-2xl border border-[#141414] p-8 text-center">
-              <Music2 size={28} className="text-[#1e1e1e] mx-auto mb-3" />
-              <p className="text-white text-base font-bold mb-1">
-                İlk şarkını oluştur
-              </p>
-              <p className="text-[#3a3a3a] text-sm">
-                Yukarıdan bir kategori seç
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ══════════════════════════════════════════════
-          Son dinlediklerin
-      ══════════════════════════════════════════════ */}
+      {/* ── Son dinlediklerin ── */}
       {recentPlays.length > 0 && (
-        <div className="bg-[#121212] pt-2">
-          <DiscoverRail
-            title="Son dinlediklerin"
-            songs={recentPlays}
-            onPlay={(s) => playSong(s, recentPlays)}
-            currentSong={currentSong}
-          />
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════
-          Kişiye özel öneriler (Spotify "Sizin için öneriler")
-      ══════════════════════════════════════════════ */}
-      {recommendations.length > 0 && (
-        <div className="bg-[#121212] pt-2">
-          <DiscoverRail
-            title={recsPersonalized ? "Sana özel" : "Popüler öneriler"}
-            songs={recommendations}
-            onPlay={(s) => playSong(s, recommendations)}
-            currentSong={currentSong}
-          />
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════
-          Spotify-tarzı keşif bölümleri
-      ══════════════════════════════════════════════ */}
-      {discoverSongs.length > 0 && (
-        <div className="bg-[#121212] pb-10">
-          {/* Selamlama + hızlı erişim */}
-          <DiscoverGreeting
-            greeting={greeting}
-            songs={discoverSongs.slice(0, 6)}
-            onPlay={(s) => playSong(s, discoverSongs)}
-            currentSong={currentSong}
-          />
-
-          {/* Sanatçı grupları */}
-          {artistGroups.map((group) => (
-            <DiscoverRail
-              key={group.username}
-              title={`${group.name} Şarkıları`}
-              songs={group.songs}
-              onPlay={(s) => playSong(s, discoverSongs)}
-              currentSong={currentSong}
-              artistUsername={group.username}
+        <Section title="Son dinlediklerin">
+          {recentPlays.map((song) => (
+            <SongCard2
+              key={song.id}
+              song={song}
+              onPlay={() => playSong(song, recentPlays)}
+              isPlaying={currentSong?.id === song.id}
             />
           ))}
-
-          {/* Bugün için önerilenler */}
-          <DiscoverRail
-            title="Bugün için önerilenler"
-            songs={discoverSongs.slice(0, 12)}
-            onPlay={(s) => playSong(s, discoverSongs)}
-            currentSong={currentSong}
-          />
-
-          {/* Yeni çıkanlar */}
-          <DiscoverRail
-            title="Yeni çıkanlar"
-            songs={[...discoverSongs].reverse().slice(0, 12)}
-            onPlay={(s) => playSong(s, discoverSongs)}
-            currentSong={currentSong}
-          />
-        </div>
+        </Section>
       )}
-    </div>
-  );
-}
 
-/* ══════════════════════════════════════════════
-   Selamlama + hızlı erişim grid'i
-══════════════════════════════════════════════ */
-function DiscoverGreeting({
-  greeting,
-  songs,
-  onPlay,
-  currentSong,
-}: {
-  greeting: string;
-  songs: Song[];
-  onPlay: (s: Song) => void;
-  currentSong: Song | null;
-}) {
-  return (
-    <div className="px-4 pt-8 pb-4">
-      <h2 className="text-white text-2xl font-black mb-4 px-2">{greeting}</h2>
-      <div className="grid grid-cols-2 gap-2">
-        {songs.map((song) => (
-          <button
-            key={song.id}
-            onClick={() => onPlay(song)}
-            className={`flex items-center gap-3 rounded-md overflow-hidden pressable transition-colors ${
-              currentSong?.id === song.id
-                ? "bg-[#ffffff20]"
-                : "bg-[#ffffff12] hover:bg-[#ffffff1e]"
-            }`}
-          >
-            {/* Cover */}
-            <div className="w-14 h-14 flex-shrink-0 overflow-hidden bg-[#282828]">
-              {song.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={song.imageUrl}
-                  alt={song.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Music2 size={20} className="text-[#535353]" />
-                </div>
-              )}
-            </div>
-            <span
-              className={`text-sm font-bold truncate pr-2 text-left ${
-                currentSong?.id === song.id ? "text-[#1db954]" : "text-white"
-              }`}
-            >
-              {song.title}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
+      {/* ── Son şarkılar ── */}
+      {moreSongs.length > 0 && (
+        <Section title="Son eklenenler">
+          {moreSongs.slice(0, 12).map((song) => (
+            <SongCard2
+              key={song.id}
+              song={song}
+              onPlay={() => playSong(song, allSongs)}
+              isPlaying={currentSong?.id === song.id}
+            />
+          ))}
+        </Section>
+      )}
 
-/* ══════════════════════════════════════════════
-   Yatay scroll rail
-══════════════════════════════════════════════ */
-function DiscoverRail({
-  title,
-  songs,
-  onPlay,
-  currentSong,
-  artistUsername,
-}: {
-  title: string;
-  songs: Song[];
-  onPlay: (s: Song) => void;
-  currentSong: Song | null;
-  artistUsername?: string;
-}) {
-  return (
-    <section className="py-6">
-      <div className="flex items-center justify-between px-6 mb-3">
-        <h2 className="text-white text-xl font-black">{title}</h2>
-        {artistUsername && (
-          <Link
-            href={`/profile/${artistUsername}`}
-            className="text-[#a7a7a7] text-sm font-semibold hover:text-white transition-colors pressable"
-          >
-            Tümünü gör
-          </Link>
-        )}
-      </div>
-      <div className="flex gap-4 overflow-x-auto scroll-area px-6 pb-1">
-        {songs.map((song) => (
-          <DiscoverCard
-            key={song.id}
-            song={song}
-            onPlay={() => onPlay(song)}
-            isActive={currentSong?.id === song.id}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
+      {/* ── Öneriler ── */}
+      {recommendations.length > 0 && (
+        <Section title={recsPersonalized ? "Sana özel" : "Popüler"}>
+          {recommendations.slice(0, 12).map((song) => (
+            <SongCard2
+              key={song.id}
+              song={song}
+              onPlay={() => playSong(song, recommendations)}
+              isPlaying={currentSong?.id === song.id}
+            />
+          ))}
+        </Section>
+      )}
 
-/* ══════════════════════════════════════════════
-   Kart — yatay scroll içinde
-══════════════════════════════════════════════ */
-function DiscoverCard({
-  song,
-  onPlay,
-  isActive,
-}: {
-  song: Song;
-  onPlay: () => void;
-  isActive: boolean;
-}) {
-  return (
-    <button
-      onClick={onPlay}
-      className="flex-shrink-0 w-36 pressable group text-left"
-    >
-      {/* Cover */}
-      <div className="w-36 h-36 rounded-md overflow-hidden bg-[#282828] mb-3 relative">
-        {song.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={song.imageUrl}
-            alt={song.title}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={32} className="text-[#535353]" />
-          </div>
-        )}
-        {/* Play overlay */}
-        <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <div className="w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl translate-y-2 group-hover:translate-y-0 transition-transform">
-            <Play size={18} fill="black" className="text-black ml-0.5" />
+      {/* ── Takip feed ── */}
+      {session?.user && feedSongs.length > 0 && (
+        <Section title="Takip ettiklerinden">
+          {feedSongs.map((song) => (
+            <SongCard2
+              key={song.id}
+              song={song}
+              onPlay={() => playSong(song, feedSongs)}
+              isPlaying={currentSong?.id === song.id}
+            />
+          ))}
+        </Section>
+      )}
+
+      {/* ── Sanatçı grupları ── */}
+      {artistGroups.map((group) => (
+        <Section
+          key={group.username}
+          title={group.name}
+          href={`/profile/${group.username}`}
+        >
+          {group.songs.map((song) => (
+            <SongCard2
+              key={song.id}
+              song={song}
+              onPlay={() => playSong(song, discoverSongs)}
+              isPlaying={currentSong?.id === song.id}
+            />
+          ))}
+        </Section>
+      ))}
+
+      {/* ── Boş durum ── */}
+      {allSongs.length === 0 && discoverSongs.length === 0 && (
+        <div className="px-5 pt-8">
+          <div className="rounded-2xl bg-[#111] p-8 text-center">
+            <Music2 size={28} className="text-[#333] mx-auto mb-3" />
+            <p className="text-white text-base font-bold mb-1">
+              İlk şarkını oluştur
+            </p>
+            <p className="text-[#666] text-sm">Yukarıdan bir kategori seç</p>
           </div>
         </div>
-      </div>
-      <p
-        className={`text-sm font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
-      >
-        {song.title}
-      </p>
-      {song.creator && (
-        <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-          {song.creator.name}
-        </p>
       )}
-    </button>
+
+      <div className="h-6" />
+    </div>
   );
 }
