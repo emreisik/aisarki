@@ -275,6 +275,14 @@ export const GENRE_WESTERN_ANCHORS: Partial<Record<GenreId, string>> = {
     "festive Balkan brass band meets Romani celebration music, wedding dance party",
   ozgun:
     "acoustic protest folk similar to Latin American nueva canción meets Mediterranean singer-songwriter",
+  karadeniz:
+    "fast Celtic/Irish fiddle-driven folk dance meets Balkan mountain folk, similar to Irish jig energy with Eastern European intensity",
+  roman:
+    "Romani Balkan brass and clarinet dance similar to Fanfare Ciocărlia meets Greek Romani clarinet tradition, festive wedding swing",
+  akustik:
+    "intimate unplugged singer-songwriter similar to European coffeehouse folk, acoustic guitar ballad with Mediterranean warmth",
+  arabesk_pop:
+    "emotional pop ballad similar to Italian canzone meets soft arabesk, accessible romantic crossover with string orchestration",
 };
 
 // ── 5. Master Çeviri Fonksiyonu ───────────────────────────────────────────

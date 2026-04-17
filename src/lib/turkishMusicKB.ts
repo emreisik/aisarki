@@ -26,7 +26,15 @@ export type ArtistPresetId =
   | "ozgun_protest"
   | "fantezi_duygusal"
   | "tsm_klasik"
-  | "modern_fusion_rock";
+  | "modern_fusion_rock"
+  | "doksanlar_pop"
+  | "modern_turk_pop"
+  | "karadeniz_horon"
+  | "turkce_rap"
+  | "roman_havasi"
+  | "oyun_havasi_dugun"
+  | "slow_arabesk_pop"
+  | "akustik_unplugged";
 
 export type RegionId =
   | "karadeniz"
@@ -64,7 +72,11 @@ export type GenreId =
   | "rap"
   | "fantezi"
   | "oyun_havasi"
-  | "ozgun";
+  | "ozgun"
+  | "karadeniz"
+  | "roman"
+  | "akustik"
+  | "arabesk_pop";
 
 export interface ArtistPreset {
   id: ArtistPresetId;
@@ -329,6 +341,142 @@ export const ARTIST_PRESETS: Record<ArtistPresetId, ArtistPreset> = {
     referenceMakams: ["kürdi", "nihavend", "hicaz"],
     lyricsStyle:
       "Modern fusion rock üslubu: kentli birey, varoluş, yalnızlık, isyanla dinginlik karışımı. Sert ve şiirsel.",
+  },
+  doksanlar_pop: {
+    id: "doksanlar_pop",
+    label: "90'lar Türk Pop",
+    icon: "💿",
+    description: "Keyboard-driven, catchy, Akdeniz pop hissi",
+    sunoStyle:
+      "90s Turkish Mediterranean pop, clean keyboard-driven production, catchy melodic hooks, drum machine with live percussion, bright synth pads, chorus reverb, radio-friendly female or male vocal, warm analog mix, upbeat nostalgic feel",
+    negativeTags:
+      "trap, autotune, lo-fi, dark, heavy metal, raw folk, modern edm, mumble",
+    styleWeight: 0.75,
+    weirdnessConstraint: 0.25,
+    vocalGender: "f",
+    bpm: [100, 125],
+    referenceMakams: ["nihavend", "kürdi", "hicaz"],
+    lyricsStyle:
+      "90'lar Türk pop üslubu: romantik ama hafif, akılda kalıcı nakarat, radyofonik, yaz havası. 'Seninle', 'bir daha' tarzı basit ama etkili kancalar. Modern argo yok.",
+  },
+  modern_turk_pop: {
+    id: "modern_turk_pop",
+    label: "Modern Türk Pop",
+    icon: "🔥",
+    description: "Trap etkili, urban, kısa formatlı",
+    sunoStyle:
+      "Modern Turkish urban pop, trap-influenced beat, 808 bass, subtle autotune on vocals, slick hi-hat rolls, dark synth atmosphere, short catchy hook, confident Turkish vocal delivery, 2020s polished production, minimal arrangement",
+    negativeTags:
+      "traditional folk, bağlama, raw acoustic, vintage analog, string orchestra, rural",
+    styleWeight: 0.7,
+    weirdnessConstraint: 0.3,
+    vocalGender: "m",
+    bpm: [85, 110],
+    referenceMakams: ["kürdi", "nihavend"],
+    lyricsStyle:
+      "Modern Türk pop üslubu: urban, kısa cümleler, Instagram/TikTok çağı, flexsiz ama özgüvenli. Minimal kelime, maksimal etki. Tekrarlanan hook kritik.",
+  },
+  karadeniz_horon: {
+    id: "karadeniz_horon",
+    label: "Karadeniz Müziği",
+    icon: "🪗",
+    description: "Kemençe, tulum, horon, 7/8 ritim",
+    sunoStyle:
+      "Black Sea Turkish folk, kemençe fiddle, tulum bagpipe, davul, fast 7/8 additive rhythm, energetic horon circle dance, nasal resonant male vocal, shouted interjections, communal festive energy, Celtic-like folk intensity",
+    negativeTags:
+      "slow ballad, pop, electronic, autotune, piano, string orchestra, western rock",
+    styleWeight: 0.85,
+    weirdnessConstraint: 0.15,
+    vocalGender: "m",
+    bpm: [140, 170],
+    referenceMakams: ["muhayyer", "uşşak", "hüseyni"],
+    lyricsStyle:
+      "Karadeniz üslubu: yayla, dağ, dere, horon, fındık. Yöresel lehçe ('n'apaysun', 'geliyrum'). Kısa ritmik satırlar, dans çağrısı. Esprili ve samimi.",
+  },
+  turkce_rap: {
+    id: "turkce_rap",
+    label: "Türkçe Rap",
+    icon: "🎤",
+    description: "Trap beats, 808 bass, conscious/street",
+    sunoStyle:
+      "Turkish conscious rap, dark trap production, heavy 808 bass, rolling hi-hats, atmospheric dark synth pads, confident Turkish flow with clear diction, melodic hook sections, 2020s hip-hop production, boom-bap foundation with modern trap elements",
+    negativeTags:
+      "folk instruments, bağlama, ney, traditional, pop ballad, anglo rap flow, mumble rap",
+    styleWeight: 0.72,
+    weirdnessConstraint: 0.3,
+    vocalGender: "m",
+    bpm: [130, 155],
+    referenceMakams: ["kürdi", "hicaz"],
+    lyricsStyle:
+      "Türkçe rap üslubu: sokak gerçekliği, bilinç, toplumsal eleştiri. Çok heceli kafiyeler ve iç kafiye kritik. Türkçe flow — Amerikan rap taklidi değil. Punchline ve wordplay.",
+  },
+  roman_havasi: {
+    id: "roman_havasi",
+    label: "Roman Havası",
+    icon: "🎺",
+    description: "Klarnet lead, 9/8, Romani swing, Trakya",
+    sunoStyle:
+      "Romani Thracian dance music, virtuosic clarinet lead, syncopated 9/8 aksak rhythm, darbuka and def percussion, festive wedding celebration energy, Romani swing groove, Balkan brass influences, energetic dance, shouted party interjections",
+    negativeTags:
+      "slow, sad, classical, autotune, electronic, piano ballad, western pop",
+    styleWeight: 0.8,
+    weirdnessConstraint: 0.2,
+    vocalGender: "m",
+    bpm: [130, 155],
+    referenceMakams: ["hicaz", "kürdi", "karcığar"],
+    lyricsStyle:
+      "Roman havası üslubu: düğün eğlencesi, dans çağrısı, 'haydi oyna' nidaları, neşeli ve hareketli. Kısa tekrar eden sloganlar. Trakya/Edirne havası.",
+  },
+  oyun_havasi_dugun: {
+    id: "oyun_havasi_dugun",
+    label: "Oyun Havası / Düğün",
+    icon: "🥁",
+    description: "Davul-zurna, halay, şenlik",
+    sunoStyle:
+      "Turkish wedding dance music, davul and zurna duo, festive halay circle dance, communal celebration, fast energetic tempo, call and response vocals, traditional Anatolian dance rhythm, folk festival atmosphere, powerful rhythmic drive",
+    negativeTags:
+      "slow ballad, sad, electronic, autotune, piano, soft, intimate, western pop",
+    styleWeight: 0.82,
+    weirdnessConstraint: 0.18,
+    vocalGender: "m",
+    bpm: [120, 155],
+    referenceMakams: ["hüseyni", "karcığar", "uşşak"],
+    lyricsStyle:
+      "Oyun havası üslubu: düğün, halay, bayram, eğlence. 'Haydi!', 'Oyna!', 'Gel!' nidaları. Kolektif neşe, kısa ritmik tekrarlar. Felsefi derinlik YOK.",
+  },
+  slow_arabesk_pop: {
+    id: "slow_arabesk_pop",
+    label: "Slow Arabesk Pop",
+    icon: "💔",
+    description: "Arabesk duygu + pop prodüksiyon, 2000'ler",
+    sunoStyle:
+      "Turkish arabesk pop crossover, arabesk emotional depth with modern pop production, string section with modern drum kit, bağlama accent, piano, accessible romantic vocal, 2000s polished mix, melancholic but radio-friendly, slower tempo ballad",
+    negativeTags:
+      "raw folk, pure arabesk, heavy distortion, trap, edm, anglo pop, k-pop",
+    styleWeight: 0.75,
+    weirdnessConstraint: 0.25,
+    vocalGender: "m",
+    bpm: [70, 95],
+    referenceMakams: ["nihavend", "hicaz", "kürdi"],
+    lyricsStyle:
+      "Slow arabesk pop üslubu: arabesk acısı ama pop erişilebilirliği. Romantik, duygusal, modern Türkçe. Klasik arabesk kadar ağır değil ama yüzeysel de değil.",
+  },
+  akustik_unplugged: {
+    id: "akustik_unplugged",
+    label: "Akustik / Unplugged",
+    icon: "🎶",
+    description: "Stripped-down, samimi, kahvehane hissi",
+    sunoStyle:
+      "Turkish acoustic unplugged, stripped-down intimate arrangement, acoustic guitar and bağlama duo, light cajon or no percussion, warm close-mic vocals, coffeehouse atmosphere, raw natural recording feel, gentle finger-picked guitar, minimal production",
+    negativeTags:
+      "full band, electronic, drum kit, heavy production, distortion, autotune, orchestra, edm",
+    styleWeight: 0.8,
+    weirdnessConstraint: 0.2,
+    vocalGender: "m",
+    bpm: [75, 100],
+    referenceMakams: ["uşşak", "nihavend", "hüseyni"],
+    lyricsStyle:
+      "Akustik unplugged üslubu: samimi, fısıltıya yakın, dostane. Kahvehane sohbeti gibi. İçten ve basit ama derin. Abartı yok, samimiyet var.",
   },
 };
 
@@ -660,6 +808,47 @@ export const GENRES: Record<GenreId, GenrePreset> = {
     styleWeight: 0.82,
     weirdnessConstraint: 0.2,
     bpm: [75, 100],
+  },
+  karadeniz: {
+    id: "karadeniz",
+    label: "Karadeniz",
+    sunoStyle:
+      "Black Sea Turkish folk music, kemençe fiddle, tulum bagpipe, davul, fast 7/8 horon dance rhythm, nasal resonant vocals, communal dance energy, Celtic-like folk intensity",
+    negativeTags: "slow ballad, pop, electronic, autotune, piano, western rock",
+    styleWeight: 0.85,
+    weirdnessConstraint: 0.15,
+    bpm: [140, 170],
+  },
+  roman: {
+    id: "roman",
+    label: "Roman Havası",
+    sunoStyle:
+      "Romani Thracian dance, virtuosic clarinet lead, syncopated 9/8 aksak, darbuka def percussion, festive wedding energy, Balkan Romani swing, shouted interjections",
+    negativeTags: "slow, sad, classical, electronic, piano ballad",
+    styleWeight: 0.8,
+    weirdnessConstraint: 0.2,
+    bpm: [130, 155],
+  },
+  akustik: {
+    id: "akustik",
+    label: "Akustik / Unplugged",
+    sunoStyle:
+      "Turkish acoustic unplugged, stripped-down intimate, acoustic guitar and bağlama, light cajon, warm close-mic vocal, coffeehouse atmosphere, minimal production",
+    negativeTags:
+      "full band, electronic, heavy production, distortion, autotune, orchestra",
+    styleWeight: 0.8,
+    weirdnessConstraint: 0.2,
+    bpm: [75, 100],
+  },
+  arabesk_pop: {
+    id: "arabesk_pop",
+    label: "Arabesk Pop",
+    sunoStyle:
+      "Turkish arabesk pop crossover, arabesk emotional depth with modern pop production, string section, modern drum kit, bağlama accent, accessible romantic vocal, 2000s polished mix",
+    negativeTags: "raw folk, heavy distortion, trap, edm, anglo pop, k-pop",
+    styleWeight: 0.75,
+    weirdnessConstraint: 0.25,
+    bpm: [70, 95],
   },
 };
 
