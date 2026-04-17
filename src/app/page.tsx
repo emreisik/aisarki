@@ -1330,20 +1330,22 @@ function Section({
   );
 }
 
-/* ── Şarkı kartı — minimal, temiz ── */
+/* ── Şarkı kartı — hover play, aktifken her zaman görünür ── */
 function SongCard2({
   song,
   onPlay,
+  isActive,
   isPlaying,
 }: {
   song: Song;
   onPlay: () => void;
+  isActive: boolean;
   isPlaying: boolean;
 }) {
   return (
     <button
       onClick={onPlay}
-      className="flex-shrink-0 w-[130px] text-left pressable"
+      className="flex-shrink-0 w-[130px] text-left pressable group"
     >
       <div className="w-[130px] h-[130px] rounded-lg overflow-hidden bg-[#1a1a1a] mb-2 relative">
         {song.imageUrl ? (
@@ -1358,26 +1360,23 @@ function SongCard2({
             <Music2 size={24} className="text-[#333]" />
           </div>
         )}
-        {isPlaying && (
-          <div className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-[#1db954] flex items-center justify-center">
-            <span className="flex items-end justify-center gap-[1.5px] h-2.5">
-              {[0, 0.12, 0.24].map((d, k) => (
-                <span
-                  key={k}
-                  className="wave-bar"
-                  style={{
-                    width: "2px",
-                    height: "100%",
-                    animationDelay: `${d}s`,
-                  }}
-                />
-              ))}
-            </span>
-          </div>
-        )}
+        {/* Buton: aktif şarkıysa (pause dahil) her zaman görünür, değilse hover'da */}
+        <div
+          className={`absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg transition-all ${
+            isActive
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
+          }`}
+        >
+          {isActive && isPlaying ? (
+            <Pause size={18} fill="black" className="text-black" />
+          ) : (
+            <Play size={18} fill="black" className="text-black ml-0.5" />
+          )}
+        </div>
       </div>
       <p
-        className={`text-[13px] font-semibold truncate ${isPlaying ? "text-[#1db954]" : "text-white"}`}
+        className={`text-[13px] font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
       >
         {song.title}
       </p>
@@ -1441,7 +1440,7 @@ function LikedCard() {
    Ana sayfa
 ══════════════════════════════════════════════ */
 export default function HomePage() {
-  const { playSong, currentSong, setShowGate } = usePlayer();
+  const { playSong, currentSong, playing, setShowGate } = usePlayer();
   const { data: session } = useSession();
   const { likedIds, toggleLiked } = useLikedIds();
   const router = useRouter();
@@ -1652,7 +1651,8 @@ export default function HomePage() {
               key={song.id}
               song={song}
               onPlay={() => playSong(song, recentPlays)}
-              isPlaying={currentSong?.id === song.id}
+              isActive={currentSong?.id === song.id}
+              isPlaying={currentSong?.id === song.id && playing}
             />
           ))}
         </Section>
@@ -1666,7 +1666,8 @@ export default function HomePage() {
               key={song.id}
               song={song}
               onPlay={() => playSong(song, allSongs)}
-              isPlaying={currentSong?.id === song.id}
+              isActive={currentSong?.id === song.id}
+              isPlaying={currentSong?.id === song.id && playing}
             />
           ))}
         </Section>
@@ -1680,7 +1681,8 @@ export default function HomePage() {
               key={song.id}
               song={song}
               onPlay={() => playSong(song, recommendations)}
-              isPlaying={currentSong?.id === song.id}
+              isActive={currentSong?.id === song.id}
+              isPlaying={currentSong?.id === song.id && playing}
             />
           ))}
         </Section>
@@ -1694,7 +1696,8 @@ export default function HomePage() {
               key={song.id}
               song={song}
               onPlay={() => playSong(song, feedSongs)}
-              isPlaying={currentSong?.id === song.id}
+              isActive={currentSong?.id === song.id}
+              isPlaying={currentSong?.id === song.id && playing}
             />
           ))}
         </Section>
@@ -1712,7 +1715,8 @@ export default function HomePage() {
               key={song.id}
               song={song}
               onPlay={() => playSong(song, discoverSongs)}
-              isPlaying={currentSong?.id === song.id}
+              isActive={currentSong?.id === song.id}
+              isPlaying={currentSong?.id === song.id && playing}
             />
           ))}
         </Section>
