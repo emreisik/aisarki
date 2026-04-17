@@ -7,6 +7,9 @@ import {
   getTaskCreatedBy,
   updateSongAudioKey,
   updateSongImageKey,
+  updateSongTranscription,
+  setPrimaryByScore,
+  getTaskPrompt,
 } from "@/lib/taskStore";
 import { translateSunoError, extractSunoError } from "@/lib/sunoErrors";
 import { sendPushToUser } from "@/lib/pushNotification";
@@ -16,6 +19,7 @@ import {
   isBunnyConfigured,
 } from "@/lib/bunnyStorage";
 import { Song } from "@/types";
+import { transcribeSong, scorePronunciation } from "@/lib/whisperService";
 
 // Vercel serverless function timeout — Bunny upload + Suno fetch için yeterli
 export const maxDuration = 60;
@@ -219,6 +223,50 @@ export async function POST(request: NextRequest) {
         console.log(
           `[after][bunny] ${uploadJobs.length} şarkı Bunny upload tamamlandı`,
         );
+      });
+    }
+
+    // ── Whisper Telaffuz Doğrulama (async, fire-and-forget) ──
+    // Bunny upload ile paralel çalışır. Başarısız olursa şarkıyı etkilemez.
+    const completeSongs = songs.filter((s) => s.status === "complete");
+    if (completeSongs.length > 0) {
+      after(async () => {
+        try {
+          const originalLyrics = await getTaskPrompt(taskId);
+          if (!originalLyrics) {
+            console.log(
+              "[after][whisper] Orijinal lyrics bulunamadı, atlanıyor",
+            );
+            return;
+          }
+
+          for (const song of completeSongs) {
+            const audioUrl = song.audioUrl || song.streamUrl;
+            if (!audioUrl) continue;
+
+            try {
+              const result = await transcribeSong(audioUrl);
+              if (!result) continue;
+
+              const score = await scorePronunciation(
+                originalLyrics,
+                result.text,
+              );
+              await updateSongTranscription(song.id, score, result.text);
+              console.log(
+                `[after][whisper] ${song.id} → score=${score} (${result.text.slice(0, 80)}...)`,
+              );
+            } catch (e) {
+              console.warn(`[after][whisper] fail ${song.id}:`, e);
+            }
+          }
+
+          // Tüm varyantlar transcribe edildiyse en iyisini primary yap
+          await setPrimaryByScore(taskId);
+          console.log(`[after][whisper] ${taskId} primary varyant belirlendi`);
+        } catch (e) {
+          console.warn("[after][whisper] pipeline hatası:", e);
+        }
       });
     }
 

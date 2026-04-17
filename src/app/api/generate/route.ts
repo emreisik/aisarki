@@ -17,6 +17,7 @@ import {
   resolveSunoParams,
   DEFAULT_NEGATIVE_TAGS,
   TURKISH_QUALITY_MARKERS,
+  PHONETIC_HINTS,
 } from "@/lib/turkishMusicKB";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
@@ -63,6 +64,8 @@ export async function POST(request: NextRequest) {
       vocalGender,
       styleWeight,
       weirdnessConstraint,
+      personaId,
+      personaModel,
     } = body;
 
     const ALLOWED_MODELS = new Set([
@@ -130,16 +133,28 @@ export async function POST(request: NextRequest) {
         : DEFAULT_NEGATIVE_TAGS;
 
     // Prompt suffix (sadece simple mode'da, custom mode'da lyrics zaten yazılı)
-    const qualitySuffix = instrumental ? "" : `, ${TURKISH_QUALITY_MARKERS}`;
+    const qualitySuffix = instrumental
+      ? ""
+      : `, ${TURKISH_QUALITY_MARKERS}, ${PHONETIC_HINTS}`;
     const finalPrompt = customMode
       ? prompt || ""
       : (prompt || "") + qualitySuffix;
 
     // Model seçimi: kullanıcı UI'dan gönderdiyse onu kullan (valid olmak kaydıyla),
     // yoksa sanatçı persona varsa V5, yoksa V4_5ALL
+    // voice_persona ise V5+ zorla
+    const V5_MODELS = new Set(["V5", "V5_5"]);
+    const needsV5 =
+      personaId && (personaModel === "voice_persona" || !personaModel);
     const validatedBodyModel =
       bodyModel && ALLOWED_MODELS.has(bodyModel) ? bodyModel : undefined;
-    const model = validatedBodyModel ?? (validArtistId ? "V5" : "V4_5ALL");
+    const model = validatedBodyModel
+      ? needsV5 && !V5_MODELS.has(validatedBodyModel)
+        ? "V5_5"
+        : validatedBodyModel
+      : needsV5
+        ? "V5_5"
+        : "V5_5";
 
     const payload: Record<string, unknown> = {
       customMode,
@@ -153,6 +168,8 @@ export async function POST(request: NextRequest) {
       ...(finalVocalGender ? { vocalGender: finalVocalGender } : {}),
       ...(customMode && finalStyle ? { style: finalStyle } : {}),
       ...(customMode && title ? { title } : {}),
+      ...(personaId ? { personaId } : {}),
+      ...(personaId ? { personaModel: personaModel || "voice_persona" } : {}),
     };
 
     console.log("Calling Suno API with callBackUrl:", callBackUrl);

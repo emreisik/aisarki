@@ -5,6 +5,7 @@ import {
   setTaskSongs,
   markTaskComplete,
   getSongsByTaskId,
+  getTaskStatus,
   updateSongAudioKey,
   updateSongImageKey,
 } from "@/lib/taskStore";
@@ -267,6 +268,17 @@ export async function GET(request: NextRequest) {
     }
   } catch {
     // DB fallback başarısız — normal polling devam etsin
+  }
+
+  // 4) DB'de task failed mı? (Suno 400 döndüyse callback markTaskFailed yapar)
+  const taskStatus = await getTaskStatus(taskId);
+  if (taskStatus?.status === "failed") {
+    return NextResponse.json({
+      status: "failed",
+      songs: [],
+      errorTitle: taskStatus.errorTitle || "Üretim başarısız",
+      errorMessage: taskStatus.errorMessage || "Tekrar deneyebilirsin",
+    });
   }
 
   return NextResponse.json({ status: "pending", songs: [] });

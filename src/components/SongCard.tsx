@@ -163,6 +163,19 @@ export default function SongCard({
 
         {/* Right */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {song.pronunciationScore != null && song.pronunciationScore > 0 && (
+            <span
+              className={`text-[10px] font-bold tabular-nums px-1 py-0.5 rounded ${
+                song.pronunciationScore >= 80
+                  ? "text-emerald-400"
+                  : song.pronunciationScore >= 60
+                    ? "text-amber-400"
+                    : "text-red-400"
+              }`}
+            >
+              {song.pronunciationScore}
+            </span>
+          )}
           {song.playCount != null && song.playCount > 0 && !isPlaying && (
             <span className="text-[#535353] text-xs tabular-nums">
               {formatListenerCount(song.playCount)}
@@ -226,6 +239,21 @@ export default function SongCard({
           </div>
         )}
 
+        {/* Pronunciation score badge (top-left overlay) */}
+        {song.pronunciationScore != null && song.pronunciationScore > 0 && (
+          <div
+            className={`absolute top-2 left-2 px-1.5 py-0.5 rounded-md backdrop-blur-sm text-[10px] font-bold tabular-nums ${
+              song.pronunciationScore >= 80
+                ? "bg-emerald-500/80 text-white"
+                : song.pronunciationScore >= 60
+                  ? "bg-amber-500/80 text-white"
+                  : "bg-red-500/80 text-white"
+            }`}
+          >
+            {song.pronunciationScore}
+          </div>
+        )}
+
         {/* Like button (top-right overlay) */}
         {showLike && ready && (
           <button
@@ -254,14 +282,14 @@ export default function SongCard({
 
         {/* Play button on hover (not playing) */}
         {ready && !isPlaying && (
-          <div
-            className="absolute inset-0 bg-black/40 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlay(song);
-            }}
-          >
-            <div className="w-9 h-9 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg">
+          <div className="absolute inset-0 bg-black/40 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <div
+              className="w-9 h-9 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg pointer-events-auto"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlay(song);
+              }}
+            >
               <Play size={16} fill="black" className="text-black ml-0.5" />
             </div>
           </div>

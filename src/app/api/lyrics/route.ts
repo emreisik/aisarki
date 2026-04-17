@@ -7,30 +7,25 @@ import {
   RegionId,
   MakamId,
 } from "@/lib/turkishMusicKB";
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+import { chatCompletion } from "@/lib/openai";
 
 interface LyricsRequest {
-  // Bağlam
-  topic: string; // "annem için doğum günü şarkısı"
-  // Stil parametreleri (legacy — string label)
+  topic: string;
   region?: string;
   era?: string;
   makam?: string;
   mood?: string;
   vocal?: string;
-  // Serbest notlar
   customNotes?: string;
-  // ── Türk Müzik Bilgi Tabanı entegrasyonu ──
-  artistId?: string; // ArtistPresetId — sanatçı tarzı (lyricsStyle KB'den çekilir)
-  regionId?: string; // RegionId — yöresel ağız (lehçe dictionary KB'den)
-  makamId?: string; // MakamId — makam mood KB'den
+  artistId?: string;
+  regionId?: string;
+  makamId?: string;
 }
 
 export async function POST(request: NextRequest) {
-  if (!ANTHROPIC_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY eksik — Railway Variables kontrol et" },
+      { error: "OPENAI_API_KEY eksik" },
       { status: 500 },
     );
   }
@@ -48,7 +43,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // KB ile zenginleştir: sanatçı/yöre/makam ID'lerinden detaylı context çek
   const artist =
     body.artistId && body.artistId in ARTIST_PRESETS
       ? ARTIST_PRESETS[body.artistId as ArtistPresetId]
@@ -117,40 +111,16 @@ Kurallar:
 - Türkçe diyakritikleri eksiksiz kullan (ç, ğ, ı, ö, ş, ü)
 - Sadece sözleri yaz, açıklama veya başlık ekleme`;
 
-  const userPrompt = `Şarkı konusu: ${body.topic.trim()}${contextBlock}
-
-Şarkı sözlerini yaz:`;
+  const userPrompt = `Şarkı konusu: ${body.topic.trim()}${contextBlock}\n\nŞarkı sözlerini yaz:`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("[lyrics] Anthropic error:", res.status, err);
-      let msg = "Sözler oluşturulamadı";
-      try {
-        const parsed = JSON.parse(err);
-        if (parsed?.error?.message) msg = parsed.error.message;
-      } catch {}
-      return NextResponse.json({ error: msg }, { status: 500 });
-    }
-
-    const data = await res.json();
-    const lyrics: string =
-      data.content?.[0]?.type === "text" ? data.content[0].text : "";
+    const lyrics = await chatCompletion(
+      [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      { model: "gpt-4o", maxTokens: 1024 },
+    );
 
     if (!lyrics) {
       return NextResponse.json({ error: "Boş yanıt alındı" }, { status: 500 });
@@ -158,7 +128,7 @@ Kurallar:
 
     return NextResponse.json({ lyrics });
   } catch (e) {
-    console.error("[lyrics] fetch error:", e);
+    console.error("[lyrics] error:", e);
     return NextResponse.json({ error: "Bağlantı hatası" }, { status: 500 });
   }
 }

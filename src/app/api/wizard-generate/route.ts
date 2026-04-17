@@ -26,11 +26,10 @@ import {
   TURKISH_CLICHE_BLACKLIST,
 } from "@/lib/wizardMappings";
 import { applySunoOptimizations } from "@/lib/sunoGlossary";
+import { chatCompletion, quickCompletion } from "@/lib/openai";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
-
 function getCallbackUrl(request: NextRequest): string {
   const raw = process.env.APP_URL?.trim();
   if (raw) {
@@ -46,29 +45,13 @@ async function callClaude(
   userPrompt: string,
   maxTokens: number = 1024,
 ): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("[wizard-generate] Claude error:", res.status, err);
-    throw new Error(`Claude API hatası: ${res.status}`);
-  }
-
-  const data = await res.json();
-  return data.content?.[0]?.type === "text" ? data.content[0].text : "";
+  return chatCompletion(
+    [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    { model: "gpt-4o", maxTokens },
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -81,7 +64,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body: WizardGenerateRequest = await request.json();
+    const body = await request.json();
     const {
       mood,
       genreId,
@@ -91,7 +74,12 @@ export async function POST(request: NextRequest) {
       era,
       regionId,
       model: bodyModel,
-    } = body;
+      approvedLyrics,
+      approvedTitle,
+    } = body as WizardGenerateRequest & {
+      approvedLyrics?: string;
+      approvedTitle?: string;
+    };
 
     if (!mood || !genreId) {
       return NextResponse.json(
@@ -269,30 +257,35 @@ Başlık:`;
 
 Şarkı sözlerini yaz:`;
 
-    let generatedTitle = "";
-    let generatedLyrics = "";
+    // ── Onaylanmış lyrics varsa Claude'u atla ──
+    let generatedTitle = approvedTitle || "";
+    let generatedLyrics = approvedLyrics || "";
 
-    if (ANTHROPIC_API_KEY) {
-      try {
-        const promises: Promise<string>[] = [
-          callClaude(titleSystemPrompt, titleUserPrompt, 64),
-        ];
-        if (!isInstrumental) {
-          promises.push(callClaude(lyricsSystemPrompt, lyricsUserPrompt, 2048));
-        }
+    if (!approvedLyrics && !approvedTitle) {
+      // Kullanıcıdan hazır lyrics gelmedi — Claude ile üret
+      if (process.env.OPENAI_API_KEY) {
+        try {
+          const promises: Promise<string>[] = [
+            callClaude(titleSystemPrompt, titleUserPrompt, 64),
+          ];
+          if (!isInstrumental) {
+            promises.push(
+              callClaude(lyricsSystemPrompt, lyricsUserPrompt, 2048),
+            );
+          }
 
-        const results = await Promise.all(promises);
-        generatedTitle = results[0].trim().replace(/^["']|["']$/g, "");
-        if (!isInstrumental && results[1]) {
-          generatedLyrics = results[1];
+          const results = await Promise.all(promises);
+          generatedTitle = results[0].trim().replace(/^["']|["']$/g, "");
+          if (!isInstrumental && results[1]) {
+            generatedLyrics = results[1];
+          }
+        } catch (claudeErr) {
+          console.error("[wizard-generate] Claude fallback:", claudeErr);
+          generatedTitle = topicText.slice(0, 30);
         }
-      } catch (claudeErr) {
-        console.error("[wizard-generate] Claude fallback:", claudeErr);
-        // Claude başarısız olursa basit fallback — Suno kendi lyrics üretsin
+      } else {
         generatedTitle = topicText.slice(0, 30);
       }
-    } else {
-      generatedTitle = topicText.slice(0, 30);
     }
 
     // ── 6. Suno Çeviri Katmanı — otomatik optimizasyonlar ──

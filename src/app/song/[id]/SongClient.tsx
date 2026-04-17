@@ -2,10 +2,11 @@
 
 import { use, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Music2 } from "lucide-react";
+import { Music2, Scissors, Layers, Disc3, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useGoBack } from "@/hooks/useGoBack";
 import SongHero from "@/components/song/SongHero";
 import LyricsBlock from "@/components/song/LyricsBlock";
 import CommentsSection from "@/components/song/CommentsSection";
@@ -67,6 +68,7 @@ export default function SongClient({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const goBack = useGoBack();
   const { data: session } = useSession();
   const { playSong, currentSong, playing, togglePlay } = usePlayer();
 
@@ -226,6 +228,111 @@ export default function SongClient({
     router.push(`/create?remixFrom=${song.id}`);
   }, [router, song?.id]);
 
+  // ── Extend / Cover / Mashup state ──
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [mashupTarget, setMashupTarget] = useState(false);
+  const [mashupUrl, setMashupUrl] = useState("");
+
+  const getAudioUrl = () => song?.audioUrl || song?.streamUrl || "";
+
+  const handleExtend = async () => {
+    if (!song?.id || actionLoading) return;
+    if (!session?.user) {
+      router.push("/auth/signin");
+      return;
+    }
+    setActionLoading("extend");
+    setActionError("");
+    try {
+      const duration = song.duration || 60;
+      const res = await fetch("/api/extend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          songId: song.id,
+          continueAt: Math.max(1, Math.floor(duration - 5)),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error || "Uzatma başarısız");
+        return;
+      }
+      router.push("/create");
+    } catch {
+      setActionError("Bağlantı hatası");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCover = async () => {
+    if (!song?.id || actionLoading) return;
+    if (!session?.user) {
+      router.push("/auth/signin");
+      return;
+    }
+    const audioUrl = getAudioUrl();
+    if (!audioUrl) {
+      setActionError("Audio bulunamadı");
+      return;
+    }
+    setActionLoading("cover");
+    setActionError("");
+    try {
+      const res = await fetch("/api/upload-cover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadUrl: audioUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error || "Cover başarısız");
+        return;
+      }
+      router.push("/create");
+    } catch {
+      setActionError("Bağlantı hatası");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMashup = async () => {
+    if (!song?.id || actionLoading || !mashupUrl.trim()) return;
+    if (!session?.user) {
+      router.push("/auth/signin");
+      return;
+    }
+    const audioUrl = getAudioUrl();
+    if (!audioUrl) {
+      setActionError("Audio bulunamadı");
+      return;
+    }
+    setActionLoading("mashup");
+    setActionError("");
+    try {
+      const res = await fetch("/api/mashup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadUrlList: [audioUrl, mashupUrl.trim()] }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error || "Mashup başarısız");
+        return;
+      }
+      setMashupTarget(false);
+      setMashupUrl("");
+      router.push("/create");
+    } catch {
+      setActionError("Bağlantı hatası");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a]">
@@ -240,7 +347,7 @@ export default function SongClient({
         <Music2 size={48} className="text-[#535353]" />
         <p className="text-white font-bold">Şarkı bulunamadı</p>
         <button
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="text-[#1db954] text-sm pressable"
         >
           Geri dön
@@ -269,7 +376,7 @@ export default function SongClient({
           playing={playing}
           onPlay={handlePlay}
           onShare={handleShare}
-          onBack={() => router.back()}
+          onBack={() => goBack()}
           onRemix={handleRemix}
           copied={copied}
           liked={liked}
@@ -291,6 +398,81 @@ export default function SongClient({
           </p>
           <LyricsBlock text={song.prompt} />
         </div>
+
+        {/* Aksiyonlar: Extend / Cover / Mashup */}
+        {song.status === "complete" && (
+          <div className="mt-8 pt-8 border-t border-white/5">
+            <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-4">
+              Aksiyonlar
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleExtend}
+                disabled={!!actionLoading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1a1a1a] text-white text-sm font-semibold hover:bg-[#222] transition-colors pressable disabled:opacity-40"
+              >
+                {actionLoading === "extend" ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Scissors size={15} />
+                )}
+                Uzat
+              </button>
+              <button
+                onClick={handleCover}
+                disabled={!!actionLoading}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1a1a1a] text-white text-sm font-semibold hover:bg-[#222] transition-colors pressable disabled:opacity-40"
+              >
+                {actionLoading === "cover" ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Disc3 size={15} />
+                )}
+                Cover
+              </button>
+              <button
+                onClick={() => setMashupTarget(!mashupTarget)}
+                disabled={!!actionLoading}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors pressable disabled:opacity-40 ${
+                  mashupTarget
+                    ? "bg-[#1db954] text-black"
+                    : "bg-[#1a1a1a] text-white hover:bg-[#222]"
+                }`}
+              >
+                {actionLoading === "mashup" ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Layers size={15} />
+                )}
+                Mashup
+              </button>
+            </div>
+
+            {/* Mashup URL girişi */}
+            {mashupTarget && (
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="url"
+                  value={mashupUrl}
+                  onChange={(e) => setMashupUrl(e.target.value)}
+                  placeholder="2. şarkının audio URL'sini yapıştır..."
+                  className="flex-1 bg-[#141414] rounded-xl px-4 py-2.5 text-white text-sm placeholder-[#444] focus:outline-none focus:ring-1 focus:ring-[#1db954]/50"
+                />
+                <button
+                  onClick={handleMashup}
+                  disabled={!mashupUrl.trim() || !!actionLoading}
+                  className="px-4 py-2.5 rounded-xl bg-[#1db954] text-black text-sm font-bold hover:bg-[#1ed760] transition-colors pressable disabled:opacity-40"
+                >
+                  Birleştir
+                </button>
+              </div>
+            )}
+
+            {actionError && (
+              <p className="text-red-400 text-sm mt-2">{actionError}</p>
+            )}
+          </div>
+        )}
 
         {/* Benzer şarkılar */}
         <div className="mt-10 pt-8 border-t border-white/5">

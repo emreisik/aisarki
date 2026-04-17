@@ -159,6 +159,20 @@ export function GenerationRow({
           <p className="text-[#555] text-[11px] truncate mt-0.5">{subtitle}</p>
         )}
       </div>
+
+      {song.pronunciationScore != null && song.pronunciationScore > 0 && (
+        <span
+          className={`text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-md flex-shrink-0 ${
+            song.pronunciationScore >= 80
+              ? "bg-emerald-500/15 text-emerald-400"
+              : song.pronunciationScore >= 60
+                ? "bg-amber-500/15 text-amber-400"
+                : "bg-red-500/15 text-red-400"
+          }`}
+        >
+          {song.pronunciationScore}
+        </span>
+      )}
     </div>
   );
 }

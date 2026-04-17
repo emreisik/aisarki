@@ -37,6 +37,9 @@ body {
 }
 .scroll-area::-webkit-scrollbar { display: none; }
 
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+
 /* Range input */
 input[type="range"] {
   -webkit-appearance: none;

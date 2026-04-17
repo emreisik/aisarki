@@ -12,6 +12,7 @@ import WizardStepMood from "./WizardStepMood";
 import WizardStepGenre from "./WizardStepGenre";
 import WizardStepTheme from "./WizardStepTheme";
 import WizardStepDetails from "./WizardStepDetails";
+import WizardStepLyrics from "./WizardStepLyrics";
 import WizardPreview from "./WizardPreview";
 
 interface WizardContainerProps {
@@ -26,7 +27,7 @@ interface WizardContainerProps {
   disabled?: boolean;
 }
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 export default function WizardContainer({
   onTaskStarted,
@@ -36,6 +37,7 @@ export default function WizardContainer({
   const { data: session } = useSession();
   const { setShowGate } = usePlayer();
 
+  // Wizard state
   const [step, setStep] = useState(1);
   const [mood, setMood] = useState<WizardMoodId | null>(null);
   const [genreId, setGenreId] = useState<string | null>(null);
@@ -47,8 +49,15 @@ export default function WizardContainer({
   const [era, setEra] = useState<"modern" | "klasik" | "90lar">("modern");
   const [regionId, setRegionId] = useState<string | null>(null);
 
+  // Lyrics state
+  const [lyrics, setLyrics] = useState("");
+  const [title, setTitle] = useState("");
+  const [lyricsLoading, setLyricsLoading] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const isInstrumental = vocalGender === "instrumental";
 
   const canAdvance = (): boolean => {
     switch (step) {
@@ -60,16 +69,55 @@ export default function WizardContainer({
         return theme !== null || themeText.trim().length > 0;
       case 4:
         return true;
+      case 5:
+        return isInstrumental || lyrics.trim().length > 0;
       default:
         return false;
+    }
+  };
+
+  const fetchLyrics = async () => {
+    if (isInstrumental || !mood || !genreId) return;
+    setLyricsLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/wizard-lyrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mood,
+          genreId,
+          theme: theme || "custom",
+          themeText: themeText.trim(),
+          regionId: regionId || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Sözler oluşturulamadı");
+        return;
+      }
+      if (data.lyrics) setLyrics(data.lyrics);
+      if (data.title) setTitle(data.title);
+    } catch {
+      setError("Bağlantı hatası");
+    } finally {
+      setLyricsLoading(false);
     }
   };
 
   const handleNext = () => {
     if (!canAdvance()) return;
     if (step === 2 && genreId) {
-      // Genre seçildiğinde default vokal cinsiyetini ayarla
       setVocalGender(resolveDefaultVocalGender(genreId as GenreId));
+    }
+    if (step === 4) {
+      // Detaylar → Sözler adımına geçerken lyrics üret
+      setStep(5);
+      if (!isInstrumental && !lyrics.trim()) {
+        fetchLyrics();
+      }
+      return;
     }
     if (step < TOTAL_STEPS) {
       setStep(step + 1);
@@ -106,6 +154,9 @@ export default function WizardContainer({
           era,
           regionId: regionId || undefined,
           model,
+          // Hazır onaylanmış lyrics ve title gönder
+          approvedLyrics: isInstrumental ? undefined : lyrics.trim(),
+          approvedTitle: title.trim() || undefined,
         }),
       });
 
@@ -136,20 +187,17 @@ export default function WizardContainer({
       onTaskStarted(
         taskId,
         themeText.trim() || mood,
-        themeText.trim().slice(0, 40) || mood,
+        title.trim() || themeText.trim().slice(0, 40) || mood,
         streamUrl,
         songId,
       );
 
-      // Reset wizard
+      // Wizard'ı başa al ama seçimleri koru — "tekrar üret" kolaylığı
+      // Mood, genre, theme, region, era, vocal aynen kalır
+      // Sadece step, lyrics ve title sıfırlanır (yeni sözler üretilsin)
       setStep(1);
-      setMood(null);
-      setGenreId(null);
-      setTheme(null);
-      setThemeText("");
-      setVocalGender("m");
-      setEra("modern");
-      setRegionId(null);
+      setLyrics("");
+      setTitle("");
     } catch {
       setError("Bağlantı hatası");
     } finally {
@@ -168,7 +216,6 @@ export default function WizardContainer({
             selected={mood}
             onSelect={(m) => {
               setMood(m);
-              // Otomatik ilerle
               setTimeout(() => setStep(2), 200);
             }}
           />
@@ -203,10 +250,27 @@ export default function WizardContainer({
             onRegionChange={setRegionId}
           />
         )}
+        {step === 5 && !isInstrumental && (
+          <WizardStepLyrics
+            lyrics={lyrics}
+            title={title}
+            loading={lyricsLoading}
+            onLyricsChange={setLyrics}
+            onTitleChange={setTitle}
+            onRegenerate={fetchLyrics}
+          />
+        )}
+        {step === 5 && isInstrumental && (
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <p className="text-[#888] text-[13px]">
+              Enstrümantal mod — söz olmadan oluşturulacak
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Önizleme — adım 3+ ve seçimler tamamsa */}
-      {step >= 3 && mood && genreId && (
+      {/* Önizleme — adım 4+ ve seçimler tamamsa */}
+      {step >= 4 && mood && genreId && (
         <WizardPreview
           mood={mood}
           genreId={genreId}
@@ -229,7 +293,7 @@ export default function WizardContainer({
           <button
             type="button"
             onClick={handleBack}
-            disabled={loading}
+            disabled={loading || lyricsLoading}
             className="flex items-center justify-center gap-1 px-4 py-3 rounded-full bg-[#1a1a1a] text-[#aaa] text-[13px] font-semibold hover:text-white transition-colors pressable disabled:opacity-30"
           >
             <ChevronLeft size={14} />
@@ -248,15 +312,15 @@ export default function WizardContainer({
                 : "bg-[#1a1a1a] text-[#555]"
             }`}
           >
-            Devam
+            {step === 4 && !isInstrumental ? "Sözleri Göster" : "Devam"}
           </button>
         ) : (
           <button
             type="button"
             onClick={handleGenerate}
-            disabled={loading || disabled || !canAdvance()}
+            disabled={loading || disabled || lyricsLoading || !canAdvance()}
             className={`flex-1 py-3.5 rounded-full font-bold text-[15px] transition-all pressable ${
-              loading || disabled
+              loading || disabled || lyricsLoading
                 ? "bg-[#1a1a1a] text-[#555]"
                 : "bg-[#1db954] hover:bg-[#1ed760] text-black active:scale-[0.98]"
             }`}
@@ -264,10 +328,10 @@ export default function WizardContainer({
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <Loader2 size={16} className="animate-spin" />
-                Hazırlanıyor...
+                Oluşturuluyor...
               </span>
             ) : (
-              "Oluştur"
+              "Onayla ve Oluştur"
             )}
           </button>
         )}

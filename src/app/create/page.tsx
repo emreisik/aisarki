@@ -90,6 +90,28 @@ export default function CreatePage() {
           );
         }
 
+        // Suno hata döndüyse (400, copyright vb.) polling'i durdur ve failed göster
+        if (data.status === "failed" || data.status === "error") {
+          pollingRef.current.delete(taskId);
+          setProcessingTasks((prev) =>
+            prev.map((t) =>
+              t.taskId === taskId
+                ? {
+                    ...t,
+                    failed: true,
+                    errorTitle:
+                      ((data as Record<string, unknown>)
+                        .errorTitle as string) || "Üretim başarısız",
+                    errorMessage:
+                      ((data as Record<string, unknown>)
+                        .errorMessage as string) || "Tekrar deneyebilirsin",
+                  }
+                : t,
+            ),
+          );
+          return;
+        }
+
         const playableSongs = (data.songs ?? []).filter(
           (s) => s.audioUrl || s.streamUrl,
         );
@@ -255,72 +277,142 @@ export default function CreatePage() {
 
   return (
     <div className="min-h-full bg-[#0a0a0a]">
-      <div className="mx-auto max-w-[640px] px-5 pt-6 pb-28">
-        {/* Başlık */}
-        <h1 className="text-white text-2xl font-black">Oluştur</h1>
-        <p className="text-[#666] text-[13px] mt-1 mb-6">
-          AI ile özgün şarkılar yap
-        </p>
+      <div className="mx-auto max-w-[640px] lg:max-w-none px-5 lg:px-8 pt-6 pb-28 flex flex-col lg:flex-row lg:gap-8">
+        {/* SOL PANEL — Form (desktop'ta sticky) */}
+        <div className="w-full lg:w-[420px] lg:flex-shrink-0 lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-90px)] lg:overflow-y-auto scrollbar-hide">
+          {/* Başlık */}
+          <h1 className="text-white text-2xl font-black">Oluştur</h1>
+          <p className="text-[#666] text-[13px] mt-1 mb-6">
+            AI ile özgün şarkılar yap
+          </p>
 
-        {/* Form */}
-        <Suspense fallback={null}>
-          <MusicGenerator onTaskStarted={handleTaskStarted} />
-        </Suspense>
+          {/* Form */}
+          <Suspense fallback={null}>
+            <MusicGenerator onTaskStarted={handleTaskStarted} />
+          </Suspense>
+        </div>
 
-        {/* Son üretimler */}
-        {hasActivity && (
-          <div className="mt-10">
-            <p className="text-[#666] text-[11px] font-semibold uppercase tracking-wider mb-3">
-              Son Üretimler
-            </p>
-            <div className="flex flex-col gap-0.5">
-              {processingTasks.map((task) =>
-                task.failed ? (
-                  <GenerationRowSkeleton
-                    key={task.taskId}
-                    failed
-                    errorTitle={task.errorTitle}
-                    errorMessage={task.errorMessage}
-                    onCancel={() => handleDismissFailed(task.taskId)}
-                    onRetry={() => handleRetry(task.taskId)}
-                    retrying={retryingTaskId === task.taskId}
-                  />
-                ) : (
-                  Array.from({ length: VARIANT_COUNT }).map((_, i) => (
+        {/* SAĞ PANEL — Sonuçlar (desktop'ta scroll) */}
+        <div className="flex-1 min-w-0 mt-10 lg:mt-0">
+          {hasActivity && (
+            <div>
+              <p className="text-[#666] text-[11px] font-semibold uppercase tracking-wider mb-3 lg:sticky lg:top-0 lg:bg-[#0a0a0a] lg:py-2 lg:z-10">
+                Son Üretimler
+              </p>
+              <div className="flex flex-col gap-0.5">
+                {processingTasks.map((task) =>
+                  task.failed ? (
                     <GenerationRowSkeleton
-                      key={`${task.taskId}:${i}`}
-                      imageHint={task.imageUrl}
-                      onCancel={
-                        i === 0
-                          ? () => handleDismissFailed(task.taskId)
-                          : undefined
-                      }
+                      key={task.taskId}
+                      failed
+                      errorTitle={task.errorTitle}
+                      errorMessage={task.errorMessage}
+                      onCancel={() => handleDismissFailed(task.taskId)}
+                      onRetry={() => handleRetry(task.taskId)}
+                      retrying={retryingTaskId === task.taskId}
                     />
-                  ))
-                ),
-              )}
-              {songs.map((song) => (
-                <GenerationRow
-                  key={song.id}
-                  song={song}
-                  isPlaying={currentSong?.id === song.id}
-                  onPlay={() => handlePlay(song)}
-                  onOpenDetail={() => handleOpenDetail(song)}
-                />
-              ))}
+                  ) : (
+                    Array.from({ length: VARIANT_COUNT }).map((_, i) => (
+                      <GenerationRowSkeleton
+                        key={`${task.taskId}:${i}`}
+                        imageHint={task.imageUrl}
+                        onCancel={
+                          i === 0
+                            ? () => handleDismissFailed(task.taskId)
+                            : undefined
+                        }
+                      />
+                    ))
+                  ),
+                )}
+                {(() => {
+                  // taskId'ye göre grupla — aynı task'tan gelen varyantları birlikte göster
+                  const grouped: Array<{
+                    taskId: string | null;
+                    songs: Song[];
+                  }> = [];
+                  const seen = new Set<string>();
+                  for (const song of songs) {
+                    const key = song.taskId || song.id;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    const siblings = song.taskId
+                      ? songs.filter((s) => s.taskId === song.taskId)
+                      : [song];
+                    grouped.push({
+                      taskId: song.taskId || null,
+                      songs: siblings,
+                    });
+                  }
+                  return grouped.map((group) =>
+                    group.songs.length > 1 ? (
+                      <div
+                        key={group.taskId || group.songs[0].id}
+                        className="space-y-0.5"
+                      >
+                        <div className="flex items-center gap-1.5 px-3 pt-1">
+                          <span className="text-[10px] text-[#444] uppercase tracking-wider font-medium">
+                            Varyantlar
+                          </span>
+                          {group.songs.every(
+                            (s) => s.pronunciationScore != null,
+                          ) && (
+                            <span className="text-[10px] text-[#333]">
+                              — skorla karşılaştır
+                            </span>
+                          )}
+                        </div>
+                        {group.songs.map((song, i) => (
+                          <div
+                            key={song.id}
+                            className="flex items-center gap-0"
+                          >
+                            <span
+                              className={`w-5 text-center text-[10px] font-bold flex-shrink-0 ${
+                                song.isPrimary
+                                  ? "text-emerald-400"
+                                  : "text-[#444]"
+                              }`}
+                            >
+                              {String.fromCharCode(65 + i)}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <GenerationRow
+                                song={song}
+                                isPlaying={currentSong?.id === song.id}
+                                onPlay={() => handlePlay(song)}
+                                onOpenDetail={() => handleOpenDetail(song)}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <GenerationRow
+                        key={group.songs[0].id}
+                        song={group.songs[0]}
+                        isPlaying={currentSong?.id === group.songs[0].id}
+                        onPlay={() => handlePlay(group.songs[0])}
+                        onOpenDetail={() => handleOpenDetail(group.songs[0])}
+                      />
+                    ),
+                  );
+                })()}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Empty state */}
-        {!hasActivity && (
-          <div className="flex flex-col items-center py-16 text-center">
-            <Music2 size={36} className="text-[#333] mb-3" />
-            <p className="text-[#444] text-sm">
-              Oluşturduğun şarkılar burada görünür
-            </p>
-          </div>
-        )}
+          {/* Empty state */}
+          {!hasActivity && (
+            <div className="flex flex-col items-center py-16 text-center">
+              <Music2 size={36} className="text-[#333] mb-3" />
+              <p className="text-[#444] text-sm">
+                Oluşturduğun şarkılar burada görünür
+              </p>
+            </div>
+          )}
+        </div>
+        {/* sağ panel sonu */}
       </div>
     </div>
   );

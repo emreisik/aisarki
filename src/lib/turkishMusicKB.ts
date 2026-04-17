@@ -136,11 +136,18 @@ export interface GenrePreset {
 
 /** Her isteğe eklenen anti-anglo negative tag baseline */
 export const DEFAULT_NEGATIVE_TAGS =
-  "western pop, american pop, k-pop, latin music, autotune, synthetic vocal, robotic voice, anglo accent, english pronunciation, generic edm, mumble rap";
+  "western pop, american pop, k-pop, latin music, autotune, synthetic vocal, robotic voice, anglo accent, english pronunciation, generic edm, mumble rap, flat i-vowel merging";
 
 /** Türk vokal kalite ipuçları — pozitif quality markers (sanatçı adı yok) */
 export const TURKISH_QUALITY_MARKERS =
   "natural authentic Turkish vocals, real organic instruments, genuine emotional voice, warm analog tone, not autotuned, professional studio production, authentic Turkish pronunciation with proper diacritics, clear Turkish diction, no Anglo accent";
+
+/**
+ * Suno'nun Türkçe telaffuzunu iyileştirmek için fonetik ipuçları.
+ * generate/route.ts ve wizard-lyrics prompt'larında kullanılır.
+ */
+export const PHONETIC_HINTS =
+  "CRITICAL: Turkish has TWO distinct i-vowels — back unrounded ı (as in kız, sığ, alın) and front i (as in giz, sil, in). Never merge them. ı sounds like the u in 'but' not like ee. Also: soft ğ as vowel lengthening not hard G, ş as sh, ç as ch, ö and ü as rounded front vowels, short syllable words for clarity, natural breath phrasing";
 
 // ── Stil Presetleri (sanatçı adı yok, karakteristik tabanlı) ─────────────────
 

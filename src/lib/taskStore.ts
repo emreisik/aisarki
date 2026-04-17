@@ -1,4 +1,4 @@
-import { Song } from "@/types";
+import { Song, Persona } from "@/types";
 import sql from "./db";
 import { keyToCdnUrl } from "./bunnyStorage";
 
@@ -77,6 +77,11 @@ async function ensureSchema() {
     sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS endpoint TEXT`,
     sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_listeners INT NOT NULL DEFAULT 0`,
     sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS total_streams INT NOT NULL DEFAULT 0`,
+    // Whisper telaffuz doğrulama kolonları
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS pronunciation_score INTEGER`,
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS transcribed_lyrics TEXT`,
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS enhanced_audio_key TEXT`,
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT true`,
   ]) {
     try {
       await stmt;
@@ -127,7 +132,23 @@ async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS personas (
+      id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      user_id         TEXT NOT NULL,
+      suno_persona_id TEXT NOT NULL,
+      name            TEXT NOT NULL,
+      description     TEXT,
+      source_song_id  TEXT,
+      vocal_start     NUMERIC DEFAULT 0.0,
+      vocal_end       NUMERIC DEFAULT 30.0,
+      persona_type    TEXT NOT NULL DEFAULT 'voice_persona',
+      style           TEXT,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
   for (const stmt of [
+    sql`CREATE INDEX IF NOT EXISTS idx_personas_user ON personas (user_id, created_at DESC)`,
     sql`CREATE INDEX IF NOT EXISTS idx_song_likes_user_created ON song_likes (user_id, created_at DESC)`,
     sql`CREATE INDEX IF NOT EXISTS idx_song_likes_song ON song_likes (song_id)`,
     // Hot path indexleri — discover/charts/feed/profile query'lerini hızlandırır
@@ -157,7 +178,7 @@ export async function saveProcessingTask(
   prompt: string,
   userId?: string,
   payload?: Record<string, unknown>,
-  endpoint?: "music" | "sounds",
+  endpoint?: string,
 ): Promise<void> {
   await ensureSchema();
   await sql`
@@ -241,6 +262,29 @@ export async function getTaskCreatedBy(taskId: string): Promise<string | null> {
     const rows =
       await sql`SELECT created_by FROM tasks WHERE task_id = ${taskId} LIMIT 1`;
     return (rows[0]?.created_by as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Task'ın DB'deki durumunu ve hata bilgisini döndür */
+export async function getTaskStatus(taskId: string): Promise<{
+  status: string;
+  errorTitle?: string;
+  errorMessage?: string;
+} | null> {
+  try {
+    await ensureSchema();
+    const rows = await sql`
+      SELECT status, error_title, error_message
+      FROM tasks WHERE task_id = ${taskId} LIMIT 1
+    `;
+    if (rows.length === 0) return null;
+    return {
+      status: rows[0].status as string,
+      errorTitle: (rows[0].error_title as string) ?? undefined,
+      errorMessage: (rows[0].error_message as string) ?? undefined,
+    };
   } catch {
     return null;
   }
@@ -360,6 +404,7 @@ function rowToSong(row: Record<string, unknown>): Song {
 
   return {
     id: row.id as string,
+    taskId: (row.task_id as string | null) ?? undefined,
     title: row.title as string,
     style: (row.style as string | null) ?? undefined,
     prompt: (row.prompt as string | null) ?? undefined,
@@ -378,6 +423,13 @@ function rowToSong(row: Record<string, unknown>): Song {
       row.created_at instanceof Date
         ? row.created_at.toISOString()
         : (row.created_at as string),
+    pronunciationScore:
+      row.pronunciation_score != null
+        ? Number(row.pronunciation_score)
+        : undefined,
+    transcribedLyrics: (row.transcribed_lyrics as string | null) ?? undefined,
+    enhancedAudioKey: (row.enhanced_audio_key as string | null) ?? undefined,
+    isPrimary: row.is_primary != null ? Boolean(row.is_primary) : undefined,
     creator:
       creatorId && creatorName && creatorUsername
         ? {
@@ -489,6 +541,68 @@ export async function updateSongImageKey(
     await sql`UPDATE songs SET image_key = ${imageKey} WHERE id = ${songId}`;
   } catch (e) {
     console.error("[db] updateSongImageKey hatası:", e);
+  }
+}
+
+/** Whisper transcription sonucunu ve telaffuz skorunu DB'ye yaz */
+export async function updateSongTranscription(
+  songId: string,
+  pronunciationScore: number,
+  transcribedLyrics: string,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    await sql`
+      UPDATE songs
+      SET pronunciation_score = ${pronunciationScore},
+          transcribed_lyrics = ${transcribedLyrics}
+      WHERE id = ${songId}
+    `;
+  } catch (e) {
+    console.error("[db] updateSongTranscription hatası:", e);
+  }
+}
+
+/** Aynı task'taki varyantlar arasında en yüksek score'luyu primary yap */
+export async function setPrimaryByScore(taskId: string): Promise<void> {
+  try {
+    await ensureSchema();
+    // Önce tüm varyantları non-primary yap
+    await sql`
+      UPDATE songs SET is_primary = false WHERE task_id = ${taskId}
+    `;
+    // En yüksek pronunciation_score olan varyantı primary yap
+    // Score null olanlar dahil (henüz score gelmemişse created_at'a göre ilk olan)
+    await sql`
+      UPDATE songs SET is_primary = true
+      WHERE id = (
+        SELECT id FROM songs
+        WHERE task_id = ${taskId}
+        ORDER BY pronunciation_score DESC NULLS LAST, created_at ASC
+        LIMIT 1
+      )
+    `;
+  } catch (e) {
+    console.error("[db] setPrimaryByScore hatası:", e);
+  }
+}
+
+/** Bir şarkının orijinal prompt/lyrics'ini getir (Whisper karşılaştırma için) */
+export async function getTaskPrompt(taskId: string): Promise<string | null> {
+  try {
+    await ensureSchema();
+    const rows = await sql`
+      SELECT prompt, payload FROM tasks WHERE task_id = ${taskId} LIMIT 1
+    `;
+    if (rows.length === 0) return null;
+    // payload JSONB'den lyrics'i çıkarmayı dene (wizard-generate bunu koyar)
+    const payload = rows[0].payload as Record<string, unknown> | null;
+    if (payload?.prompt && typeof payload.prompt === "string") {
+      return payload.prompt as string;
+    }
+    return (rows[0].prompt as string) || null;
+  } catch {
+    return null;
   }
 }
 
@@ -1237,4 +1351,90 @@ export async function getSimilarSongs(
     LIMIT ${limit}
   `;
   return rows.map(rowToSong);
+}
+
+/* ── personas ── */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToPersona(r: any): Persona {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    sunoPersonaId: r.suno_persona_id,
+    name: r.name,
+    description: r.description ?? undefined,
+    sourceSong: r.source_title
+      ? {
+          id: r.source_song_id,
+          title: r.source_title,
+          imageUrl: r.source_image_key
+            ? keyToCdnUrl(r.source_image_key)
+            : (r.source_image_url ?? undefined),
+        }
+      : undefined,
+    vocalStart: Number(r.vocal_start) || 0,
+    vocalEnd: Number(r.vocal_end) || 30,
+    personaType: r.persona_type ?? "voice_persona",
+    createdAt: r.created_at?.toISOString?.() ?? r.created_at,
+  };
+}
+
+export async function savePersona(
+  userId: string,
+  sunoPersonaId: string,
+  name: string,
+  description: string | undefined,
+  sourceSongId: string | undefined,
+  vocalStart: number,
+  vocalEnd: number,
+  personaType: "style_persona" | "voice_persona",
+  style?: string,
+): Promise<Persona> {
+  await ensureSchema();
+  const [row] = await sql`
+    INSERT INTO personas (user_id, suno_persona_id, name, description, source_song_id, vocal_start, vocal_end, persona_type, style)
+    VALUES (${userId}, ${sunoPersonaId}, ${name}, ${description ?? null}, ${sourceSongId ?? null}, ${vocalStart}, ${vocalEnd}, ${personaType}, ${style ?? null})
+    RETURNING *
+  `;
+  return { ...rowToPersona(row), sourceSong: undefined };
+}
+
+export async function getUserPersonas(userId: string): Promise<Persona[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT p.*,
+           s.title      AS source_title,
+           s.image_url  AS source_image_url,
+           s.image_key  AS source_image_key
+    FROM personas p
+    LEFT JOIN songs s ON s.id = p.source_song_id
+    WHERE p.user_id = ${userId}
+    ORDER BY p.created_at DESC
+  `;
+  return rows.map(rowToPersona);
+}
+
+export async function getPersonaById(id: string): Promise<Persona | null> {
+  await ensureSchema();
+  const [row] = await sql`
+    SELECT p.*,
+           s.title      AS source_title,
+           s.image_url  AS source_image_url,
+           s.image_key  AS source_image_key
+    FROM personas p
+    LEFT JOIN songs s ON s.id = p.source_song_id
+    WHERE p.id = ${id}
+  `;
+  return row ? rowToPersona(row) : null;
+}
+
+export async function deletePersona(
+  id: string,
+  userId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  await sql`
+    DELETE FROM personas WHERE id = ${id} AND user_id = ${userId}
+  `;
+  return true;
 }

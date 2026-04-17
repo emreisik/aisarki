@@ -20,8 +20,7 @@ import {
 } from "./turkishMusicKB";
 import type { PromptAnalysis } from "@/types";
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+import { chatCompletion } from "./openai";
 
 const ARTIST_IDS = Object.keys(ARTIST_PRESETS) as ArtistPresetId[];
 const GENRE_IDS = Object.keys(GENRES) as GenreId[];
@@ -176,36 +175,19 @@ function isValidAnalysis(obj: unknown): obj is PromptAnalysis {
 export async function analyzePrompt(
   userPrompt: string,
 ): Promise<PromptAnalysis | null> {
-  if (!ANTHROPIC_API_KEY || !userPrompt.trim()) return null;
+  if (!process.env.OPENAI_API_KEY || !userPrompt.trim()) return null;
 
   try {
-    const res = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 600,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: `Fikir: ${userPrompt.trim()}\n\nJSON analiz:`,
-          },
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      console.warn("[promptIntelligence] Claude error:", res.status);
-      return null;
-    }
-    const data = await res.json();
-    const text: string =
-      data.content?.[0]?.type === "text" ? data.content[0].text : "";
+    const text = await chatCompletion(
+      [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `Fikir: ${userPrompt.trim()}\n\nJSON analiz:`,
+        },
+      ],
+      { model: "gpt-4o-mini", maxTokens: 600, temperature: 0.3 },
+    );
     if (!text) return null;
     const parsed = safeJsonParse(text);
     if (!isValidAnalysis(parsed)) {

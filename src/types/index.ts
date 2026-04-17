@@ -7,6 +7,8 @@ export interface SongCreator {
 
 export interface Song {
   id: string;
+  /** Suno task ID — aynı task'tan gelen varyantları gruplamak için */
+  taskId?: string;
   title: string;
   style?: string;
   prompt?: string;
@@ -25,6 +27,14 @@ export interface Song {
   liked?: boolean;
   /** Toplam yorum sayısı (song_comments tablosundan denormalize) */
   commentCount?: number;
+  /** Whisper telaffuz doğrulama skoru (0-100) */
+  pronunciationScore?: number;
+  /** Whisper tarafından transcribe edilen gerçek söylenen sözler */
+  transcribedLyrics?: string;
+  /** İyileştirilmiş audio CDN key'i (Demucs+RVC pipeline çıktısı) */
+  enhancedAudioKey?: string;
+  /** Aynı task'taki varyantlar arasında en iyi score'lu mu? */
+  isPrimary?: boolean;
   createdAt: string;
   creator?: SongCreator;
 }

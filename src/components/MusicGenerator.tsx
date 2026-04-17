@@ -500,40 +500,9 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
               onChange={setCustomMode}
               label="Özel Mod"
             />
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setModelOpen((v) => !v)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#1a1a1a] text-[#aaa] text-xs font-semibold hover:text-white transition-colors pressable"
-              >
-                {selectedModel.label}
-                <ChevronDown
-                  size={12}
-                  className={`transition-transform ${modelOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-              {modelOpen && (
-                <div className="absolute top-full right-0 mt-1 z-10 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 min-w-[100px]">
-                  {MODELS.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => {
-                        setModel(m.id);
-                        setModelOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                        m.id === model
-                          ? "bg-[#1db954] text-white"
-                          : "text-[#888] hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <span className="px-2.5 py-1.5 rounded-lg bg-[#1a1a1a] text-[#555] text-xs font-semibold">
+              V5.5
+            </span>
           </div>
 
           {/* Persona seçici — sadece customMode'da */}
