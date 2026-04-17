@@ -53,6 +53,19 @@ export interface SongComment {
   user?: SongCreator;
 }
 
+export interface Persona {
+  id: string;
+  userId: string;
+  sunoPersonaId: string;
+  name: string;
+  description?: string;
+  sourceSong?: { id: string; title: string; imageUrl?: string };
+  vocalStart: number;
+  vocalEnd: number;
+  personaType: "style_persona" | "voice_persona";
+  createdAt: string;
+}
+
 export interface GenerateRequest {
   prompt: string;
   style?: string;
@@ -70,6 +83,10 @@ export interface GenerateRequest {
   /** Manuel override (kullanıcı slider'la değiştirdiyse) */
   styleWeight?: number;
   weirdnessConstraint?: number;
+  /** Suno persona ID (ses klonu veya stil persona) — sadece customMode'da */
+  personaId?: string;
+  /** Persona tipi: voice_persona (V5+ gerekir) veya style_persona */
+  personaModel?: "style_persona" | "voice_persona";
 }
 
 export interface SunoGeneratePayload {
@@ -115,6 +132,50 @@ export interface PromptAnalysis {
   culturalDetails: string[];
   /** Kullanıcı dostu özet (önizleme kartında gösterilir) */
   summary: string;
+}
+
+// ── Wizard Tipleri ──────────────────────────────────────────────────────────
+
+export type WizardMoodId =
+  | "huzunlu"
+  | "romantik"
+  | "enerjik"
+  | "nostaljik"
+  | "isyankar"
+  | "huzurlu"
+  | "coskulu"
+  | "ozlem";
+
+export type WizardThemeId =
+  | "ask"
+  | "ayrilik"
+  | "gurbet"
+  | "anne_baba"
+  | "doga"
+  | "hayat"
+  | "custom";
+
+export interface WizardState {
+  step: 1 | 2 | 3 | 4;
+  mood: WizardMoodId | null;
+  genreId: string | null;
+  theme: WizardThemeId | null;
+  themeText: string;
+  vocalGender: "m" | "f" | "instrumental";
+  era: "modern" | "klasik" | "90lar";
+  regionId: string | null;
+  model: string;
+}
+
+export interface WizardGenerateRequest {
+  mood: WizardMoodId;
+  genreId: string;
+  theme: WizardThemeId;
+  themeText: string;
+  vocalGender: "m" | "f" | "instrumental";
+  era: "modern" | "klasik" | "90lar";
+  regionId?: string;
+  model?: string;
 }
 
 export interface SunoSong {

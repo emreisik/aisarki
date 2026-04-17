@@ -4,8 +4,10 @@ import React, { useState, useRef, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Loader2, Wand2, Sparkles, ChevronDown } from "lucide-react";
-import { GenerateRequest, SunoApiResponse } from "@/types";
+import { Loader2, Wand2, Sparkles, ChevronDown, Mic2 } from "lucide-react";
+import Link from "next/link";
+import { GenerateRequest, SunoApiResponse, Persona } from "@/types";
+import WizardContainer from "./wizard/WizardContainer";
 
 interface MusicGeneratorProps {
   onTaskStarted: (
@@ -200,7 +202,7 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
   const { setShowGate } = usePlayer();
 
   const [tab, setTab] = useState<"music" | "sounds">("music");
-  const [customMode, setCustomMode] = useState(true);
+  const [customMode, setCustomMode] = useState(false);
   const [model, setModel] = useState<string>("V5_5");
   const [title, setTitle] = useState("");
   const [style, setStyle] = useState("");
@@ -218,6 +220,13 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
   const [modelOpen, setModelOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Persona state
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(
+    null,
+  );
+  const [personaOpen, setPersonaOpen] = useState(false);
 
   const [enrichLoading, setEnrichLoading] = useState(false);
   const [enrichError, setEnrichError] = useState("");
@@ -245,6 +254,15 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
       setPrompt(qp);
     }
   }, [searchParams]);
+
+  // Persona listesini fetch et
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch("/api/personas")
+      .then((r) => r.json())
+      .then((d) => setPersonas(d.personas || []))
+      .catch(() => {});
+  }, [session?.user?.id]);
 
   const PROMPT_MAX = customMode ? 3000 : 500;
   const STYLE_MAX = 1000;
@@ -386,12 +404,21 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
     setLoading(true);
 
     try {
+      const selPersona = selectedPersonaId
+        ? personas.find((p) => p.id === selectedPersonaId)
+        : undefined;
       const payload: GenerateRequest & { model?: string } = {
         prompt: customMode ? lyrics.trim() : prompt.trim(),
         style: customMode ? style.trim() : undefined,
         title: customMode ? title.trim() : undefined,
         instrumental,
         customMode,
+        ...(selPersona
+          ? {
+              personaId: selPersona.sunoPersonaId,
+              personaModel: selPersona.personaType || "voice_persona",
+            }
+          : {}),
       };
       (payload as unknown as Record<string, unknown>).model = model;
 
@@ -509,6 +536,77 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
             </div>
           </div>
 
+          {/* Persona seçici — sadece customMode'da */}
+          {customMode && (
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-1.5">
+                <Mic2 size={14} className="text-[#666]" />
+                <span className="text-white text-[13px] font-semibold">
+                  Persona
+                </span>
+              </div>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setPersonaOpen((v) => !v)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#1a1a1a] text-[#aaa] text-xs font-semibold hover:text-white transition-colors pressable"
+                >
+                  {selectedPersonaId
+                    ? personas.find((p) => p.id === selectedPersonaId)?.name ||
+                      "Seçili"
+                    : "Yok"}
+                  <ChevronDown
+                    size={12}
+                    className={`transition-transform ${personaOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {personaOpen && (
+                  <div className="absolute top-full right-0 mt-1 z-10 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-2xl py-1 min-w-[160px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPersonaId(null);
+                        setPersonaOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                        !selectedPersonaId
+                          ? "bg-[#1db954] text-white"
+                          : "text-[#888] hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      Persona kullanma
+                    </button>
+                    {personas.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPersonaId(p.id);
+                          setPersonaOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                          selectedPersonaId === p.id
+                            ? "bg-[#1db954] text-white"
+                            : "text-[#888] hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                    {personas.length === 0 && (
+                      <Link
+                        href="/voices"
+                        className="block px-3 py-1.5 text-xs text-[#1db954] hover:underline"
+                      >
+                        Persona oluştur
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {customMode ? (
             <>
               {/* Başlık */}
@@ -612,46 +710,12 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
               )}
             </>
           ) : (
-            /* Non-Custom Mode */
-            <>
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-[#666] text-[11px] font-semibold uppercase tracking-wider">
-                    Ne tür bir şarkı istiyorsun?
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleEnrichPrompt}
-                    disabled={enrichLoading || !prompt.trim()}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-[#1db954] hover:text-white disabled:opacity-30 transition-colors pressable"
-                  >
-                    {enrichLoading ? (
-                      <Loader2 size={11} className="animate-spin" />
-                    ) : (
-                      <Wand2 size={11} />
-                    )}
-                    {enrichLoading ? "Güzelleştiriliyor..." : "Güzelleştir"}
-                  </button>
-                </div>
-                <textarea
-                  ref={promptTextareaRef}
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Sahilde özgür hissettiren bir şarkı, rüzgarın sesi..."
-                  rows={4}
-                  maxLength={PROMPT_MAX}
-                  className="w-full bg-[#141414] rounded-xl px-4 py-3 text-white text-sm placeholder-[#444] resize-none focus:outline-none focus:ring-1 focus:ring-[#1db954]/50 transition-all leading-relaxed"
-                />
-                {enrichError && (
-                  <p className="text-red-400 text-xs">{enrichError}</p>
-                )}
-              </div>
-              <Toggle
-                checked={instrumental}
-                onChange={setInstrumental}
-                label="Enstrümantal"
-              />
-            </>
+            /* Wizard Mode */
+            <WizardContainer
+              onTaskStarted={onTaskStarted}
+              model={model}
+              disabled={loading}
+            />
           )}
         </>
       )}
@@ -741,32 +805,34 @@ export default function MusicGenerator({ onTaskStarted }: MusicGeneratorProps) {
         </>
       )}
 
-      {/* ── Hata ── */}
-      {error && (
-        <p className="text-red-400 text-sm text-center py-1">{error}</p>
+      {/* ── Hata + Üret butonu — wizard kendi butonunu yönetir ── */}
+      {(customMode || tab === "sounds") && (
+        <>
+          {error && (
+            <p className="text-red-400 text-sm text-center py-1">{error}</p>
+          )}
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            className={`w-full py-3.5 rounded-full font-bold text-[15px] transition-all pressable ${
+              loading
+                ? "bg-[#1a1a1a] text-[#555]"
+                : "bg-[#1db954] hover:bg-[#1ed760] text-black active:scale-[0.98]"
+            }`}
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                Başlatılıyor...
+              </span>
+            ) : tab === "music" ? (
+              "Oluştur"
+            ) : (
+              "Ses Oluştur"
+            )}
+          </button>
+        </>
       )}
-
-      {/* ── Üret butonu ── */}
-      <button
-        onClick={handleGenerate}
-        disabled={loading}
-        className={`w-full py-3.5 rounded-full font-bold text-[15px] transition-all pressable ${
-          loading
-            ? "bg-[#1a1a1a] text-[#555]"
-            : "bg-[#1db954] hover:bg-[#1ed760] text-black active:scale-[0.98]"
-        }`}
-      >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <Loader2 size={16} className="animate-spin" />
-            Başlatılıyor...
-          </span>
-        ) : tab === "music" ? (
-          "Oluştur"
-        ) : (
-          "Ses Oluştur"
-        )}
-      </button>
     </div>
   );
 }
