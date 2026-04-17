@@ -15,7 +15,6 @@ import {
   buildSunoStyle,
   buildNegativeTags,
   resolveSunoParams,
-  TURKISH_QUALITY_MARKERS,
 } from "@/lib/turkishMusicKB";
 import {
   resolveArtistPreset,
@@ -305,12 +304,13 @@ Başlık:`;
     });
 
     const hasLyrics = sunoOpt.optimizedLyrics.trim().length > 0;
-    const qualitySuffix = isInstrumental ? "" : `, ${TURKISH_QUALITY_MARKERS}`;
+    // customMode'da quality markers zaten style'da (buildSunoStyle ekliyor)
+    // prompt alanı sadece lyrics veya konu metni içermeli
     const finalPrompt = isInstrumental
       ? ""
       : hasLyrics
-        ? sunoOpt.optimizedLyrics + qualitySuffix
-        : topicText + qualitySuffix;
+        ? sunoOpt.optimizedLyrics
+        : topicText;
     const useCustomMode = hasLyrics || isInstrumental;
 
     // Style'a Suno boost ekle (bölgesel tavır, makam scale, genre anchor)
@@ -356,6 +356,10 @@ Başlık:`;
         title: generatedTitle,
         model,
         era,
+        styleLen: finalStyle.length,
+        promptLen: finalPrompt.length,
+        hasLyrics,
+        useCustomMode,
       }),
     );
 
