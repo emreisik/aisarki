@@ -66,7 +66,7 @@ export default function MiniPlayer() {
     <div
       className="fixed left-2 right-2 z-40 rounded-xl overflow-hidden cursor-pointer"
       style={{
-        bottom: "calc(76px + env(safe-area-inset-bottom, 0px) + 8px)",
+        bottom: "calc(50px + env(safe-area-inset-bottom, 0px) + 4px)",
         background: gradient,
       }}
       onClick={() => setPlayerOpen(true)}
