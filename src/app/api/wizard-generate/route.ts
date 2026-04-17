@@ -26,6 +26,7 @@ import {
   MOOD_EMOTION_LABELS,
   TURKISH_CLICHE_BLACKLIST,
 } from "@/lib/wizardMappings";
+import { applySunoOptimizations } from "@/lib/sunoGlossary";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
@@ -295,16 +296,27 @@ Başlık:`;
       generatedTitle = topicText.slice(0, 30);
     }
 
-    // ── 6. Final Suno payload oluştur ──
-    const hasLyrics = generatedLyrics.trim().length > 0;
+    // ── 6. Suno Çeviri Katmanı — otomatik optimizasyonlar ──
+    const sunoOpt = applySunoOptimizations({
+      lyrics: generatedLyrics,
+      regionId: validRegionId,
+      makamId: validMakamId,
+      genreId: validGenreId,
+    });
+
+    const hasLyrics = sunoOpt.optimizedLyrics.trim().length > 0;
     const qualitySuffix = isInstrumental ? "" : `, ${TURKISH_QUALITY_MARKERS}`;
     const finalPrompt = isInstrumental
       ? ""
       : hasLyrics
-        ? generatedLyrics + qualitySuffix
+        ? sunoOpt.optimizedLyrics + qualitySuffix
         : topicText + qualitySuffix;
-    // Lyrics varsa customMode (tam kontrol), yoksa simple mode (Suno kendi üretsin)
     const useCustomMode = hasLyrics || isInstrumental;
+
+    // Style'a Suno boost ekle (bölgesel tavır, makam scale, genre anchor)
+    const finalStyle = sunoOpt.styleBoost
+      ? `${kbStyle}, ${sunoOpt.styleBoost}`
+      : kbStyle;
 
     const ALLOWED_MODELS = new Set([
       "V4",
@@ -329,7 +341,7 @@ Başlık:`;
       negativeTags: kbNegativeTags,
       styleWeight: kbParams.styleWeight,
       weirdnessConstraint: kbParams.weirdnessConstraint,
-      ...(useCustomMode ? { style: kbStyle } : {}),
+      ...(useCustomMode ? { style: finalStyle } : {}),
       ...(generatedTitle ? { title: generatedTitle } : {}),
       ...(finalVocalGender ? { vocalGender: finalVocalGender } : {}),
     };
