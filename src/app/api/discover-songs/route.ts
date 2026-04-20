@@ -16,7 +16,7 @@ export async function GET() {
       LEFT JOIN users u ON u.id::text = s.created_by
       WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
       ORDER BY s.created_at DESC
-      LIMIT 200
+      LIMIT 50
     `;
 
     const songs = rows.map((r) => ({

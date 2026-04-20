@@ -1453,7 +1453,7 @@ export default function HomePage() {
   } | null>(null);
 
   useEffect(() => {
-    fetch("/api/all-songs")
+    fetch("/api/all-songs?limit=30")
       .then((r) => r.json())
       .then((d) => {
         setAllSongs(d.songs || []);

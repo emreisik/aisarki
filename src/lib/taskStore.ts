@@ -487,11 +487,14 @@ export async function getAllSongs(
 ): Promise<Song[]> {
   await ensureSchema();
   // Neon HTTP adapter LIMIT değerini template literal'da kabul ediyor; 0 = limitsiz
-  const lim = limit && limit > 0 ? limit : 10000;
+  const lim = limit && limit > 0 ? limit : 50;
   const rows = userId
     ? await sql`
         SELECT
-          s.*,
+          s.id, s.title, s.style, s.audio_url, s.stream_url, s.image_url,
+          s.audio_key, s.image_key, s.duration, s.status, s.task_id,
+          s.play_count, s.play_count_7d, s.like_count, s.comment_count,
+          s.pronunciation_score, s.is_primary, s.created_at,
           u.id           AS creator_id,
           u.display_name AS creator_name,
           u.username     AS creator_username,
@@ -505,7 +508,10 @@ export async function getAllSongs(
       `
     : await sql`
         SELECT
-          s.*,
+          s.id, s.title, s.style, s.audio_url, s.stream_url, s.image_url,
+          s.audio_key, s.image_key, s.duration, s.status, s.task_id,
+          s.play_count, s.play_count_7d, s.like_count, s.comment_count,
+          s.pronunciation_score, s.is_primary, s.created_at,
           u.id           AS creator_id,
           u.display_name AS creator_name,
           u.username     AS creator_username,
