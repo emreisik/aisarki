@@ -99,14 +99,14 @@ export async function transcribeSong(
  * - Sorunlu kelimelerin listesini ve severity'sini verir
  * - Bir sonraki üretim için fonetik iyileştirme önerileri sunar
  *
- * OPENAI_API_KEY yoksa basit Levenshtein fallback'e düşer.
+ * ANTHROPIC_API_KEY yoksa basit Levenshtein fallback'e düşer.
  */
 export async function scorePronunciation(
   originalLyrics: string,
   transcribedText: string,
 ): Promise<number> {
   // Claude varsa akıllı analiz yap
-  if (OPENAI_API_KEY) {
+  if (process.env.ANTHROPIC_API_KEY) {
     try {
       const analysis = await gptAnalyzePronunciation(
         originalLyrics,
@@ -133,7 +133,7 @@ export async function analyzePronunciation(
   originalLyrics: string,
   transcribedText: string,
 ): Promise<PronunciationAnalysis> {
-  if (OPENAI_API_KEY) {
+  if (process.env.ANTHROPIC_API_KEY) {
     try {
       const analysis = await gptAnalyzePronunciation(
         originalLyrics,

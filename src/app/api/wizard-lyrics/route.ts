@@ -27,9 +27,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Giriş gerekli" }, { status: 401 });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error(
+      "[wizard-lyrics] ANTHROPIC_API_KEY env variable tanımlı değil!",
+    );
     return NextResponse.json(
-      { error: "OPENAI_API_KEY eksik" },
+      {
+        error:
+          "Sunucu yapılandırma hatası — lütfen yöneticiyle iletişime geçin",
+      },
       { status: 500 },
     );
   }

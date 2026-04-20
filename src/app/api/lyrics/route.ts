@@ -23,9 +23,9 @@ interface LyricsRequest {
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
-      { error: "OPENAI_API_KEY eksik" },
+      { error: "ANTHROPIC_API_KEY eksik" },
       { status: 500 },
     );
   }

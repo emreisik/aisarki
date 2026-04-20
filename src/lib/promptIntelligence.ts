@@ -175,7 +175,7 @@ function isValidAnalysis(obj: unknown): obj is PromptAnalysis {
 export async function analyzePrompt(
   userPrompt: string,
 ): Promise<PromptAnalysis | null> {
-  if (!process.env.OPENAI_API_KEY || !userPrompt.trim()) return null;
+  if (!process.env.ANTHROPIC_API_KEY || !userPrompt.trim()) return null;
 
   try {
     const text = await chatCompletion(

@@ -263,7 +263,7 @@ Başlık:`;
 
     if (!approvedLyrics && !approvedTitle) {
       // Kullanıcıdan hazır lyrics gelmedi — Claude ile üret
-      if (process.env.OPENAI_API_KEY) {
+      if (process.env.ANTHROPIC_API_KEY) {
         try {
           const promises: Promise<string>[] = [
             callClaude(titleSystemPrompt, titleUserPrompt, 64),

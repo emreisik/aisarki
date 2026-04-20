@@ -27,9 +27,9 @@ Görev: Kullanıcının kısa/naif fikrini önce **derin analiz** et, sonra **T�
 - Sadece zenginleştirilmiş betimlemeyi yaz, başlık/açıklama yok, sanatçı adı yok`;
 
 export async function POST(request: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
-      { error: "OPENAI_API_KEY eksik" },
+      { error: "ANTHROPIC_API_KEY eksik" },
       { status: 500 },
     );
   }
