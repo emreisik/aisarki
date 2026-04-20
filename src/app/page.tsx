@@ -1070,144 +1070,180 @@ function PromptModal({
 }) {
   const Icon = item.icon;
   const [values, setValues] = useState<Record<string, string>>({});
+  const [step, setStep] = useState(0);
   const [closing, setClosing] = useState(false);
-  const preview = item.buildPrompt(values);
 
-  const textFields = item.fields.filter((f) => f.type === "text");
-  const hasInput =
-    textFields.length === 0 || textFields.some((f) => values[f.key]?.trim());
+  const fields = item.fields;
+  const currentField = fields[step];
+  const isLastStep = step === fields.length - 1;
+  const totalSteps = fields.length;
 
   const set = (key: string, val: string) =>
     setValues((v) => ({ ...v, [key]: val }));
-  const toggle = (key: string, val: string) =>
-    setValues((v) => ({ ...v, [key]: v[key] === val ? "" : val }));
 
   const dismiss = useCallback(() => {
     setClosing(true);
     setTimeout(onClose, 280);
   }, [onClose]);
 
+  const handleNext = () => {
+    if (isLastStep) {
+      const style = MUSICAL_STYLES[item.title] || "";
+      const description = item.buildPrompt(values);
+      const full = style ? `${style}, ${description}` : description;
+      onGenerate(full);
+    } else {
+      setStep((s) => s + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (step > 0) setStep((s) => s - 1);
+  };
+
+  const canNext =
+    currentField?.type === "select" ? !!values[currentField.key] : true; // text alanları opsiyonel — boş geçilebilir
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
-      {/* Backdrop — blur + fade */}
       <div
-        className={`absolute inset-0 bg-black/60 backdrop-blur-md ${closing ? "backdrop-exit" : "backdrop-enter"}`}
+        className={`absolute inset-0 bg-black/70 backdrop-blur-sm ${closing ? "backdrop-exit" : "backdrop-enter"}`}
         onClick={dismiss}
       />
 
-      {/* ── Full-height native sheet ── */}
       <div
-        className={`relative z-10 w-full h-[92vh] bg-[#0c0c0c] rounded-t-[28px] flex flex-col ${closing ? "sheet-exit" : "sheet-enter"}`}
+        className={`relative z-10 w-full bg-[#181818] rounded-t-[16px] flex flex-col ${closing ? "sheet-exit" : "sheet-enter"}`}
       >
         {/* Drag handle */}
-        <div className="flex justify-center pt-2.5 pb-1">
-          <div className="w-9 h-[5px] rounded-full bg-[#333]" />
+        <div className="flex justify-center pt-[10px] pb-[6px]">
+          <div className="w-[36px] h-[4px] rounded-full bg-[#333]" />
         </div>
 
-        {/* ── Header — icon hero + title ── */}
-        <div className="flex flex-col items-center pt-3 pb-5 px-6">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-3"
-            style={{
-              background: `linear-gradient(135deg, ${color}30, ${color}10)`,
-              boxShadow: `0 8px 32px ${color}15`,
-            }}
-          >
-            <Icon size={28} style={{ color }} />
-          </div>
-          <h2 className="text-white text-xl font-black tracking-tight">
-            {item.title}
-          </h2>
-          <p className="text-[#666] text-xs mt-0.5">
-            Bilgileri doldur, şarkını oluşturalım
-          </p>
-        </div>
-
-        {/* ── Form — scrollable ── */}
-        <div className="flex-1 overflow-y-auto scroll-area px-5 pb-4 space-y-5">
-          {item.fields.map((field) => (
-            <div key={field.key}>
-              <label className="text-[#888] text-[11px] font-semibold uppercase tracking-widest mb-2 block pl-1">
-                {field.label}
-              </label>
-              {field.type === "text" ? (
-                <input
-                  value={values[field.key] || ""}
-                  onChange={(e) => set(field.key, e.target.value)}
-                  placeholder={field.placeholder}
-                  className="w-full bg-[#161616] rounded-2xl px-4 py-3.5 text-white text-[15px] placeholder-[#333] focus:outline-none focus:ring-1 transition-shadow"
-                  style={{ focusRingColor: color } as React.CSSProperties}
-                />
-              ) : (
-                /* iOS segmented-control tarzı seçim */
-                <div className="flex flex-wrap gap-2">
-                  {field.options?.map((opt) => {
-                    const active = values[field.key] === opt;
-                    return (
-                      <button
-                        key={opt}
-                        onClick={() => toggle(field.key, opt)}
-                        className="px-4 py-2.5 rounded-2xl text-[13px] font-semibold transition-all pressable active:scale-95"
-                        style={
-                          active
-                            ? {
-                                background: color,
-                                color: "#000",
-                                boxShadow: `0 4px 14px ${color}40`,
-                              }
-                            : {
-                                background: "#161616",
-                                color: "#888",
-                              }
-                        }
-                      >
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Prompt önizleme — native card */}
-          {preview && (
+        {/* Header — kompakt */}
+        <div className="flex items-center justify-between px-[20px] pb-[16px]">
+          <div className="flex items-center gap-[12px]">
             <div
-              className="rounded-2xl p-4 mt-2"
-              style={{
-                background: `${color}08`,
-                border: `1px solid ${color}15`,
-              }}
+              className="w-[40px] h-[40px] rounded-[10px] flex items-center justify-center"
+              style={{ background: `${color}20` }}
             >
-              <p className="text-[#555] text-[10px] font-bold uppercase tracking-widest mb-1.5">
-                Oluşturulacak
+              <Icon size={20} style={{ color }} />
+            </div>
+            <div>
+              <h2 className="text-white text-[16px] font-bold">{item.title}</h2>
+              <p className="text-[#666] text-[12px]">
+                Adım {step + 1}/{totalSteps}
               </p>
-              <p className="text-[#aaa] text-[13px] leading-relaxed">
-                {preview}
-              </p>
+            </div>
+          </div>
+          <button
+            onClick={dismiss}
+            className="w-[32px] h-[32px] rounded-full bg-[#2a2a2a] flex items-center justify-center pressable"
+          >
+            <X size={14} className="text-[#999]" />
+          </button>
+        </div>
+
+        {/* Progress bar */}
+        <div className="px-[20px] pb-[20px]">
+          <div className="h-[3px] bg-[#2a2a2a] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${((step + 1) / totalSteps) * 100}%`,
+                background: color,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Soru alanı — tek soru */}
+        <div className="px-[20px] pb-[24px]">
+          <p className="text-white text-[18px] font-bold mb-[16px]">
+            {currentField?.label}
+          </p>
+
+          {currentField?.type === "text" ? (
+            <input
+              autoFocus
+              value={values[currentField.key] || ""}
+              onChange={(e) => set(currentField.key, e.target.value)}
+              placeholder={currentField.placeholder}
+              className="w-full h-[52px] bg-[#2a2a2a] rounded-[8px] px-[16px] text-white text-[16px] placeholder-[#555] focus:outline-none border border-transparent focus:border-[#1db954] transition-colors"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleNext();
+              }}
+            />
+          ) : (
+            <div className="flex flex-wrap gap-[8px]">
+              {currentField?.options?.map((opt) => {
+                const active = values[currentField.key] === opt;
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => {
+                      set(currentField.key, opt);
+                      // Seçince otomatik ilerle
+                      setTimeout(() => {
+                        if (isLastStep) {
+                          const style = MUSICAL_STYLES[item.title] || "";
+                          const description = item.buildPrompt({
+                            ...values,
+                            [currentField.key]: opt,
+                          });
+                          const full = style
+                            ? `${style}, ${description}`
+                            : description;
+                          onGenerate(full);
+                        } else {
+                          setStep((s) => s + 1);
+                        }
+                      }, 200);
+                    }}
+                    className="px-[16px] py-[12px] rounded-[8px] text-[14px] font-semibold transition-all pressable"
+                    style={
+                      active
+                        ? {
+                            background: color,
+                            color: "#000",
+                            boxShadow: `0 4px 16px ${color}40`,
+                          }
+                        : { background: "#2a2a2a", color: "#ddd" }
+                    }
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* ── CTA — safe area destekli ── */}
-        <div className="px-5 pt-3 pb-[calc(16px+env(safe-area-inset-bottom,0px))]">
-          <button
-            onClick={() => {
-              if (!preview) return;
-              const style = MUSICAL_STYLES[item.title];
-              const full = style ? `[${style}] ${preview}` : preview;
-              onGenerate(full);
-            }}
-            disabled={!preview || !hasInput}
-            className="w-full py-4 rounded-2xl font-black text-[15px] tracking-wide transition-all pressable active:scale-[0.98] disabled:opacity-25"
-            style={{
-              background: preview && hasInput ? color : "#1a1a1a",
-              color: preview && hasInput ? "#000" : "#444",
-              boxShadow: preview && hasInput ? `0 6px 24px ${color}35` : "none",
-            }}
-          >
-            {hasInput ? "Şarkıyı Oluştur" : "Bilgileri doldurun"}
-          </button>
+        {/* Alt butonlar */}
+        <div className="flex gap-[8px] px-[20px] pb-[calc(16px+env(safe-area-inset-bottom,0px))]">
+          {step > 0 && (
+            <button
+              onClick={handleBack}
+              className="h-[48px] px-[20px] rounded-[8px] bg-[#2a2a2a] text-white text-[14px] font-semibold pressable"
+            >
+              Geri
+            </button>
+          )}
+          {currentField?.type === "text" && (
+            <button
+              onClick={handleNext}
+              className="flex-1 h-[48px] rounded-[8px] text-[14px] font-bold pressable transition-colors"
+              style={{
+                background: isLastStep ? color : "#1db954",
+                color: "#000",
+              }}
+            >
+              {isLastStep
+                ? "Şarkıyı Oluştur"
+                : values[currentField.key]?.trim()
+                  ? "Devam"
+                  : "Atla"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1311,19 +1347,21 @@ function Section({
   href?: string;
 }) {
   return (
-    <section className="mb-6">
-      <div className="flex items-center justify-between px-5 mb-3">
-        <h2 className="text-white text-[17px] font-bold">{title}</h2>
+    <section className="mb-[24px]">
+      <div className="flex items-baseline justify-between px-[16px] mb-[12px]">
+        <h2 className="text-white text-[22px] font-bold leading-[28px]">
+          {title}
+        </h2>
         {href && (
           <Link
             href={href}
-            className="text-[#888] text-[12px] font-semibold pressable"
+            className="text-[#b3b3b3] text-[12px] font-bold uppercase tracking-wide pressable hover:text-white transition-colors"
           >
-            Tümü
+            Tümünü göster
           </Link>
         )}
       </div>
-      <div className="flex gap-3 overflow-x-auto scroll-area px-5 pb-1">
+      <div className="flex gap-[16px] overflow-x-auto scroll-area px-[16px] pb-[4px]">
         {children}
       </div>
     </section>
@@ -1345,9 +1383,9 @@ function SongCard2({
   return (
     <button
       onClick={onPlay}
-      className="flex-shrink-0 w-[130px] text-left pressable group"
+      className="flex-shrink-0 w-[156px] text-left pressable group"
     >
-      <div className="w-[130px] h-[130px] rounded-lg overflow-hidden bg-[#1a1a1a] mb-2 relative">
+      <div className="w-[156px] h-[156px] rounded-[8px] overflow-hidden bg-[#282828] mb-[8px] relative shadow-lg shadow-black/40">
         {song.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -1357,30 +1395,30 @@ function SongCard2({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Music2 size={24} className="text-[#333]" />
+            <Music2 size={32} className="text-[#7f7f7f]" />
           </div>
         )}
-        {/* Buton: aktif şarkıysa (pause dahil) her zaman görünür, değilse hover'da */}
+        {/* Spotify play button — yeşil, sağ alt, hover animasyonu */}
         <div
-          className={`absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-lg transition-all ${
+          className={`absolute bottom-[8px] right-[8px] w-[48px] h-[48px] rounded-full bg-[#1ed760] flex items-center justify-center shadow-xl shadow-black/50 transition-all duration-300 ${
             isActive
               ? "opacity-100 translate-y-0"
-              : "opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
+              : "opacity-0 group-hover:opacity-100 translate-y-[8px] group-hover:translate-y-0"
           }`}
         >
           {isActive && isPlaying ? (
-            <Pause size={18} fill="black" className="text-black" />
+            <Pause size={20} fill="black" className="text-black" />
           ) : (
-            <Play size={18} fill="black" className="text-black ml-0.5" />
+            <Play size={20} fill="black" className="text-black ml-[2px]" />
           )}
         </div>
       </div>
       <p
-        className={`text-[13px] font-semibold truncate ${isActive ? "text-[#1db954]" : "text-white"}`}
+        className={`text-[14px] font-bold truncate leading-[20px] ${isActive ? "text-[#1db954]" : "text-white"}`}
       >
         {song.title}
       </p>
-      <p className="text-[#666] text-[11px] truncate mt-0.5">
+      <p className="text-[#b3b3b3] text-[11px] truncate mt-[4px] leading-[16px]">
         {song.creator?.name || song.style?.split(",")[0] || "Hubeya"}
       </p>
     </button>
@@ -1451,6 +1489,50 @@ export default function HomePage() {
     item: CategoryItem;
     color: string;
   } | null>(null);
+  const [inlineInput, setInlineInput] = useState("");
+  const [inlineGenerating, setInlineGenerating] = useState(false);
+
+  const handleInlineGenerate = useCallback(async () => {
+    if (!selectedCat || inlineGenerating) return;
+    if (!session?.user) {
+      router.push("/auth/signin");
+      return;
+    }
+    setInlineGenerating(true);
+    try {
+      const description = inlineInput.trim()
+        ? selectedCat.item.buildPrompt({
+            [selectedCat.item.fields[0]?.key || "name"]: inlineInput.trim(),
+          })
+        : selectedCat.item.buildPrompt({});
+      const style =
+        MUSICAL_STYLES[selectedCat.item.title] ||
+        "Turkish pop, natural vocals, acoustic guitar";
+      // Simple mode — prompt açıklama olarak gider, Suno kendi lyrics üretir
+      const prompt = `${style}, ${description}`;
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          customMode: false,
+          model: "V5_5",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Şarkı oluşturulamadı");
+        return;
+      }
+      setSelectedCat(null);
+      setInlineInput("");
+      router.push("/create");
+    } catch {
+      alert("Bağlantı hatası");
+    } finally {
+      setInlineGenerating(false);
+    }
+  }, [selectedCat, inlineInput, inlineGenerating, session, router]);
 
   useEffect(() => {
     fetch("/api/all-songs?limit=30")
@@ -1551,127 +1633,123 @@ export default function HomePage() {
   })();
 
   return (
-    <div className="min-h-full bg-[#0a0a0a]">
-      {/* ── Üst: Selamlama + Oluştur ── */}
-      <div className="pt-4 pb-2 px-5">
-        <div className="flex items-center justify-between">
-          <h1 className="text-white text-[22px] font-bold">{greeting}</h1>
-          <Link
-            href="/create"
-            className="text-[13px] text-[#b3b3b3] font-medium pressable"
-          >
-            Serbest mod
-          </Link>
-        </div>
+    <div className="min-h-full bg-[#121212]">
+      {/* ── Spotify Header: Selamlama + Avatar ── */}
+      <div className="pt-[14px] pb-[10px] px-[16px]">
+        <h1 className="text-white text-[24px] font-bold leading-[32px]">
+          {greeting}
+        </h1>
       </div>
 
-      {/* ── Hızlı erişim grid — Spotify tarzı ── */}
-      {discoverSongs.length > 0 && (
-        <div className="px-4 pt-2 pb-4">
-          <div className="grid grid-cols-2 gap-2">
-            {discoverSongs.slice(0, 4).map((song) => {
-              const active = currentSong?.id === song.id;
+      {/* ── Şarkını Oluştur — inline input ── */}
+      <section className="mb-[24px]">
+        <div className="px-[16px] mb-[12px]">
+          <h2 className="text-white text-[22px] font-bold leading-[28px]">
+            Şarkını oluştur
+          </h2>
+        </div>
+        <div className="flex gap-[16px] overflow-x-auto scroll-area px-[16px] pb-[4px]">
+          {CATEGORY_GROUPS.flatMap((group) =>
+            group.items.map((item) => {
+              const Icon = item.icon;
+              const isSelected = selectedCat?.item.title === item.title;
               return (
-                <button
-                  key={song.id}
-                  onClick={() => playSong(song, discoverSongs)}
-                  className={`flex items-center gap-3 h-[48px] rounded overflow-hidden pressable ${
-                    active ? "bg-[#ffffff18]" : "bg-[#ffffff0a]"
-                  }`}
-                >
-                  <div className="w-[48px] h-[48px] flex-shrink-0 overflow-hidden bg-[#1a1a1a]">
-                    {song.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={song.imageUrl}
-                        alt={song.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Music2 size={16} className="text-[#333]" />
-                      </div>
-                    )}
-                  </div>
-                  <span
-                    className={`text-[13px] font-semibold truncate pr-3 ${active ? "text-[#1db954]" : "text-white"}`}
+                <div key={item.title} className="flex-shrink-0 w-[156px]">
+                  <button
+                    onClick={() =>
+                      setSelectedCat(
+                        isSelected ? null : { item, color: group.color },
+                      )
+                    }
+                    className="w-full text-left pressable group"
                   >
-                    {song.title}
-                  </span>
-                </button>
+                    <div
+                      className="w-[156px] h-[156px] rounded-[8px] overflow-hidden mb-[8px] relative flex items-end p-[12px] transition-all"
+                      style={{
+                        background: `linear-gradient(160deg, ${group.color}40 0%, ${group.color}15 50%, #282828 100%)`,
+                        outline: isSelected
+                          ? `2px solid ${group.color}`
+                          : "none",
+                        outlineOffset: "2px",
+                      }}
+                    >
+                      <div
+                        className="absolute top-[12px] right-[12px] w-[40px] h-[40px] rounded-full flex items-center justify-center"
+                        style={{ background: `${group.color}30` }}
+                      >
+                        <Icon size={18} style={{ color: group.color }} />
+                      </div>
+                      <span className="text-white text-[15px] font-bold leading-[20px]">
+                        {item.title}
+                      </span>
+                    </div>
+                    <p className="text-[#b3b3b3] text-[11px] truncate leading-[16px]">
+                      {group.label}
+                    </p>
+                  </button>
+                </div>
               );
-            })}
+            }),
+          )}
+        </div>
+
+        {/* Inline input — seçili kartın altında */}
+        {selectedCat && (
+          <div className="px-[16px] mt-[12px]">
+            <div className="flex gap-[8px] items-center">
+              <input
+                autoFocus
+                value={inlineInput}
+                onChange={(e) => setInlineInput(e.target.value)}
+                placeholder={
+                  selectedCat.item.fields[0]?.placeholder || "Kimin için?"
+                }
+                className="flex-1 h-[48px] bg-[#2a2a2a] rounded-[8px] px-[16px] text-white text-[14px] placeholder-[#666] focus:outline-none border border-transparent focus:border-[#1db954] transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleInlineGenerate();
+                  }
+                }}
+              />
+              <button
+                onClick={handleInlineGenerate}
+                disabled={inlineGenerating}
+                className="h-[48px] px-[20px] rounded-[8px] bg-[#1db954] text-black text-[14px] font-bold pressable hover:bg-[#1ed760] transition-colors disabled:opacity-50 flex items-center gap-[6px] flex-shrink-0"
+              >
+                {inlineGenerating ? (
+                  <div className="w-[16px] h-[16px] border-2 border-black border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Play size={14} fill="black" />
+                    Üret
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedCat(null);
+                  setInlineInput("");
+                }}
+                className="h-[48px] w-[48px] rounded-[8px] bg-[#2a2a2a] flex items-center justify-center pressable flex-shrink-0"
+              >
+                <X size={16} className="text-[#999]" />
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </section>
 
-      {/* ── Kategori carousel ── */}
-      <div className="pb-4">
-        <div className="px-5 mb-3">
-          <h2 className="text-white text-[17px] font-bold">Şarkını oluştur</h2>
-        </div>
-        <CategoryCarousel
-          groups={CATEGORY_GROUPS}
-          onSelect={(item, color) => setSelectedCat({ item, color })}
-        />
-      </div>
-
-      {/* ── Kategori prompt modal ── */}
-      {selectedCat && (
-        <PromptModal
-          item={selectedCat.item}
-          color={selectedCat.color}
-          onClose={() => setSelectedCat(null)}
-          onGenerate={(prompt) => {
-            setSelectedCat(null);
-            router.push(`/create?prompt=${encodeURIComponent(prompt)}`);
-          }}
-        />
-      )}
-
-      {/* ── Kitaplık ── */}
-      {session?.user && (
-        <Section title="Kitaplığın" href="/playlists">
-          <LikedCard />
-          {playlists.map((pl) => (
-            <PlaylistCard key={pl.id} playlist={pl} />
-          ))}
-        </Section>
-      )}
-
-      {/* ── Son dinlediklerin (sadece oturum açmış) ── */}
-      {session?.user && recentPlays.length > 0 && (
-        <Section title="Son dinlediklerin">
-          {recentPlays.map((song) => (
-            <SongCard2
-              key={song.id}
-              song={song}
-              onPlay={() => playSong(song, recentPlays)}
-              isActive={currentSong?.id === song.id}
-              isPlaying={currentSong?.id === song.id && playing}
-            />
-          ))}
-        </Section>
-      )}
-
-      {/* ── Son şarkılar ── */}
-      {moreSongs.length > 0 && (
-        <Section title="Son eklenenler">
-          {moreSongs.slice(0, 12).map((song) => (
-            <SongCard2
-              key={song.id}
-              song={song}
-              onPlay={() => playSong(song, allSongs)}
-              isActive={currentSong?.id === song.id}
-              isPlaying={currentSong?.id === song.id && playing}
-            />
-          ))}
-        </Section>
-      )}
+      {/* Kaldırılan bölümler: Kitaplık, Son dinlediklerin, Son eklenenler */}
 
       {/* ── Öneriler ── */}
       {recommendations.length > 0 && (
-        <Section title={recsPersonalized ? "Sana özel" : "Popüler"}>
+        <Section
+          title={
+            recsPersonalized
+              ? "Günlük müzik ihtiyacın"
+              : "Popüler albümler ve single'lar"
+          }
+        >
           {recommendations.slice(0, 12).map((song) => (
             <SongCard2
               key={song.id}
