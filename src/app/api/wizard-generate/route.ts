@@ -50,7 +50,7 @@ async function callClaude(
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    { model: "gpt-4o", maxTokens },
+    { maxTokens },
   );
 }
 

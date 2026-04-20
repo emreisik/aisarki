@@ -197,7 +197,7 @@ PUANLAMA:
           content: `ORİJİNAL SÖZLER:\n${originalLyrics.slice(0, 2000)}\n\nWHISPER TRANSCRİPTİON (gerçekte söylenen):\n${transcribedText.slice(0, 2000)}`,
         },
       ],
-      { model: "gpt-4o-mini", maxTokens: 1024, temperature: 0.2 },
+      { maxTokens: 1024, temperature: 0.2 },
     );
 
     const jsonStr = text

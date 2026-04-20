@@ -13,6 +13,8 @@ import {
   Sparkles,
   User,
   Disc3,
+  Mic2,
+  Volume2,
 } from "lucide-react";
 import AppLogo from "./AppLogo";
 import { useState, useEffect, useRef } from "react";
@@ -80,6 +82,8 @@ export default function DesktopSidebar() {
             { href: "/discover", label: "Keşfet", icon: Compass },
             { href: "/create", label: "Oluştur", icon: Sparkles },
             { href: "/playlists", label: "Listeler", icon: Disc3 },
+            { href: "/voices", label: "Seslerim", icon: Mic2 },
+            { href: "/sounds", label: "Sesler", icon: Volume2 },
             {
               href: session?.user ? "/profile" : "/auth/signin",
               label: "Profil",

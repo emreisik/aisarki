@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useGoBack } from "@/hooks/useGoBack";
 import Link from "next/link";
 import { Play, Pause, Music2, MoreHorizontal, ArrowLeft } from "lucide-react";
 import { formatListenerCount } from "@/lib/formatNumber";
@@ -92,6 +93,7 @@ export default function ArtistPage() {
   const params = useParams();
   const username = params.username as string;
   const router = useRouter();
+  const goBack = useGoBack();
   const { data: session } = useSession();
   const { playSong, currentSong, playing, togglePlay } = usePlayer();
 
@@ -200,7 +202,7 @@ export default function ArtistPage() {
       >
         {/* Geri */}
         <button
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="absolute top-4 left-4 z-10 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white pressable active:scale-95"
         >
           <ArrowLeft size={18} />

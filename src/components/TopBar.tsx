@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { handleSignOut } from "@/lib/authUtils";
 import { ChevronLeft, User, LogOut, LogIn } from "lucide-react";
 import Link from "next/link";
 
@@ -86,7 +87,7 @@ export default function TopBar() {
                 </Link>
                 <div className="h-px bg-[#3e3e3e]" />
                 <button
-                  onClick={() => signOut({ callbackUrl: "/" })}
+                  onClick={() => handleSignOut()}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white text-sm hover:bg-[#3e3e3e] transition-colors text-left"
                 >
                   <LogOut size={16} />

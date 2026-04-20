@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useGoBack } from "@/hooks/useGoBack";
 import Link from "next/link";
 import { ArrowLeft, Play, Pause, Music2, Shuffle } from "lucide-react";
 
@@ -98,6 +99,7 @@ function fmt(s?: number) {
 export default function CategoryPage() {
   const params = useParams();
   const router = useRouter();
+  const goBack = useGoBack("/discover");
   const categoryId = params.category as string;
   const { playSong, currentSong, playing, togglePlay } = usePlayer();
 
@@ -191,7 +193,7 @@ export default function CategoryPage() {
 
         {/* Geri butonu */}
         <button
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="absolute top-4 left-4 w-10 h-10 flex items-center justify-center rounded-full bg-black/30 backdrop-blur-sm pressable z-10"
         >
           <ArrowLeft size={20} className="text-white" />

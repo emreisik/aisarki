@@ -1,6 +1,7 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { handleSignOut } from "@/lib/authUtils";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -140,7 +141,7 @@ export default function ProfilePage() {
             Düzenle
           </button>
           <button
-            onClick={() => signOut({ callbackUrl: "/" })}
+            onClick={() => handleSignOut()}
             className="flex items-center gap-2 border border-white/10 rounded-full px-4 py-1.5 text-white/50 text-sm font-semibold hover:text-white hover:border-white/30 transition-colors pressable"
           >
             <LogOut size={14} />

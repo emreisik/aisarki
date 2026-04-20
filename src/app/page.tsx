@@ -1491,18 +1491,14 @@ export default function HomePage() {
       .catch(() => setFeedSongs([]));
   }, [session?.user?.id]);
 
-  // ── Son dinlediklerin ──
+  // ── Son dinlediklerin (sadece oturum açmış kullanıcılar) ──
   const [recentPlays, setRecentPlays] = useState<Song[]>([]);
   useEffect(() => {
-    let sid = "";
-    try {
-      sid = localStorage.getItem("hubeya_sid") ?? "";
-    } catch {
-      /* storage yok */
+    if (!session?.user?.id) {
+      setRecentPlays([]);
+      return;
     }
-    const headers: HeadersInit = {};
-    if (!session?.user && sid) headers["x-session-id"] = sid;
-    fetch("/api/recent-plays?limit=10", { headers })
+    fetch("/api/recent-plays?limit=10")
       .then((r) => r.json())
       .then((d) => setRecentPlays(d.songs || []))
       .catch(() => {});
@@ -1643,8 +1639,8 @@ export default function HomePage() {
         </Section>
       )}
 
-      {/* ── Son dinlediklerin ── */}
-      {recentPlays.length > 0 && (
+      {/* ── Son dinlediklerin (sadece oturum açmış) ── */}
+      {session?.user && recentPlays.length > 0 && (
         <Section title="Son dinlediklerin">
           {recentPlays.map((song) => (
             <SongCard2

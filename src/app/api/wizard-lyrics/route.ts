@@ -205,7 +205,7 @@ Sadece sözleri yaz — açıklama, başlık veya yorum ekleme.`;
             content: `Şarkı konusu: ${topicText}${contextBlock}\n\nŞarkı sözlerini yaz:`,
           },
         ],
-        { model: "gpt-4o", maxTokens: 2048 },
+        { maxTokens: 2048 },
       ),
       quickCompletion(
         titleSystemPrompt,

@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
           content: `Fikir: ${body.prompt.trim()}\n\nZenginleştirilmiş betimleme:`,
         },
       ],
-      { model: "gpt-4o", maxTokens: 400 },
+      { maxTokens: 400 },
     );
 
     if (!enriched) {

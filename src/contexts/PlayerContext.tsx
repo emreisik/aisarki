@@ -56,7 +56,7 @@ function saveState(
 }
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [playlist, setPlaylist] = useState<Song[]>([]);
@@ -85,13 +85,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const KEY = "hubeya_sid";
-      let sid = localStorage.getItem(KEY);
+      // sessionStorage kullan — sekme/pencere kapanınca otomatik silinir
+      let sid = sessionStorage.getItem(KEY);
       if (!sid) {
         sid =
           typeof crypto !== "undefined" && "randomUUID" in crypto
             ? crypto.randomUUID()
             : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-        localStorage.setItem(KEY, sid);
+        sessionStorage.setItem(KEY, sid);
       }
       anonSessionIdRef.current = sid;
     } catch {
@@ -111,8 +112,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   currentIndexRef.current = currentIndex;
   currentSongRef.current = currentSong;
 
-  // ── Mount: localStorage'dan geri yükle ──
+  // ── Mount: localStorage'dan geri yükle (sadece oturum açıksa) ──
   useEffect(() => {
+    // Oturum durumu henüz belirlenmemişse bekle
+    if (status === "loading") return;
+
+    // Oturum kapalıysa player state'i temizle
+    if (status === "unauthenticated") {
+      setCurrentSong(null);
+      setPlaylist([]);
+      setCurrentIndex(-1);
+      setPlayerOpen(false);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
+      return;
+    }
+
+    // Oturum açıksa localStorage'dan geri yükle
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
@@ -124,10 +141,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setCurrentSong(song);
       setPlaylist(pl || [song]);
       setCurrentIndex(index ?? 0);
-      setPlayerOpen(isOpen ?? true); // Kaydedilmiş durumu geri yükle
+      setPlayerOpen(isOpen ?? true);
       // playing = false kalır (autoplay politikası)
     } catch {}
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Şarkı değişince yükle ──
   useEffect(() => {

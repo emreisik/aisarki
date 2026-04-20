@@ -186,7 +186,7 @@ export async function analyzePrompt(
           content: `Fikir: ${userPrompt.trim()}\n\nJSON analiz:`,
         },
       ],
-      { model: "gpt-4o-mini", maxTokens: 600, temperature: 0.3 },
+      { maxTokens: 600, temperature: 0.3 },
     );
     if (!text) return null;
     const parsed = safeJsonParse(text);

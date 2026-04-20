@@ -25,82 +25,121 @@ import {
 interface Category {
   id: string;
   label: string;
-  gradient: [string, string]; // iki renk → mesh gradient
+  /** CSS mesh gradient — tek string, birebir Suno deseni */
+  bg: string;
   keywords: string[];
 }
 
+// Her kategori Suno'nun birebir mesh-gradient desenini kullanır.
+// Teknik: birden fazla radial-gradient katmanı, büyük blur, üst üste binen blob'lar.
 const CATEGORIES: Category[] = [
   {
     id: "pop",
     label: "Pop",
-    gradient: ["#e91429", "#ff6a3d"],
+    bg: "radial-gradient(circle at 30% 20%, #a855f7 0%, transparent 50%), radial-gradient(circle at 80% 80%, #ec4899 0%, transparent 50%), radial-gradient(circle at 50% 60%, #7c3aed 0%, transparent 60%), linear-gradient(135deg, #6d28d9 0%, #db2777 100%)",
     keywords: ["pop"],
   },
   {
     id: "turk",
     label: "Türk Müziği",
-    gradient: ["#148a08", "#45c928"],
+    bg: "radial-gradient(circle at 25% 25%, #4ade80 0%, transparent 50%), radial-gradient(circle at 75% 75%, #166534 0%, transparent 50%), radial-gradient(circle at 60% 30%, #22c55e 0%, transparent 55%), linear-gradient(135deg, #14532d 0%, #15803d 100%)",
     keywords: ["türk", "türkçe", "anatolian", "arabesk"],
   },
   {
     id: "rock",
     label: "Rock",
-    gradient: ["#4a2c70", "#e8115b"],
+    bg: "radial-gradient(circle at 40% 30%, #2dd4bf 0%, transparent 45%), radial-gradient(circle at 70% 70%, #064e3b 0%, transparent 50%), radial-gradient(circle at 20% 80%, #0f766e 0%, transparent 55%), linear-gradient(135deg, #134e4a 0%, #0d3d36 100%)",
     keywords: ["rock", "metal", "alternative"],
   },
   {
     id: "hiphop",
     label: "Hip-Hop",
-    gradient: ["#1e3264", "#5b8def"],
+    bg: "radial-gradient(circle at 30% 30%, #60a5fa 0%, transparent 50%), radial-gradient(circle at 75% 70%, #1e3a8a 0%, transparent 50%), radial-gradient(circle at 55% 50%, #3b82f6 0%, transparent 55%), linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%)",
     keywords: ["hip", "rap", "trap"],
   },
   {
-    id: "romantik",
-    label: "Romantik",
-    gradient: ["#c62a2a", "#ff7eb3"],
-    keywords: ["romantic", "romantik", "love", "aşk"],
+    id: "electronic",
+    label: "Electronic",
+    bg: "radial-gradient(circle at 35% 25%, #22d3ee 0%, transparent 45%), radial-gradient(circle at 70% 75%, #0e7490 0%, transparent 50%), radial-gradient(circle at 50% 50%, #06b6d4 0%, transparent 55%), linear-gradient(135deg, #164e63 0%, #0891b2 100%)",
+    keywords: ["electronic", "edm", "synth", "techno"],
+  },
+  {
+    id: "latin",
+    label: "Latin",
+    bg: "radial-gradient(circle at 25% 30%, #818cf8 0%, transparent 50%), radial-gradient(circle at 80% 70%, #2563eb 0%, transparent 45%), radial-gradient(circle at 50% 50%, #4f46e5 0%, transparent 55%), linear-gradient(135deg, #312e81 0%, #3730a3 100%)",
+    keywords: ["latin", "reggaeton", "salsa"],
+  },
+  {
+    id: "country",
+    label: "Country",
+    bg: "radial-gradient(circle at 30% 30%, #fbbf24 0%, transparent 45%), radial-gradient(circle at 75% 70%, #b45309 0%, transparent 50%), radial-gradient(circle at 55% 45%, #f59e0b 0%, transparent 55%), linear-gradient(135deg, #78350f 0%, #d97706 100%)",
+    keywords: ["country"],
+  },
+  {
+    id: "folk",
+    label: "Folk",
+    bg: "radial-gradient(circle at 35% 35%, #a3e635 0%, transparent 45%), radial-gradient(circle at 70% 65%, #4d7c0f 0%, transparent 50%), radial-gradient(circle at 45% 75%, #65a30d 0%, transparent 50%), linear-gradient(135deg, #365314 0%, #4d7c0f 100%)",
+    keywords: ["folk", "acoustic", "akustik"],
+  },
+  {
+    id: "jazz",
+    label: "Jazz",
+    bg: "radial-gradient(circle at 30% 25%, #fbbf24 0%, transparent 45%), radial-gradient(circle at 75% 75%, #c2410c 0%, transparent 50%), radial-gradient(circle at 50% 50%, #ea580c 0%, transparent 55%), linear-gradient(135deg, #9a3412 0%, #ea580c 100%)",
+    keywords: ["jazz", "swing", "blues"],
+  },
+  {
+    id: "rnb",
+    label: "R&B",
+    bg: "radial-gradient(circle at 30% 25%, #f97316 0%, transparent 45%), radial-gradient(circle at 75% 75%, #dc2626 0%, transparent 50%), radial-gradient(circle at 50% 55%, #ea580c 0%, transparent 50%), linear-gradient(135deg, #7f1d1d 0%, #c2410c 100%)",
+    keywords: ["rnb", "r&b", "soul"],
   },
   {
     id: "dans",
     label: "Dance",
-    gradient: ["#5c2d82", "#c471ed"],
-    keywords: ["dance", "dans", "edm", "electronic"],
+    bg: "radial-gradient(circle at 30% 30%, #c084fc 0%, transparent 45%), radial-gradient(circle at 75% 70%, #7c3aed 0%, transparent 50%), radial-gradient(circle at 50% 55%, #a855f7 0%, transparent 55%), linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)",
+    keywords: ["dance", "dans"],
+  },
+  {
+    id: "romantik",
+    label: "Romantik",
+    bg: "radial-gradient(circle at 30% 30%, #fb7185 0%, transparent 45%), radial-gradient(circle at 75% 70%, #be123c 0%, transparent 50%), radial-gradient(circle at 50% 55%, #f43f5e 0%, transparent 55%), linear-gradient(135deg, #881337 0%, #e11d48 100%)",
+    keywords: ["romantic", "romantik", "love", "aşk"],
   },
   {
     id: "cocuk",
     label: "Çocuk",
-    gradient: ["#e8a400", "#ffe066"],
+    bg: "radial-gradient(circle at 25% 25%, #fde047 0%, transparent 50%), radial-gradient(circle at 75% 75%, #f97316 0%, transparent 45%), radial-gradient(circle at 55% 45%, #facc15 0%, transparent 55%), linear-gradient(135deg, #a16207 0%, #eab308 100%)",
     keywords: ["child", "çocuk", "kid", "nursery"],
-  },
-  {
-    id: "akustik",
-    label: "Akustik",
-    gradient: ["#2d6a4f", "#74c69d"],
-    keywords: ["acoustic", "akustik", "folk"],
-  },
-  {
-    id: "nostalji",
-    label: "Nostaljik",
-    gradient: ["#3a506b", "#8bbae8"],
-    keywords: ["nostalji", "klasik", "retro", "vintage"],
-  },
-  {
-    id: "motivasyon",
-    label: "Motivasyon",
-    gradient: ["#f05e22", "#ffa751"],
-    keywords: ["motivation", "motivasyon", "uplifting", "energetic"],
   },
   {
     id: "sakin",
     label: "Chill",
-    gradient: ["#27856a", "#6ee7b7"],
-    keywords: ["calm", "chill", "sakin", "relaxing", "ambient"],
+    bg: "radial-gradient(circle at 30% 30%, #6ee7b7 0%, transparent 45%), radial-gradient(circle at 70% 70%, #065f46 0%, transparent 50%), radial-gradient(circle at 50% 50%, #10b981 0%, transparent 55%), linear-gradient(135deg, #064e3b 0%, #047857 100%)",
+    keywords: ["calm", "chill", "sakin", "ambient"],
   },
   {
     id: "duygusal",
     label: "Duygusal",
-    gradient: ["#9b1d8a", "#e879f9"],
-    keywords: ["sad", "duygusal", "emotional", "üzgün", "melanko"],
+    bg: "radial-gradient(circle at 30% 25%, #e879f9 0%, transparent 45%), radial-gradient(circle at 75% 75%, #86198f 0%, transparent 50%), radial-gradient(circle at 50% 55%, #d946ef 0%, transparent 55%), linear-gradient(135deg, #701a75 0%, #a21caf 100%)",
+    keywords: ["sad", "duygusal", "emotional", "melanko"],
+  },
+  {
+    id: "nostalji",
+    label: "Nostaljik",
+    bg: "radial-gradient(circle at 30% 30%, #93c5fd 0%, transparent 45%), radial-gradient(circle at 75% 70%, #1e3a8a 0%, transparent 50%), radial-gradient(circle at 50% 55%, #3b82f6 0%, transparent 55%), linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)",
+    keywords: ["nostalji", "retro", "vintage", "klasik"],
+  },
+  {
+    id: "reggae",
+    label: "Reggae",
+    bg: "radial-gradient(circle at 30% 30%, #4ade80 0%, transparent 45%), radial-gradient(circle at 75% 70%, #eab308 0%, transparent 45%), radial-gradient(circle at 50% 55%, #22c55e 0%, transparent 50%), linear-gradient(135deg, #14532d 0%, #15803d 100%)",
+    keywords: ["reggae", "ska", "dub"],
+  },
+  {
+    id: "punk",
+    label: "Punk",
+    bg: "radial-gradient(circle at 30% 30%, #ef4444 0%, transparent 45%), radial-gradient(circle at 75% 70%, #1c1917 0%, transparent 50%), radial-gradient(circle at 50% 50%, #dc2626 0%, transparent 55%), linear-gradient(135deg, #450a0a 0%, #991b1b 100%)",
+    keywords: ["punk", "hardcore", "grunge"],
   },
 ];
 
@@ -109,53 +148,96 @@ function fmt(s?: number) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
-/* ── Suno tarzı gradient kart ── */
-function GenreCard({ cat, onClick }: { cat: Category; onClick: () => void }) {
+/* ── Suno birebir mesh-gradient genre kart + üst deste ── */
+function GenreCard({
+  cat,
+  onClick,
+  onPlay,
+  isPlaying,
+}: {
+  cat: Category;
+  onClick: () => void;
+  onPlay?: () => void;
+  isPlaying?: boolean;
+}) {
   return (
-    <button
-      onClick={onClick}
-      className="flex-shrink-0 flex flex-col items-start pressable group"
-    >
-      <div
-        className="w-[130px] h-[130px] md:w-[154px] md:h-[154px] rounded-xl overflow-hidden relative"
-        style={{
-          background: `linear-gradient(135deg, ${cat.gradient[0]} 0%, ${cat.gradient[1]} 50%, ${cat.gradient[0]}88 100%)`,
-        }}
-      >
-        {/* Bulanık dekoratif daireler — Suno "blob" efekti */}
+    <div className="flex-shrink-0 w-[148px] flex flex-col items-start group">
+      <div className="relative w-full pt-[8px]">
+        {/* Deste katman 2 (en arka, en üstte) */}
         <div
-          className="absolute w-[80%] h-[80%] rounded-full blur-2xl opacity-50"
+          className="absolute rounded-t-[12px] transition-all duration-200 ease-out group-hover:top-[-2px] group-hover:left-[5px] group-hover:right-[5px]"
           style={{
-            background: cat.gradient[1],
-            top: "10%",
-            left: "-20%",
+            top: 0,
+            left: 8,
+            right: 8,
+            height: 14,
+            background: cat.bg,
+            opacity: 0.3,
+            filter: "brightness(0.45) saturate(0.8)",
           }}
         />
+        {/* Deste katman 1 */}
         <div
-          className="absolute w-[60%] h-[60%] rounded-full blur-2xl opacity-40"
+          className="absolute rounded-t-[13px] transition-all duration-200 ease-out group-hover:top-[1px] group-hover:left-[2px] group-hover:right-[2px]"
           style={{
-            background: cat.gradient[0],
-            bottom: "-10%",
-            right: "-10%",
+            top: 4,
+            left: 4,
+            right: 4,
+            height: 12,
+            background: cat.bg,
+            opacity: 0.55,
+            filter: "brightness(0.65) saturate(0.9)",
           }}
         />
 
-        {/* Kategori adı — sol üst */}
-        <span className="absolute top-3 left-3.5 text-white font-bold text-[15px] md:text-base leading-tight drop-shadow-md z-10">
-          {cat.label}
-        </span>
+        {/* Ana kart */}
+        <button
+          onClick={onClick}
+          className="relative w-full aspect-square rounded-[14px] overflow-hidden transition-transform duration-200 ease-out group-hover:translate-y-[3px] active:scale-[0.97]"
+          style={{ background: cat.bg }}
+        >
+          {/* Kategori adı — sol üst */}
+          <span
+            className="absolute z-10 text-white italic"
+            style={{
+              top: "14px",
+              left: "14px",
+              fontSize: "20px",
+              fontWeight: 600,
+              lineHeight: 1.1,
+              textShadow: "0 2px 16px rgba(0,0,0,0.3)",
+            }}
+          >
+            {cat.label}
+          </span>
 
-        {/* Hover play indicator */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors flex items-center justify-center">
-          <Play
-            size={28}
-            fill="white"
-            className="text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow-lg ml-0.5"
-          />
-        </div>
+          {/* Play / equalizer */}
+          <div
+            className="absolute bottom-[10px] right-[10px] z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay?.();
+            }}
+          >
+            {isPlaying ? (
+              <div className="w-[32px] h-[32px] rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center gap-[2px]">
+                <span className="w-[2.5px] h-[11px] wave-bar !bg-white" />
+                <span className="w-[2.5px] h-[11px] wave-bar !bg-white" />
+                <span className="w-[2.5px] h-[11px] wave-bar !bg-white" />
+              </div>
+            ) : (
+              <div className="w-[32px] h-[32px] rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Play size={14} fill="white" className="text-white ml-[1px]" />
+              </div>
+            )}
+          </div>
+        </button>
       </div>
-      <p className="text-[#999] text-xs mt-2 ml-0.5">{cat.label} şarkıları</p>
-    </button>
+
+      <p className="text-[#888] text-[11px] mt-[8px] ml-[2px] font-medium">
+        Best of {cat.label}
+      </p>
+    </div>
   );
 }
 
@@ -226,8 +308,14 @@ function SongCard({
         {/* Badge */}
         {showBadge && badge}
         {/* Hover play */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end justify-end p-2.5">
-          <div className="w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end justify-end p-2.5 pointer-events-none">
+          <div
+            className="w-10 h-10 rounded-full bg-[#1db954] flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all pointer-events-auto"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay();
+            }}
+          >
             {isActive && isPlaying ? (
               <Pause size={18} fill="black" className="text-black" />
             ) : (
@@ -342,81 +430,122 @@ export default function DiscoverPage() {
       {!isSearching ? (
         <>
           {/* ══ Trend — yatay kart satırı ══ */}
-          {trending.length > 0 && (
-            <SectionRow title="Bu hafta trend">
-              {trending.slice(0, 10).map((song, i) => {
-                const isActive = currentSong?.id === song.id;
-                return (
-                  <SongCard
-                    key={song.id}
-                    song={song}
-                    isActive={isActive}
-                    isPlaying={isActive && playing}
-                    onPlay={() =>
-                      isActive ? togglePlay() : playSong(song, trending)
-                    }
-                    showBadge
-                    badge={
-                      <div className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white text-xs font-black z-10">
-                        {i + 1}
-                      </div>
-                    }
-                  />
-                );
-              })}
-            </SectionRow>
-          )}
+          <SectionRow title="Bu hafta trend">
+            {loading
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-[130px] md:w-[154px]">
+                    <div className="w-full aspect-square rounded-xl bg-[#1a1a1a] animate-pulse" />
+                    <div className="h-3 w-20 rounded-full bg-[#1a1a1a] animate-pulse mt-2.5" />
+                    <div className="h-2 w-14 rounded-full bg-[#141414] animate-pulse mt-1.5" />
+                  </div>
+                ))
+              : trending.slice(0, 10).map((song, i) => {
+                  const isActive = currentSong?.id === song.id;
+                  return (
+                    <SongCard
+                      key={song.id}
+                      song={song}
+                      isActive={isActive}
+                      isPlaying={isActive && playing}
+                      onPlay={() =>
+                        isActive ? togglePlay() : playSong(song, trending)
+                      }
+                      showBadge
+                      badge={
+                        <div className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white text-xs font-black z-10">
+                          {i + 1}
+                        </div>
+                      }
+                    />
+                  );
+                })}
+          </SectionRow>
 
-          {/* ══ Best Of — Suno tarzı gradient kartlar ══ */}
+          {/* ══ Best Of — Suno mesh-gradient yatay scroll ══ */}
           <SectionRow title="Türe Göre">
-            {CATEGORIES.map((cat) => (
-              <GenreCard
-                key={cat.id}
-                cat={cat}
-                onClick={() => router.push(`/discover/${cat.id}`)}
-              />
-            ))}
+            {CATEGORIES.map((cat) => {
+              const catSongs = songs.filter((s) =>
+                cat.keywords.some(
+                  (kw) =>
+                    s.style?.toLowerCase().includes(kw) ||
+                    s.prompt?.toLowerCase().includes(kw),
+                ),
+              );
+              const isCatPlaying =
+                playing &&
+                !!currentSong &&
+                catSongs.some((s) => s.id === currentSong.id);
+              return (
+                <GenreCard
+                  key={cat.id}
+                  cat={cat}
+                  onClick={() => router.push(`/discover/${cat.id}`)}
+                  isPlaying={isCatPlaying}
+                  onPlay={() => {
+                    if (isCatPlaying) {
+                      togglePlay();
+                    } else if (catSongs.length > 0) {
+                      playSong(catSongs[0], catSongs);
+                    } else {
+                      router.push(`/discover/${cat.id}`);
+                    }
+                  }}
+                />
+              );
+            })}
           </SectionRow>
 
           {/* ══ En çok dinlenenler — yatay kart ══ */}
-          {topCharts.length > 0 && (
-            <SectionRow title="En çok dinlenenler">
-              {topCharts.slice(0, 10).map((song) => {
-                const isActive = currentSong?.id === song.id;
-                return (
-                  <SongCard
-                    key={song.id}
-                    song={song}
-                    isActive={isActive}
-                    isPlaying={isActive && playing}
-                    onPlay={() =>
-                      isActive ? togglePlay() : playSong(song, topCharts)
-                    }
-                  />
-                );
-              })}
-            </SectionRow>
-          )}
+          <SectionRow title="En çok dinlenenler">
+            {loading
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-[130px] md:w-[154px]">
+                    <div className="w-full aspect-square rounded-xl bg-[#1a1a1a] animate-pulse" />
+                    <div className="h-3 w-20 rounded-full bg-[#1a1a1a] animate-pulse mt-2.5" />
+                    <div className="h-2 w-14 rounded-full bg-[#141414] animate-pulse mt-1.5" />
+                  </div>
+                ))
+              : topCharts.slice(0, 10).map((song) => {
+                  const isActive = currentSong?.id === song.id;
+                  return (
+                    <SongCard
+                      key={song.id}
+                      song={song}
+                      isActive={isActive}
+                      isPlaying={isActive && playing}
+                      onPlay={() =>
+                        isActive ? togglePlay() : playSong(song, topCharts)
+                      }
+                    />
+                  );
+                })}
+          </SectionRow>
 
           {/* ══ Son eklenenler — "Staff Picks" tarzı ══ */}
-          {!loading && recentPicks.length > 0 && (
-            <SectionRow title="Son eklenenler">
-              {recentPicks.map((song) => {
-                const isActive = currentSong?.id === song.id;
-                return (
-                  <SongCard
-                    key={song.id}
-                    song={song}
-                    isActive={isActive}
-                    isPlaying={isActive && playing}
-                    onPlay={() =>
-                      isActive ? togglePlay() : playSong(song, songs)
-                    }
-                  />
-                );
-              })}
-            </SectionRow>
-          )}
+          <SectionRow title="Son eklenenler">
+            {loading
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-[130px] md:w-[154px]">
+                    <div className="w-full aspect-square rounded-xl bg-[#1a1a1a] animate-pulse" />
+                    <div className="h-3 w-20 rounded-full bg-[#1a1a1a] animate-pulse mt-2.5" />
+                    <div className="h-2 w-14 rounded-full bg-[#141414] animate-pulse mt-1.5" />
+                  </div>
+                ))
+              : recentPicks.map((song) => {
+                  const isActive = currentSong?.id === song.id;
+                  return (
+                    <SongCard
+                      key={song.id}
+                      song={song}
+                      isActive={isActive}
+                      isPlaying={isActive && playing}
+                      onPlay={() =>
+                        isActive ? togglePlay() : playSong(song, songs)
+                      }
+                    />
+                  );
+                })}
+          </SectionRow>
 
           {/* Boş padding */}
           <div className="h-10" />
@@ -466,14 +595,14 @@ export default function DiscoverPage() {
                             <Music2 size={16} className="text-[#333]" />
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                           <button
                             onClick={() =>
                               isActive
                                 ? togglePlay()
                                 : playSong(song, filteredSongs)
                             }
-                            className="pressable"
+                            className="pressable pointer-events-auto"
                           >
                             {isActive && playing ? (
                               <Pause

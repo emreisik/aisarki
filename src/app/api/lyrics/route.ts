@@ -119,7 +119,7 @@ Kurallar:
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      { model: "gpt-4o", maxTokens: 1024 },
+      { maxTokens: 1024 },
     );
 
     if (!lyrics) {

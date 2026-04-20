@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useGoBack } from "@/hooks/useGoBack";
 import Link from "next/link";
 import { Mail, Lock, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import AppLogo from "@/components/AppLogo";
 
 export default function SignUpPage() {
   const router = useRouter();
+  const goBack = useGoBack();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -56,7 +58,7 @@ export default function SignUpPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-4 py-12">
       <button
-        onClick={() => router.back()}
+        onClick={() => goBack()}
         className="absolute top-6 left-6 flex items-center gap-2 text-white/50 hover:text-white transition-colors pressable"
       >
         <ArrowLeft size={20} />

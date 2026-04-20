@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useSession } from "next-auth/react";
 import { Playlist, Song } from "@/types";
 import Link from "next/link";
@@ -80,6 +81,7 @@ export default function PlaylistPage({
   const { playSong, currentSong, playing, togglePlay } = usePlayer();
   const { data: session } = useSession();
   const router = useRouter();
+  const goBack = useGoBack("/playlists");
 
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
@@ -243,7 +245,7 @@ export default function PlaylistPage({
       >
         {/* Geri butonu */}
         <button
-          onClick={() => router.back()}
+          onClick={() => goBack()}
           className="absolute top-4 left-4 z-10 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white pressable"
         >
           <ArrowLeft size={18} />
