@@ -35,6 +35,9 @@ import {
   Coffee,
   Mic2,
   MapPin,
+  Plus,
+  Shuffle,
+  Upload,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1490,6 +1493,8 @@ export default function HomePage() {
     color: string;
   } | null>(null);
   const [inlineInput, setInlineInput] = useState("");
+  const [heroPrompt, setHeroPrompt] = useState("");
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [inlineGenerating, setInlineGenerating] = useState(false);
 
   const handleInlineGenerate = useCallback(async () => {
@@ -1634,110 +1639,138 @@ export default function HomePage() {
 
   return (
     <div className="min-h-full bg-[#121212]">
-      {/* ── Spotify Header: Selamlama + Avatar ── */}
-      <div className="pt-[14px] pb-[10px] px-[16px]">
-        <h1 className="text-white text-[24px] font-bold leading-[32px]">
-          {greeting}
-        </h1>
-      </div>
+      {/* ── Suno Hero ── */}
+      <div
+        className="relative"
+        style={{
+          background:
+            "radial-gradient(ellipse at 50% 0%, #3a1c0a 0%, #1a0e06 40%, #121212 70%)",
+        }}
+      >
+        <div className="pt-[16px] pb-[40px] px-[20px] flex flex-col items-center">
+          {/* Selamlama — en üstte */}
+          <div className="w-full max-w-[560px] mb-[32px]">
+            <h2 className="text-white text-[22px] font-bold">{greeting}</h2>
+          </div>
 
-      {/* ── Şarkını Oluştur — inline input ── */}
-      <section className="mb-[24px]">
-        <div className="px-[16px] mb-[12px]">
-          <h2 className="text-white text-[22px] font-bold leading-[28px]">
-            Şarkını oluştur
-          </h2>
-        </div>
-        <div className="flex gap-[16px] overflow-x-auto scroll-area px-[16px] pb-[4px]">
-          {CATEGORY_GROUPS.flatMap((group) =>
-            group.items.map((item) => {
-              const Icon = item.icon;
-              const isSelected = selectedCat?.item.title === item.title;
-              return (
-                <div key={item.title} className="flex-shrink-0 w-[156px]">
-                  <button
-                    onClick={() =>
-                      setSelectedCat(
-                        isSelected ? null : { item, color: group.color },
-                      )
-                    }
-                    className="w-full text-left pressable group"
-                  >
-                    <div
-                      className="w-[156px] h-[156px] rounded-[8px] overflow-hidden mb-[8px] relative flex items-end p-[12px] transition-all"
-                      style={{
-                        background: `linear-gradient(160deg, ${group.color}40 0%, ${group.color}15 50%, #282828 100%)`,
-                        outline: isSelected
-                          ? `2px solid ${group.color}`
-                          : "none",
-                        outlineOffset: "2px",
-                      }}
-                    >
-                      <div
-                        className="absolute top-[12px] right-[12px] w-[40px] h-[40px] rounded-full flex items-center justify-center"
-                        style={{ background: `${group.color}30` }}
-                      >
-                        <Icon size={18} style={{ color: group.color }} />
-                      </div>
-                      <span className="text-white text-[15px] font-bold leading-[20px]">
-                        {item.title}
-                      </span>
-                    </div>
-                    <p className="text-[#b3b3b3] text-[11px] truncate leading-[16px]">
-                      {group.label}
-                    </p>
-                  </button>
-                </div>
-              );
-            }),
-          )}
-        </div>
+          <h1 className="text-[#f5e6d3] text-[28px] md:text-[36px] font-bold text-center leading-[1.2] mb-[28px]">
+            Hayalindeki şarkıyı
+            <br />
+            duymanın zamanı
+          </h1>
 
-        {/* Inline input — seçili kartın altında */}
-        {selectedCat && (
-          <div className="px-[16px] mt-[12px]">
-            <div className="flex gap-[8px] items-center">
-              <input
-                autoFocus
-                value={inlineInput}
-                onChange={(e) => setInlineInput(e.target.value)}
-                placeholder={
-                  selectedCat.item.fields[0]?.placeholder || "Kimin için?"
+          {/* Suno input bar */}
+          <div className="w-full max-w-[560px] bg-[#1a1a1a] rounded-[16px] border border-[#2a2a2a] overflow-hidden">
+            {/* Üst — textarea */}
+            <textarea
+              value={heroPrompt}
+              onChange={(e) => setHeroPrompt(e.target.value)}
+              placeholder="Nasıl bir şarkı istiyorsun?"
+              rows={2}
+              className="w-full bg-transparent px-[16px] pt-[14px] pb-[4px] text-white text-[15px] placeholder-[#555] focus:outline-none resize-none leading-[22px]"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && heroPrompt.trim()) {
+                  e.preventDefault();
+                  router.push(
+                    `/create?prompt=${encodeURIComponent(heroPrompt.trim())}`,
+                  );
                 }
-                className="flex-1 h-[48px] bg-[#2a2a2a] rounded-[8px] px-[16px] text-white text-[14px] placeholder-[#666] focus:outline-none border border-transparent focus:border-[#1db954] transition-colors"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleInlineGenerate();
-                  }
-                }}
-              />
-              <button
-                onClick={handleInlineGenerate}
-                disabled={inlineGenerating}
-                className="h-[48px] px-[20px] rounded-[8px] bg-[#1db954] text-black text-[14px] font-bold pressable hover:bg-[#1ed760] transition-colors disabled:opacity-50 flex items-center gap-[6px] flex-shrink-0"
-              >
-                {inlineGenerating ? (
-                  <div className="w-[16px] h-[16px] border-2 border-black border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Play size={14} fill="black" />
-                    Üret
-                  </>
+              }}
+            />
+
+            {/* Alt — butonlar */}
+            <div className="flex items-center justify-between px-[10px] pb-[10px] pt-[4px]">
+              {/* Sol — + menü */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowPlusMenu((v) => !v)}
+                  className="w-[40px] h-[40px] rounded-full border border-[#3a3a3a] flex items-center justify-center pressable hover:bg-[#2a2a2a] transition-colors"
+                >
+                  <Plus size={18} className="text-[#999]" />
+                </button>
+                {showPlusMenu && (
+                  <div className="absolute bottom-[52px] left-[-4px] bg-[#2a2a2a] rounded-[12px] py-[6px] shadow-2xl shadow-black/60 z-[100] min-w-[170px] border border-[#3a3a3a]">
+                    <button
+                      onClick={() => {
+                        setShowPlusMenu(false);
+                        alert("Kayıt özelliği yakında!");
+                      }}
+                      className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
+                    >
+                      <Mic2 size={16} className="text-[#ccc]" />
+                      <span className="text-white text-[14px] font-medium">
+                        Kayıt
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowPlusMenu(false);
+                        alert("Yükleme özelliği yakında!");
+                      }}
+                      className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
+                    >
+                      <Upload size={16} className="text-[#ccc]" />
+                      <span className="text-white text-[14px] font-medium">
+                        Yükle
+                      </span>
+                    </button>
+                  </div>
                 )}
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedCat(null);
-                  setInlineInput("");
-                }}
-                className="h-[48px] w-[48px] rounded-[8px] bg-[#2a2a2a] flex items-center justify-center pressable flex-shrink-0"
-              >
-                <X size={16} className="text-[#999]" />
-              </button>
+              </div>
+
+              {/* Sağ — rastgele + oluştur */}
+              <div className="flex items-center gap-[8px]">
+                {/* Rastgele buton */}
+                <button
+                  onClick={() => {
+                    const randoms = [
+                      "Enerjik dans şarkısı, yaz havası",
+                      "Hüzünlü arabesk, gece yağmuru",
+                      "Akustik folk, dağ başı, özlem",
+                      "Neşeli pop, arkadaşlarla yolculuk",
+                      "Romantik slow, yıldızlı gece",
+                      "Türkçe rap, sokak hikayesi",
+                      "Sufi ilahi, huzur ve tefekkür",
+                    ];
+                    setHeroPrompt(
+                      randoms[Math.floor(Math.random() * randoms.length)],
+                    );
+                  }}
+                  className="w-[40px] h-[40px] rounded-full border border-[#3a3a3a] flex items-center justify-center pressable hover:bg-[#2a2a2a] transition-colors"
+                  title="Rastgele prompt"
+                >
+                  <Shuffle size={18} className="text-[#999]" />
+                </button>
+
+                {/* Create butonu */}
+                <button
+                  onClick={() => {
+                    if (heroPrompt.trim()) {
+                      router.push(
+                        `/create?prompt=${encodeURIComponent(heroPrompt.trim())}`,
+                      );
+                    } else {
+                      router.push("/create");
+                    }
+                  }}
+                  className="flex items-center gap-[6px] pl-[16px] pr-[20px] py-[10px] rounded-full font-bold text-[14px] text-white pressable active:scale-95 transition-transform"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #e8825c 0%, #d4654a 40%, #c04e3a 70%, #a8402e 100%)",
+                  }}
+                >
+                  <Music2 size={15} />
+                  Oluştur
+                </button>
+              </div>
             </div>
           </div>
-        )}
-      </section>
+        </div>
+      </div>
+
+      {/* Selamlama hero'ya taşındı */}
+
+      {/* Şarkını oluştur bölümü kaldırıldı — hero input yeterli */}
 
       {/* Kaldırılan bölümler: Kitaplık, Son dinlediklerin, Son eklenenler */}
 
