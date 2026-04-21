@@ -81,6 +81,36 @@ export async function uploadAudioFromUrl(
   }
 }
 
+/** Buffer'dan doğrudan Bunny'ye yükle (kullanıcı upload için) */
+export async function uploadAudioFromBuffer(
+  buffer: Buffer,
+  filename: string,
+): Promise<string | null> {
+  if (!isBunnyConfigured()) return null;
+  try {
+    const key = filename;
+    const putUrl = `https://${HOST}/${ZONE}/${PREFIX}/${key}`;
+    const putRes = await fetch(putUrl, {
+      method: "PUT",
+      headers: {
+        AccessKey: PASSWORD,
+        "Content-Type": "application/octet-stream",
+      },
+      body: new Uint8Array(buffer),
+    });
+    if (!putRes.ok) {
+      console.warn(`[bunny] buffer upload ${putRes.status}`);
+      return null;
+    }
+    const sizeMb = (buffer.byteLength / 1024 / 1024).toFixed(2);
+    console.log(`[bunny] ✓ buffer ${sizeMb}MB → ${key}`);
+    return key;
+  } catch (e) {
+    console.warn("[bunny] buffer upload hatası:", e);
+    return null;
+  }
+}
+
 /**
  * Image upload — key döner (örn "covers/xxx.jpg").
  */

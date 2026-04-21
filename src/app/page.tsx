@@ -1495,6 +1495,37 @@ export default function HomePage() {
   const [inlineInput, setInlineInput] = useState("");
   const [heroPrompt, setHeroPrompt] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Dinamik placeholder
+  const PLACEHOLDERS = [
+    "Annem için duygusal bir şarkı yap",
+    "Sevgilime romantik akustik şarkı",
+    "Doğum günü kutlama şarkısı, neşeli pop",
+    "Babama teşekkür şarkısı, sıcak ton",
+    "En yakın arkadaşıma enerjik dans şarkısı",
+    "Düğünümüz için özel romantik slow",
+    "İstanbul gecelerini anlatan arabesk",
+    "Motivasyon veren Türkçe rap",
+    "Bebeğim için ninni, sakin ve huzurlu",
+    "Mezuniyet kutlaması, gururlu ve coşkulu",
+    "Memleket özlemi, halk müziği tarzında",
+    "Yaz tatili havası, sahil ve güneş",
+    "Ayrılık acısı, hüzünlü piyano balad",
+    "Eşimle yıl dönümümüz için nostaljik şarkı",
+    "Öğretmenime minnettarlık şarkısı",
+    "Kahve keyfi, lo-fi akustik, sakin",
+  ];
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setPlaceholderIdx((i) => (i + 1) % PLACEHOLDERS.length);
+    }, 3000);
+    return () => clearInterval(id);
+  }, []);
   const [inlineGenerating, setInlineGenerating] = useState(false);
 
   const handleInlineGenerate = useCallback(async () => {
@@ -1665,7 +1696,7 @@ export default function HomePage() {
             <textarea
               value={heroPrompt}
               onChange={(e) => setHeroPrompt(e.target.value)}
-              placeholder="Nasıl bir şarkı istiyorsun?"
+              placeholder={PLACEHOLDERS[placeholderIdx]}
               rows={2}
               className="w-full bg-transparent px-[16px] pt-[14px] pb-[4px] text-white text-[15px] placeholder-[#555] focus:outline-none resize-none leading-[22px]"
               onKeyDown={(e) => {
@@ -1691,21 +1722,84 @@ export default function HomePage() {
                 {showPlusMenu && (
                   <div className="absolute bottom-[52px] left-[-4px] bg-[#2a2a2a] rounded-[12px] py-[6px] shadow-2xl shadow-black/60 z-[100] min-w-[170px] border border-[#3a3a3a]">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setShowPlusMenu(false);
-                        alert("Kayıt özelliği yakında!");
+                        if (recording) {
+                          // Kaydı durdur
+                          mediaRecorderRef.current?.stop();
+                          return;
+                        }
+                        try {
+                          const stream =
+                            await navigator.mediaDevices.getUserMedia({
+                              audio: true,
+                            });
+                          const recorder = new MediaRecorder(stream);
+                          audioChunksRef.current = [];
+                          recorder.ondataavailable = (e) =>
+                            audioChunksRef.current.push(e.data);
+                          recorder.onstop = async () => {
+                            stream.getTracks().forEach((t) => t.stop());
+                            setRecording(false);
+                            const blob = new Blob(audioChunksRef.current, {
+                              type: "audio/webm",
+                            });
+                            // Blob'u Bunny'ye yükle, URL al, upload-extend'e gönder
+                            const formData = new FormData();
+                            formData.append("file", blob, "recording.webm");
+                            try {
+                              const uploadRes = await fetch(
+                                "/api/upload-audio",
+                                { method: "POST", body: formData },
+                              );
+                              const uploadData = await uploadRes.json();
+                              if (uploadData.url) {
+                                const res = await fetch("/api/upload-extend", {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    uploadUrl: uploadData.url,
+                                    model: "V5_5",
+                                  }),
+                                });
+                                const data = await res.json();
+                                if (res.ok) {
+                                  router.push("/create");
+                                } else {
+                                  alert(data.error || "Hata oluştu");
+                                }
+                              }
+                            } catch {
+                              alert("Yükleme hatası");
+                            }
+                          };
+                          recorder.start();
+                          mediaRecorderRef.current = recorder;
+                          setRecording(true);
+                          // 60 saniye sonra otomatik durdur
+                          setTimeout(() => {
+                            if (recorder.state === "recording") recorder.stop();
+                          }, 60000);
+                        } catch {
+                          alert("Mikrofon erişimi reddedildi");
+                        }
                       }}
                       className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
                     >
-                      <Mic2 size={16} className="text-[#ccc]" />
+                      <Mic2
+                        size={16}
+                        className={recording ? "text-red-500" : "text-[#ccc]"}
+                      />
                       <span className="text-white text-[14px] font-medium">
-                        Kayıt
+                        {recording ? "Kaydı Durdur" : "Kayıt"}
                       </span>
                     </button>
                     <button
                       onClick={() => {
                         setShowPlusMenu(false);
-                        alert("Yükleme özelliği yakında!");
+                        fileInputRef.current?.click();
                       }}
                       className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
                     >
@@ -1716,6 +1810,51 @@ export default function HomePage() {
                     </button>
                   </div>
                 )}
+                {/* Gizli file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="audio/*,video/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!session?.user) {
+                      router.push("/auth/signin");
+                      return;
+                    }
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    try {
+                      const uploadRes = await fetch("/api/upload-audio", {
+                        method: "POST",
+                        body: formData,
+                      });
+                      const uploadData = await uploadRes.json();
+                      if (uploadData.url) {
+                        const res = await fetch("/api/upload-extend", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            uploadUrl: uploadData.url,
+                            model: "V5_5",
+                          }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          router.push("/create");
+                        } else {
+                          alert(data.error || "Hata oluştu");
+                        }
+                      } else {
+                        alert(uploadData.error || "Dosya yüklenemedi");
+                      }
+                    } catch {
+                      alert("Bağlantı hatası");
+                    }
+                    e.target.value = "";
+                  }}
+                />
               </div>
 
               {/* Sağ — rastgele + oluştur */}
