@@ -290,7 +290,7 @@ export default function CategoryPage() {
                     {song.title}
                   </p>
                   <p className="text-[#666] text-[11px] truncate mt-0.5">
-                    {song.creator?.name || "Hubeya"}
+                    {song.creator?.name || "Rifmo"}
                   </p>
                 </button>
               );
@@ -390,7 +390,7 @@ export default function CategoryPage() {
                       {song.title}
                     </p>
                     <p className="text-[#666] text-xs truncate mt-0.5">
-                      {song.creator?.name || "Hubeya"}
+                      {song.creator?.name || "Rifmo"}
                     </p>
                   </div>
 

@@ -295,7 +295,7 @@ export default function PlaylistPage({
               <Music2 size={10} className="text-black" />
             </div>
             <span className="text-white text-[13px] font-semibold">
-              {playlist.owner?.displayName ?? "Hubeya"}
+              {playlist.owner?.displayName ?? "Rifmo"}
             </span>
           </div>
         </div>
@@ -389,7 +389,7 @@ export default function PlaylistPage({
                       {song.title}
                     </p>
                     <p className="text-[#888] text-xs truncate">
-                      {song.creator?.name || "Hubeya"}
+                      {song.creator?.name || "Rifmo"}
                     </p>
                   </div>
                   <Plus size={16} className="text-[#1db954] flex-shrink-0" />
@@ -481,7 +481,7 @@ export default function PlaylistPage({
                           {song.creator.name}
                         </Link>
                       ) : (
-                        song.style?.split(",")[0] || "Hubeya"
+                        song.style?.split(",")[0] || "Rifmo"
                       )}
                     </p>
                   </button>

@@ -53,7 +53,7 @@ export default function SignInPage() {
             <AppLogo size="lg" />
           </div>
           <h1 className="text-white text-2xl font-black">
-            Hubeya&apos;ya giriş yap
+            Rifmo&apos;ya giriş yap
           </h1>
         </div>
 

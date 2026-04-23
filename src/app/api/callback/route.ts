@@ -12,6 +12,9 @@ import {
   getTaskPrompt,
 } from "@/lib/taskStore";
 import { translateSunoError, extractSunoError } from "@/lib/sunoErrors";
+import { refundCredits } from "@/lib/credits";
+import { CREDIT_COSTS, type CreditAction } from "@/lib/plans";
+import { getTaskPayload } from "@/lib/taskStore";
 import { sendPushToUser } from "@/lib/pushNotification";
 import {
   uploadAudioFromUrl,
@@ -123,8 +126,27 @@ export async function POST(request: NextRequest) {
         `[callback] Suno error code=${sunoError.code} → ${translated.title}: ${translated.message}`,
       );
       markTaskFailed(taskId, translated.title, translated.message).catch(
-        () => {},
+        () => { },
       );
+
+      // Kredi iadesi — task'ın hangi endpoint'ten geldiğine göre doğru miktarda
+      const ENDPOINT_TO_ACTION: Record<string, CreditAction> = {
+        music: "generate",
+        extend: "extend",
+        "upload-cover": "cover",
+        "upload-extend": "upload_extend",
+        mashup: "mashup",
+      };
+      getTaskPayload(taskId)
+        .then((tp) => {
+          if (!tp?.userId || !tp.endpoint) return;
+          const action = ENDPOINT_TO_ACTION[tp.endpoint];
+          if (!action) return;
+          const amount = CREDIT_COSTS[action];
+          if (amount <= 0) return;
+          return refundCredits(tp.userId, amount, taskId);
+        })
+        .catch((e) => console.error("[callback] refund hatası:", e));
 
       // Kullanıcıya push bildirimi gönder (varsa)
       getTaskCreatedBy(taskId)
@@ -137,7 +159,7 @@ export async function POST(request: NextRequest) {
             tag: `song-failed-${taskId}`,
           });
         })
-        .catch(() => {});
+        .catch(() => { });
 
       return NextResponse.json({ ok: true });
     }
@@ -274,7 +296,7 @@ export async function POST(request: NextRequest) {
     const allComplete =
       songs.length > 0 && songs.every((s) => s.status === "complete");
     if (allComplete) {
-      markTaskComplete(taskId).catch(() => {});
+      markTaskComplete(taskId).catch(() => { });
 
       // Oluşturan kullanıcıya push bildirimi gönder
       getTaskCreatedBy(taskId)
@@ -284,12 +306,12 @@ export async function POST(request: NextRequest) {
           return sendPushToUser(userId, {
             title: "Şarkın hazır!",
             body: `"${first.title}" dinlemeye hazır`,
-            icon: first.imageUrl || "/icon-192.png",
+            icon: first.imageUrl || "/fav.png",
             url: `/song/${first.id}`,
             tag: `song-ready-${taskId}`,
           });
         })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     console.log(

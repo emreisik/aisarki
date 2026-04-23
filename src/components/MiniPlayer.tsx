@@ -102,7 +102,7 @@ export default function MiniPlayer() {
             {currentSong.title}
           </p>
           <p className="text-[#a7a7a7] text-xs truncate">
-            {currentSong.style?.split(",")[0] || "Hubeya"}
+            {currentSong.style?.split(",")[0] || "Rifmo"}
           </p>
         </div>
 

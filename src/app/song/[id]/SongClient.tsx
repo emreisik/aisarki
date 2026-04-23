@@ -158,9 +158,9 @@ export default function SongClient({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: song?.title ?? "Hubeya",
+          title: song?.title ?? "Rifmo",
           text: song?.creator
-            ? `${song.title} — ${song.creator.name} • Hubeya`
+            ? `${song.title} — ${song.creator.name} • Rifmo`
             : song?.title,
           url,
         });

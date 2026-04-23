@@ -106,7 +106,7 @@ export default function SimilarRail({ songId, creatorName }: Props) {
                   {s.title}
                 </p>
                 <p className="text-[#6a6a6a] text-xs truncate mt-0.5">
-                  {s.style?.split(",")[0] || "Hubeya"}
+                  {s.style?.split(",")[0] || "Rifmo"}
                   {s.playCount != null && s.playCount > 0 && (
                     <> · {formatListenerCount(s.playCount)}</>
                   )}

@@ -11,23 +11,23 @@ export async function generateMetadata({
   const song = await getSongById(id);
 
   if (!song) {
-    return { title: "Şarkı bulunamadı – Hubeya" };
+    return { title: "Şarkı bulunamadı – Rifmo" };
   }
 
   const title = song.creator
     ? `${song.title} — ${song.creator.name}`
     : song.title;
-  const description = "Hubeya ile yapay zeka tarafından oluşturuldu";
+  const description = "Rifmo ile yapay zeka tarafından oluşturuldu";
   const url = `${process.env.APP_URL ?? "https://aisarki.com"}/song/${id}`;
 
   return {
-    title: `${title} – Hubeya`,
+    title: `${title} – Rifmo`,
     description,
     openGraph: {
       title,
       description,
       url,
-      siteName: "Hubeya",
+      siteName: "Rifmo",
       type: "music.song",
       images: song.imageUrl
         ? [{ url: song.imageUrl, width: 1000, height: 1000, alt: song.title }]

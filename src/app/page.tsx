@@ -43,6 +43,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useUpload } from "@/contexts/UploadContext";
 import { useSession } from "next-auth/react";
 import { useLikedIds } from "@/hooks/useLikedIds";
 
@@ -1352,9 +1353,6 @@ function Section({
   return (
     <section className="mb-[24px]">
       <div className="flex items-baseline justify-between px-[16px] mb-[12px]">
-        <h2 className="text-white text-[22px] font-bold leading-[28px]">
-          {title}
-        </h2>
         {href && (
           <Link
             href={href}
@@ -1422,7 +1420,7 @@ function SongCard2({
         {song.title}
       </p>
       <p className="text-[#b3b3b3] text-[11px] truncate mt-[4px] leading-[16px]">
-        {song.creator?.name || song.style?.split(",")[0] || "Hubeya"}
+        {song.creator?.name || song.style?.split(",")[0] || "Rifmo"}
       </p>
     </button>
   );
@@ -1495,10 +1493,16 @@ export default function HomePage() {
   const [inlineInput, setInlineInput] = useState("");
   const [heroPrompt, setHeroPrompt] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { setPending: setPendingUpload } = useUpload();
+  const heroFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleHeroFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingUpload({ file, startedAt: Date.now() });
+    e.target.value = "";
+    router.push("/create");
+  };
 
   // Dinamik placeholder
   const PLACEHOLDERS = [
@@ -1679,16 +1683,20 @@ export default function HomePage() {
         }}
       >
         <div className="pt-[16px] pb-[40px] px-[20px] flex flex-col items-center">
-          {/* Selamlama — en üstte */}
-          <div className="w-full max-w-[560px] mb-[32px]">
-            <h2 className="text-white text-[22px] font-bold">{greeting}</h2>
-          </div>
-
-          <h1 className="text-[#f5e6d3] text-[28px] md:text-[36px] font-bold text-center leading-[1.2] mb-[28px]">
+          <h1 className="text-white text-[28px] md:text-[36px] font-bold text-center leading-[1.2] mb-[28px]">
             Hayalindeki şarkıyı
             <br />
             duymanın zamanı
           </h1>
+
+          {/* Hero için global dosya yükleme input'u — her zaman mount */}
+          <input
+            ref={heroFileInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={handleHeroFilePick}
+          />
 
           {/* Suno input bar */}
           <div className="w-full max-w-[560px] bg-[#1a1a1a] rounded-[16px] border border-[#2a2a2a] overflow-hidden">
@@ -1722,84 +1730,21 @@ export default function HomePage() {
                 {showPlusMenu && (
                   <div className="absolute bottom-[52px] left-[-4px] bg-[#2a2a2a] rounded-[12px] py-[6px] shadow-2xl shadow-black/60 z-[100] min-w-[170px] border border-[#3a3a3a]">
                     <button
-                      onClick={async () => {
+                      onClick={() => {
                         setShowPlusMenu(false);
-                        if (recording) {
-                          // Kaydı durdur
-                          mediaRecorderRef.current?.stop();
-                          return;
-                        }
-                        try {
-                          const stream =
-                            await navigator.mediaDevices.getUserMedia({
-                              audio: true,
-                            });
-                          const recorder = new MediaRecorder(stream);
-                          audioChunksRef.current = [];
-                          recorder.ondataavailable = (e) =>
-                            audioChunksRef.current.push(e.data);
-                          recorder.onstop = async () => {
-                            stream.getTracks().forEach((t) => t.stop());
-                            setRecording(false);
-                            const blob = new Blob(audioChunksRef.current, {
-                              type: "audio/webm",
-                            });
-                            // Blob'u Bunny'ye yükle, URL al, upload-extend'e gönder
-                            const formData = new FormData();
-                            formData.append("file", blob, "recording.webm");
-                            try {
-                              const uploadRes = await fetch(
-                                "/api/upload-audio",
-                                { method: "POST", body: formData },
-                              );
-                              const uploadData = await uploadRes.json();
-                              if (uploadData.url) {
-                                const res = await fetch("/api/upload-extend", {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    uploadUrl: uploadData.url,
-                                    model: "V5_5",
-                                  }),
-                                });
-                                const data = await res.json();
-                                if (res.ok) {
-                                  router.push("/create");
-                                } else {
-                                  alert(data.error || "Hata oluştu");
-                                }
-                              }
-                            } catch {
-                              alert("Yükleme hatası");
-                            }
-                          };
-                          recorder.start();
-                          mediaRecorderRef.current = recorder;
-                          setRecording(true);
-                          // 60 saniye sonra otomatik durdur
-                          setTimeout(() => {
-                            if (recorder.state === "recording") recorder.stop();
-                          }, 60000);
-                        } catch {
-                          alert("Mikrofon erişimi reddedildi");
-                        }
+                        router.push("/create?mode=record");
                       }}
                       className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
                     >
-                      <Mic2
-                        size={16}
-                        className={recording ? "text-red-500" : "text-[#ccc]"}
-                      />
+                      <Mic2 size={16} className="text-[#ccc]" />
                       <span className="text-white text-[14px] font-medium">
-                        {recording ? "Kaydı Durdur" : "Kayıt"}
+                        Kayıt
                       </span>
                     </button>
                     <button
                       onClick={() => {
+                        heroFileInputRef.current?.click();
                         setShowPlusMenu(false);
-                        fileInputRef.current?.click();
                       }}
                       className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
                     >
@@ -1810,51 +1755,6 @@ export default function HomePage() {
                     </button>
                   </div>
                 )}
-                {/* Gizli file input */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="audio/*,video/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (!session?.user) {
-                      router.push("/auth/signin");
-                      return;
-                    }
-                    const formData = new FormData();
-                    formData.append("file", file);
-                    try {
-                      const uploadRes = await fetch("/api/upload-audio", {
-                        method: "POST",
-                        body: formData,
-                      });
-                      const uploadData = await uploadRes.json();
-                      if (uploadData.url) {
-                        const res = await fetch("/api/upload-extend", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            uploadUrl: uploadData.url,
-                            model: "V5_5",
-                          }),
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          router.push("/create");
-                        } else {
-                          alert(data.error || "Hata oluştu");
-                        }
-                      } else {
-                        alert(uploadData.error || "Dosya yüklenemedi");
-                      }
-                    } catch {
-                      alert("Bağlantı hatası");
-                    }
-                    e.target.value = "";
-                  }}
-                />
               </div>
 
               {/* Sağ — rastgele + oluştur */}
@@ -1895,7 +1795,7 @@ export default function HomePage() {
                   className="flex items-center gap-[6px] pl-[16px] pr-[20px] py-[10px] rounded-full font-bold text-[14px] text-white pressable active:scale-95 transition-transform"
                   style={{
                     background:
-                      "linear-gradient(135deg, #e8825c 0%, #d4654a 40%, #c04e3a 70%, #a8402e 100%)",
+                      "linear-gradient(45deg, #082122 0%, #295b53 40%, #19b35c 75%, #fcff9a 100%)",
                   }}
                 >
                   <Music2 size={15} />

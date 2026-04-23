@@ -330,7 +330,7 @@ function SongCard({
         {song.title}
       </p>
       <p className="text-[#666] text-[11px] truncate mt-0.5">
-        {song.creator?.name || song.style?.split(",")[0] || "Hubeya"}
+        {song.creator?.name || song.style?.split(",")[0] || "Rifmo"}
       </p>
     </button>
   );
@@ -637,7 +637,7 @@ export default function DiscoverPage() {
                         <p className="text-[#888] text-xs truncate mt-0.5">
                           {song.creator?.name ||
                             song.style?.split(",")[0] ||
-                            "Hubeya"}
+                            "Rifmo"}
                         </p>
                       </button>
 

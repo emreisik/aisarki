@@ -14,7 +14,7 @@ const taskStore: Map<string, Song[]> =
 
 /* ── Tüm tabloları oluştur / migrate et (process başına bir kez) ── */
 
-async function ensureSchema() {
+export async function ensureSchema() {
   if (global.__schemaReady) return;
   await sql`
     CREATE TABLE IF NOT EXISTS users (
@@ -168,6 +168,146 @@ async function ensureSchema() {
       /* zaten var */
     }
   }
+
+  // ── Plan & abonelik & kredi ────────────────────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS plans (
+      id                       TEXT PRIMARY KEY,
+      name                     TEXT NOT NULL,
+      monthly_credits          INTEGER NOT NULL,
+      refresh_period           TEXT NOT NULL,
+      price_monthly_usd        INTEGER NOT NULL DEFAULT 0,
+      price_yearly_usd         INTEGER NOT NULL DEFAULT 0,
+      features                 JSONB NOT NULL DEFAULT '{}'::jsonb,
+      stripe_price_id_monthly  TEXT,
+      stripe_price_id_yearly   TEXT,
+      sort_order               INTEGER NOT NULL DEFAULT 0,
+      is_active                BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  // NOT: users.id prod'da UUID, dev'de TEXT olabilir. Tip uyumsuzluğu FK
+  // oluşturmayı bozduğu için user_id'de FK kullanmıyoruz — veri bütünlüğü
+  // app seviyesinde sağlanıyor (auth guard + ensureCreditsRow).
+  await sql`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id                     TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      user_id                TEXT NOT NULL,
+      plan_id                TEXT NOT NULL REFERENCES plans(id),
+      status                 TEXT NOT NULL,
+      billing_period         TEXT NOT NULL,
+      current_period_start   TIMESTAMPTZ NOT NULL,
+      current_period_end     TIMESTAMPTZ NOT NULL,
+      credit_period_end      TIMESTAMPTZ NOT NULL,
+      cancel_at_period_end   BOOLEAN NOT NULL DEFAULT FALSE,
+      stripe_customer_id     TEXT,
+      stripe_subscription_id TEXT UNIQUE,
+      created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS credits (
+      user_id         TEXT PRIMARY KEY,
+      balance         INTEGER NOT NULL DEFAULT 0,
+      plan_credits    INTEGER NOT NULL DEFAULT 0,
+      addon_credits   INTEGER NOT NULL DEFAULT 0,
+      last_refresh_at TIMESTAMPTZ,
+      next_refresh_at TIMESTAMPTZ,
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS credit_ledger (
+      id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      user_id       TEXT NOT NULL,
+      delta         INTEGER NOT NULL,
+      reason        TEXT NOT NULL,
+      ref_task_id   TEXT,
+      balance_after INTEGER NOT NULL,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  // Index'ler — FK yok ama user_id'ye göre sorgu yapıyoruz
+  for (const stmt of [
+    sql`CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions (user_id)`,
+  ]) {
+    try {
+      await stmt;
+    } catch {
+      /* zaten var */
+    }
+  }
+  for (const stmt of [
+    sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`,
+    sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_id TEXT NOT NULL DEFAULT 'free'`,
+    // TRY → USD kolon göçü (eski DB'ler için)
+    sql`ALTER TABLE plans RENAME COLUMN price_monthly_try TO price_monthly_usd`,
+    sql`ALTER TABLE plans RENAME COLUMN price_yearly_try TO price_yearly_usd`,
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_user_active
+         ON subscriptions (user_id)
+         WHERE status IN ('active', 'trialing', 'past_due')`,
+    sql`CREATE INDEX IF NOT EXISTS idx_subscriptions_credit_period
+         ON subscriptions (credit_period_end)
+         WHERE status IN ('active', 'trialing')`,
+    sql`CREATE INDEX IF NOT EXISTS idx_credit_ledger_user
+         ON credit_ledger (user_id, created_at DESC)`,
+  ]) {
+    try {
+      await stmt;
+    } catch {
+      /* zaten var */
+    }
+  }
+
+  // Plan seed — idempotent upsert
+  const { PLAN_DEFINITIONS } = await import("./plans");
+  for (const p of Object.values(PLAN_DEFINITIONS)) {
+    await sql`
+      INSERT INTO plans (
+        id, name, monthly_credits, refresh_period,
+        price_monthly_usd, price_yearly_usd, features, sort_order
+      )
+      VALUES (
+        ${p.id}, ${p.name}, ${p.monthlyCredits}, ${p.refreshPeriod},
+        ${p.priceMonthlyUsd}, ${p.priceYearlyUsd},
+        ${JSON.stringify(p.features)}::jsonb, ${p.sortOrder}
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        monthly_credits = EXCLUDED.monthly_credits,
+        refresh_period = EXCLUDED.refresh_period,
+        price_monthly_usd = EXCLUDED.price_monthly_usd,
+        price_yearly_usd = EXCLUDED.price_yearly_usd,
+        features = EXCLUDED.features,
+        sort_order = EXCLUDED.sort_order
+    `;
+  }
+
+  // Mevcut kullanıcılara Free subscription + credits satırı
+  // NOT: users.id UUID, subscriptions.user_id TEXT — cast şart.
+  await sql`
+    INSERT INTO subscriptions (
+      user_id, plan_id, status, billing_period,
+      current_period_start, current_period_end, credit_period_end
+    )
+    SELECT u.id::text, 'free', 'active', 'monthly',
+           NOW(), NOW() + INTERVAL '30 days',
+           NOW() + INTERVAL '1 month'
+    FROM users u
+    WHERE NOT EXISTS (
+      SELECT 1 FROM subscriptions s
+      WHERE s.user_id = u.id::text
+        AND s.status IN ('active', 'trialing', 'past_due')
+    )
+  `;
+  await sql`
+    INSERT INTO credits (user_id, balance, plan_credits, last_refresh_at, next_refresh_at)
+    SELECT u.id::text, 10, 10, NOW(), NOW() + INTERVAL '1 month'
+    FROM users u
+    WHERE NOT EXISTS (SELECT 1 FROM credits c WHERE c.user_id = u.id::text)
+  `;
+
   global.__schemaReady = true;
 }
 

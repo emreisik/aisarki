@@ -3,6 +3,7 @@ import { GenerateRequest, SunoApiResponse } from "@/types";
 import { saveProcessingTask, markTaskFailed } from "@/lib/taskStore";
 import { auth } from "@/auth";
 import { translateSunoError } from "@/lib/sunoErrors";
+import { checkCanGenerate, deductCredits } from "@/lib/credits";
 import {
   ARTIST_PRESETS,
   GENRES,
@@ -79,6 +80,23 @@ export async function POST(request: NextRequest) {
 
     if (!prompt && !customMode) {
       return NextResponse.json({ error: "Prompt gereklidir" }, { status: 400 });
+    }
+
+    // ── Kredi + model kilidi kontrolü ──
+    const check = await checkCanGenerate(session.user.id, {
+      action: "generate",
+      model: bodyModel,
+    });
+    if (!check.ok) {
+      return NextResponse.json(
+        {
+          error: check.message || "Kredi yetersiz",
+          code: check.error,
+          credits: check.credits,
+          planId: check.plan.id,
+        },
+        { status: check.error === "insufficient_credits" ? 402 : 403 },
+      );
     }
 
     const callBackUrl = getCallbackUrl(request);
@@ -234,6 +252,14 @@ export async function POST(request: NextRequest) {
         body as unknown as Record<string, unknown>,
         "music",
       ).catch((e) => console.error("[db] saveProcessingTask hatası:", e));
+
+      // Kredi düşümü — atomik, race'e dayanıklı
+      await deductCredits(
+        session.user.id,
+        check.cost,
+        "generate",
+        taskId,
+      ).catch((e) => console.error("[credits] deduct hatası:", e));
     }
 
     return NextResponse.json(data);

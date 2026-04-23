@@ -38,7 +38,7 @@ interface PlayerCtx {
 
 const PlayerContext = createContext<PlayerCtx | null>(null);
 
-const STORAGE_KEY = "hubeya_player";
+const STORAGE_KEY = "rifmo_player";
 
 function saveState(
   song: Song,
@@ -84,7 +84,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      const KEY = "hubeya_sid";
+      const KEY = "rifmo_sid";
       // sessionStorage kullan — sekme/pencere kapanınca otomatik silinir
       let sid = sessionStorage.getItem(KEY);
       if (!sid) {
@@ -360,9 +360,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentSong) return;
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentSong.title || "Hubeya",
-      artist: "Hubeya",
-      album: currentSong.style?.split(",")[0] || "Hubeya",
+      title: currentSong.title || "Rifmo",
+      artist: "Rifmo",
+      album: currentSong.style?.split(",")[0] || "Rifmo",
       artwork: currentSong.imageUrl
         ? [{ src: currentSong.imageUrl, sizes: "512x512", type: "image/jpeg" }]
         : [],

@@ -156,7 +156,7 @@ export default function SongCard({
             </Link>
           ) : (
             <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-              {song.style?.split(",")[0] || "Hubeya"}
+              {song.style?.split(",")[0] || "Rifmo"}
             </p>
           )}
         </div>
@@ -317,7 +317,7 @@ export default function SongCard({
           </Link>
         ) : (
           <p className="text-[#a7a7a7] text-xs truncate mt-0.5">
-            {song.style?.split(",")[0] || "Hubeya"}
+            {song.style?.split(",")[0] || "Rifmo"}
           </p>
         )}
         <div className="mt-0.5 flex items-center justify-between gap-2">

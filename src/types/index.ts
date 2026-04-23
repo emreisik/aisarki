@@ -209,3 +209,33 @@ export interface SunoApiResponse {
     sunoData?: SunoSong[];
   };
 }
+
+// ── Plan & abonelik tipleri ───────────────────────────────────────
+export interface UserSubscription {
+  id: string;
+  userId: string;
+  planId: "free" | "pro" | "premier";
+  status: "active" | "past_due" | "canceled" | "incomplete" | "trialing";
+  billingPeriod: "monthly" | "yearly";
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  creditPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+}
+
+export interface UserCredits {
+  balance: number;
+  planCredits: number;
+  addonCredits: number;
+  lastRefreshAt: string | null;
+  nextRefreshAt: string | null;
+}
+
+export interface CreditLedgerEntry {
+  id: string;
+  delta: number;
+  reason: string;
+  refTaskId: string | null;
+  balanceAfter: number;
+  createdAt: string;
+}

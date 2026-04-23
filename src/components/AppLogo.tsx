@@ -13,8 +13,8 @@ function HIcon({ px }: { px: number }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/test.png"
-      alt="Hubeya"
+      src="/fav.png"
+      alt="Rifmo"
       width={px}
       height={px}
       style={{ display: "block", objectFit: "contain" }}
@@ -37,7 +37,7 @@ export default function AppLogo({
         className={`${s.text} font-black text-white tracking-tight leading-none`}
         style={{ fontFamily: "inherit" }}
       >
-        Hubeya
+        Rifmo
       </span>
     </div>
   );

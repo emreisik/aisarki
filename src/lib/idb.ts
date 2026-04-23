@@ -1,8 +1,9 @@
 // IndexedDB yardımcısı — recently played (şu an sadece saveRecentSong kullanılıyor)
 import { Song } from "@/types";
 
-const DB_NAME = "hubeya";
-const DB_VERSION = 1;
+const DB_NAME = "rifmo";
+// v2: generateQueue store'u eklendi (sw.js ile uyumlu)
+const DB_VERSION = 2;
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -12,6 +13,12 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains("recentSongs")) {
         const store = db.createObjectStore("recentSongs", { keyPath: "id" });
         store.createIndex("playedAt", "playedAt");
+      }
+      if (!db.objectStoreNames.contains("generateQueue")) {
+        db.createObjectStore("generateQueue", {
+          keyPath: "id",
+          autoIncrement: true,
+        });
       }
     };
     req.onsuccess = () => resolve(req.result);

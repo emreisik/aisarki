@@ -287,7 +287,7 @@ export default function AudioPlayer() {
             <p className="text-white/60 text-sm truncate mt-0.5">
               {currentSong.creator?.name ||
                 currentSong.style?.split(",")[0] ||
-                "Hubeya"}
+                "Rifmo"}
             </p>
           </div>
           <button
@@ -439,7 +439,7 @@ export default function AudioPlayer() {
                 <p className="text-white/60 text-sm truncate">
                   {currentSong.creator?.name ||
                     currentSong.style?.split(",")[0] ||
-                    "Hubeya"}
+                    "Rifmo"}
                 </p>
               </div>
             </div>

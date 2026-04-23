@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { uploadAudioFromBuffer } from "@/lib/bunnyStorage";
+import { uploadAudioFromBuffer, keyToCdnUrl } from "@/lib/bunnyStorage";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -34,8 +34,13 @@ export async function POST(request: NextRequest) {
     }
 
     // CDN URL döndür
-    const cdnBase = process.env.BUNNY_CDN_URL || "";
-    const url = `https://${cdnBase}/${key}`;
+    const url = keyToCdnUrl(key);
+    if (!url) {
+      return NextResponse.json(
+        { error: "CDN URL oluşturulamadı" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ url, key });
   } catch (e) {

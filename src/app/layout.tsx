@@ -1,19 +1,21 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PlayerProvider } from "@/contexts/PlayerContext";
+import { UploadProvider } from "@/contexts/UploadContext";
+import { CreditsProvider } from "@/contexts/CreditsContext";
 import AppShell from "@/components/AppShell";
 import SessionProvider from "@/components/SessionProvider";
 import PWAManager from "@/components/PWAManager";
 
 export const metadata: Metadata = {
-  title: "Hubeya – Yapay Zeka ile Müzik Oluştur",
+  title: "Rifmo – Yapay Zeka ile Müzik Oluştur",
   description:
-    "Hubeya – Saniyeler içinde yapay zeka ile özgün şarkılar oluşturun.",
+    "Rifmo – Saniyeler içinde yapay zeka ile özgün şarkılar oluşturun.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Hubeya",
+    title: "Rifmo",
   },
 };
 
@@ -34,26 +36,19 @@ export default function RootLayout({
   return (
     <html lang="tr" suppressHydrationWarning>
       <head>
-        <link
-          rel="icon"
-          href="/favicon-32.png"
-          type="image/png"
-          sizes="32x32"
-        />
-        <link
-          rel="icon"
-          href="/icon-192.png"
-          type="image/png"
-          sizes="192x192"
-        />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="icon" href="/fav.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/fav.png" />
       </head>
       <body className="h-full">
         <SessionProvider>
-          <PlayerProvider>
-            <AppShell>{children}</AppShell>
-            <PWAManager />
-          </PlayerProvider>
+          <CreditsProvider>
+            <PlayerProvider>
+              <UploadProvider>
+                <AppShell>{children}</AppShell>
+                <PWAManager />
+              </UploadProvider>
+            </PlayerProvider>
+          </CreditsProvider>
         </SessionProvider>
       </body>
     </html>

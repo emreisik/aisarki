@@ -1,4 +1,4 @@
-const CACHE = "hubeya-v1";
+const CACHE = "rifmo-v2";
 const PRECACHE = ["/", "/discover", "/create", "/playlists", "/manifest.json"];
 
 // ── Install ───────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ self.addEventListener("fetch", (e) => {
 
 // ── Push Notification ─────────────────────────────────────────────
 self.addEventListener("push", (e) => {
-  let data = { title: "Hubeya", body: "Yeni bir bildirim var!", url: "/" };
+  let data = { title: "Rifmo", body: "Yeni bir bildirim var!", url: "/" };
   try {
     data = { ...data, ...e.data.json() };
   } catch {
@@ -73,9 +73,9 @@ self.addEventListener("push", (e) => {
   e.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      tag: data.tag || "hubeya-notification",
+      icon: "/fav.png",
+      badge: "/fav.png",
+      tag: data.tag || "rifmo-notification",
       renotify: true,
       data: { url: data.url || "/" },
       actions: [
@@ -138,7 +138,7 @@ async function flushGenerateQueue() {
         // Kullanıcıya başarı bildirimi
         self.registration.showNotification("Şarkı kuyruğa alındı", {
           body: `"${item.title}" oluşturma başladı!`,
-          icon: "/icon-192.png",
+          icon: "/fav.png",
           tag: "sync-success",
         });
       }
@@ -151,7 +151,7 @@ async function flushGenerateQueue() {
 // ── IndexedDB helpers (SW context) ───────────────────────────────
 function openIDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("hubeya", 1);
+    const req = indexedDB.open("rifmo", 2);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains("recentSongs")) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { saveProcessingTask, markTaskFailed } from "@/lib/taskStore";
 import { translateSunoError } from "@/lib/sunoErrors";
+import { checkCanGenerate, deductCredits } from "@/lib/credits";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
@@ -48,6 +49,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Audio URL gereklidir" },
         { status: 400 },
+      );
+    }
+
+    // ── Kredi + model kilidi kontrolü ──
+    const check = await checkCanGenerate(session.user.id, {
+      action: "cover",
+      model,
+    });
+    if (!check.ok) {
+      return NextResponse.json(
+        {
+          error: check.message || "Kredi yetersiz",
+          code: check.error,
+          credits: check.credits,
+        },
+        { status: check.error === "insufficient_credits" ? 402 : 403 },
       );
     }
 
@@ -114,6 +131,10 @@ export async function POST(request: NextRequest) {
         body,
         "upload-cover",
       ).catch(() => {});
+
+      await deductCredits(session.user.id, check.cost, "cover", taskId).catch(
+        (e) => console.error("[credits] deduct hatası:", e),
+      );
     }
 
     return NextResponse.json(data);
