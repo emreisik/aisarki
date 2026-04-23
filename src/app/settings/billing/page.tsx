@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCredits } from "@/contexts/CreditsContext";
@@ -60,7 +60,15 @@ function formatDate(iso: string): string {
   }
 }
 
-export default function BillingPage() {
+export default function BillingPageWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-full bg-[#0a0a0a]" />}>
+      <BillingPage />
+    </Suspense>
+  );
+}
+
+function BillingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { credits, plan, refresh: refreshCredits } = useCredits();
