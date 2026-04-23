@@ -357,15 +357,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [playing, currentSong]);
 
   // ── Media Session API — kilit ekranı / bildirim kontrolleri ──
+  // iOS PWA: artwork olmadan skip butonları güvenilir görünmüyor; fallback zorunlu.
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentSong) return;
+    const art = currentSong.imageUrl || "/icon.png";
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.title || "Rifmo",
-      artist: "Rifmo",
+      artist: currentSong.creator?.name || "Rifmo",
       album: currentSong.style?.split(",")[0] || "Rifmo",
-      artwork: currentSong.imageUrl
-        ? [{ src: currentSong.imageUrl, sizes: "512x512", type: "image/jpeg" }]
-        : [],
+      artwork: [
+        { src: art, sizes: "96x96", type: "image/png" },
+        { src: art, sizes: "192x192", type: "image/png" },
+        { src: art, sizes: "256x256", type: "image/png" },
+        { src: art, sizes: "384x384", type: "image/png" },
+        { src: art, sizes: "512x512", type: "image/png" },
+      ],
     });
   }, [currentSong]);
 
@@ -546,7 +552,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // ── Media Session action handler'ları — playNext/playPrev tanımlandıktan sonra ──
+  // ── Media Session action handler'ları ──
+  // currentSong dependency'si: iOS PWA'da şarkı değiştiğinde MediaSession state
+  // resetleniyor; handler'ları her yeni metadata ile birlikte yeniden kurmak
+  // lock screen'deki skip butonlarının kaybolmasını engelliyor.
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
 
@@ -583,7 +592,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         );
       }
     });
-  }, [playNext, playPrev]);
+  }, [playNext, playPrev, currentSong?.id]);
 
   return (
     <PlayerContext.Provider

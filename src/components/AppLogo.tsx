@@ -17,7 +17,7 @@ function HIcon({ px }: { px: number }) {
       alt="Rifmo"
       width={px}
       height={px}
-      style={{ display: "block", objectFit: "contain" }}
+      style={{ display: "block", objectFit: "contain", borderRadius: 8 }}
     />
   );
 }
