@@ -306,7 +306,7 @@ export const ARTIST_PRESETS: Record<ArtistPresetId, ArtistPreset> = {
     icon: "🎤",
     description: "Güneydoğu havası, uzun hava, dramatik",
     sunoStyle:
-      "Turkish fantezi music, southeastern Anatolian flavor, dramatic male vocal with extended melisma, bağlama, darbuka, strings, sometimes uzun hava (free rhythm) sections, 90s-2000s production, big emotional gestures",
+      "Turkish fantezi music, southeastern Anatolian flavor, dramatic male vocal with extended melisma, bağlama, darbuka, strings, sometimes free rhythm improvisation sections, 90s-2000s production, big emotional gestures",
     negativeTags: "pop, modern edm, soft acoustic, anglo, k-pop",
     styleWeight: 0.8,
     weirdnessConstraint: 0.2,
@@ -552,7 +552,7 @@ export const REGIONS: Record<RegionId, RegionPreset> = {
     id: "trakya",
     label: "Trakya",
     instruments: ["klarnet", "darbuka", "def", "ud"],
-    rhythms: ["9/8 oyun havası", "Roman havası"],
+    rhythms: ["9/8 aksak dance rhythm", "Romani Thracian dance"],
     preferredMakams: ["hicaz", "kürdi", "nihavend"],
     lyricsLehce: {},
     lyricsThemes: ["roman", "düğün", "Edirne", "Meriç", "ayçiçeği"],
@@ -570,7 +570,7 @@ export const REGIONS: Record<RegionId, RegionPreset> = {
     id: "guneydogu",
     label: "Güneydoğu Anadolu",
     instruments: ["bağlama", "ud", "tef", "kaval", "mey"],
-    rhythms: ["uzun hava", "halay aksak"],
+    rhythms: ["free rhythm folk improvisation", "halay aksak"],
     preferredMakams: ["hicaz", "hüseyni", "uşşak"],
     lyricsLehce: {},
     lyricsThemes: [
@@ -800,7 +800,7 @@ export const GENRES: Record<GenreId, GenrePreset> = {
     id: "oyun_havasi",
     label: "Oyun Havası",
     sunoStyle:
-      "Turkish oyun havası dance music, festive celebratory, klarnet, darbuka, def, bağlama, violin, 9/8 aksak or roman style, often instrumental with shouted interjections",
+      "Turkish folk dance music, festive celebratory, klarnet, darbuka, def, bağlama, violin, 9/8 aksak or Romani style, often instrumental with shouted interjections",
     negativeTags: "slow ballad, sad, anglo pop, edm, trap",
     styleWeight: 0.78,
     weirdnessConstraint: 0.2,
@@ -891,6 +891,26 @@ export function applyRegionalLehce(text: string, regionId: RegionId): string {
 }
 
 /** Birleşik Suno style string oluştur — stil preset + genre + region + makam */
+/**
+ * Suno style alanını kirleten bazı Türkçe compound ifadeleri Suno'nun naif
+ * sanatçı-adı filtresi tetikliyor (örn "hava" gibi bağımsız kelimeler).
+ * Preset'leri temizledik ama yeni eklemelerde ve kullanıcı free-form input'ta
+ * kaçak olmasın diye son bir defensive pass — Suno'ya giden style string'ini
+ * sterilize eder. Export edilir; generate/wizard-generate route'ları da
+ * kullanıcı input'unu buradan geçirir.
+ */
+export function sanitizeSunoStyle(style: string): string {
+  return style
+    .replace(/\buzun hava\b/gi, "free rhythm folk improvisation")
+    .replace(/\broman hava[sı]?\b/gi, "Romani dance")
+    .replace(/\boyun hava[sı]?\b/gi, "folk dance")
+    .replace(/\bhavası\b/gi, "") // son kale
+    .replace(/\s+,/g, ",")
+    .replace(/,\s*,/g, ",")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function buildSunoStyle(input: {
   artistId?: ArtistPresetId;
   genreId?: GenreId;
@@ -910,7 +930,7 @@ export function buildSunoStyle(input: {
   if (input.makamId) parts.push(MAKAMS[input.makamId].sunoHint);
   if (input.extraTags?.length) parts.push(...input.extraTags);
   parts.push(TURKISH_QUALITY_MARKERS);
-  return parts.filter(Boolean).join(", ");
+  return sanitizeSunoStyle(parts.filter(Boolean).join(", "));
 }
 
 /** Birleşik negative tags — stil preset + genre baseline */

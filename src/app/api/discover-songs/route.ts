@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { auth } from "@/auth";
 import { keyToCdnUrl } from "@/lib/bunnyStorage";
 
 export async function GET() {
   try {
+    const session = await auth();
+    const viewerId = session?.user?.id ?? null;
     const rows = await sql`
       SELECT
         s.id, s.title, s.style, s.audio_url, s.stream_url,
@@ -14,7 +17,17 @@ export async function GET() {
         u.username     AS creator_username
       FROM songs s
       LEFT JOIN users u ON u.id::text = s.created_by
-      WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
+      WHERE s.status = 'complete' AND s.audio_key IS NOT NULL AND s.takedown_at IS NULL
+        AND s.is_public = TRUE
+        AND (
+          ${viewerId}::text IS NULL
+          OR s.created_by IS NULL
+          OR s.created_by NOT IN (
+            SELECT blocked_id FROM user_blocks WHERE blocker_id = ${viewerId}::text
+            UNION ALL
+            SELECT hidden_id  FROM user_hidden WHERE user_id    = ${viewerId}::text
+          )
+        )
       ORDER BY s.created_at DESC
       LIMIT 50
     `;

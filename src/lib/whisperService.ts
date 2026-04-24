@@ -14,10 +14,21 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? "";
 
 // ── Tipler ──────────────────────────────────────────────────────
 
-interface TranscriptionResult {
+export interface TranscriptionSegment {
+  /** Segment başlangıç saniyesi (ondalıklı) */
+  start: number;
+  /** Segment bitiş saniyesi (ondalıklı) */
+  end: number;
+  /** Segment metni */
+  text: string;
+}
+
+export interface TranscriptionResult {
   text: string;
   language: string;
   duration: number;
+  /** Zamanlama segmentleri (varsa). whisper-1 verbose_json ile gelir. */
+  segments?: TranscriptionSegment[];
 }
 
 interface PronunciationAnalysis {
@@ -59,11 +70,14 @@ export async function transcribeSong(
     const audioBuffer = await audioRes.arrayBuffer();
     const audioBlob = new Blob([audioBuffer], { type: "audio/mpeg" });
 
+    // verbose_json + segment granularity için whisper-1 model gerekli.
+    // gpt-4o-transcribe segments dönmüyor — timestamped lyrics için uygun değil.
     const formData = new FormData();
     formData.append("file", audioBlob, "song.mp3");
-    formData.append("model", "gpt-4o-transcribe");
+    formData.append("model", "whisper-1");
     formData.append("language", "tr");
-    formData.append("response_format", "json");
+    formData.append("response_format", "verbose_json");
+    formData.append("timestamp_granularities[]", "segment");
 
     const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
@@ -77,15 +91,55 @@ export async function transcribeSong(
     }
 
     const data = await res.json();
+    const rawSegments = Array.isArray(data.segments) ? data.segments : [];
+    const segments: TranscriptionSegment[] = rawSegments
+      .map((s: { start?: number; end?: number; text?: string }) => ({
+        start: typeof s.start === "number" ? s.start : 0,
+        end: typeof s.end === "number" ? s.end : 0,
+        text: typeof s.text === "string" ? s.text.trim() : "",
+      }))
+      .filter((s: TranscriptionSegment) => s.text.length > 0);
+
     return {
       text: data.text ?? "",
       language: data.language ?? "tr",
       duration: data.duration ?? 0,
+      segments: segments.length > 0 ? segments : undefined,
     };
   } catch (e) {
     console.error("[whisper] Transcription hatası:", e);
     return null;
   }
+}
+
+// ── LRC Üretimi ──────────────────────────────────────────────────
+
+/**
+ * Whisper segmentlerinden standart LRC (Lyric) formatı üret.
+ * Format: [mm:ss.xx]lyric text
+ *
+ * Döndürdüğü string herhangi bir LRC player'da (WinAmp, player plugin'leri,
+ * bizim song detail karaoke bileşenimiz) doğrudan kullanılabilir.
+ */
+export function segmentsToLrc(
+  segments: TranscriptionSegment[],
+  options: { title?: string; artist?: string } = {},
+): string {
+  const header: string[] = [];
+  if (options.title) header.push(`[ti:${options.title}]`);
+  if (options.artist) header.push(`[ar:${options.artist}]`);
+
+  const lines = segments.map((s) => {
+    const t = Math.max(0, s.start);
+    const mm = Math.floor(t / 60)
+      .toString()
+      .padStart(2, "0");
+    const ssFloat = t - Math.floor(t / 60) * 60;
+    const ss = ssFloat.toFixed(2).padStart(5, "0");
+    return `[${mm}:${ss}]${s.text}`;
+  });
+
+  return [...header, ...lines].join("\n");
 }
 
 // ── Claude ile Akıllı Türkçe Telaffuz Analizi ──────────────────

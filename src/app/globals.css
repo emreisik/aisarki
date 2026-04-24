@@ -91,6 +91,19 @@ input[type="range"]::-webkit-slider-thumb {
 .snap-x { scroll-snap-type: x mandatory; }
 .snap-start { scroll-snap-align: start; }
 
+/* Toast — bottom center slide-in */
+@keyframes toast-in {
+  from { transform: translate(-50%, 20px); opacity: 0; }
+  to   { transform: translate(-50%, 0);     opacity: 1; }
+}
+.animate-toast-in { animation: toast-in 0.22s cubic-bezier(0.32,0.72,0,1) forwards; }
+
+/* Centered modal animations */
+@keyframes modal-in  { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes modal-out { from { transform: scale(1); opacity: 1; } to { transform: scale(0.94); opacity: 0; } }
+.modal-enter { animation: modal-in 0.2s cubic-bezier(0.32,0.72,0,1) forwards; }
+.modal-exit  { animation: modal-out 0.18s cubic-bezier(0.32,0.72,0,1) forwards; }
+
 /* Native sheet animations */
 @keyframes sheet-up {
   from { transform: translateY(100%); }
@@ -119,6 +132,69 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .animate-ping-slow {
   animation: ping-slow 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Mic pulse — kayıt butonunda yumuşak halka efekti */
+@keyframes mic-pulse {
+  0%   { transform: scale(1);    opacity: 0.55; }
+  70%  { transform: scale(1.55); opacity: 0;    }
+  100% { transform: scale(1.55); opacity: 0;    }
+}
+.mic-pulse {
+  background: radial-gradient(circle, rgba(30,215,96,0.55) 0%, rgba(30,215,96,0) 70%);
+  animation: mic-pulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+/* Hero neon blob animasyonu — yeşil gradyan ışık efekti */
+.hero-neon {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  will-change: transform, opacity;
+  mix-blend-mode: screen;
+}
+.hero-neon-1 {
+  top: -25%;
+  left: 15%;
+  width: 55%;
+  height: 90%;
+  background: radial-gradient(circle, #19b35c 0%, rgba(25,179,92,0) 65%);
+  opacity: 0.55;
+  animation: neon-float-1 14s ease-in-out infinite;
+}
+.hero-neon-2 {
+  top: -35%;
+  left: 50%;
+  width: 50%;
+  height: 80%;
+  background: radial-gradient(circle, #1ed760 0%, rgba(30,215,96,0) 65%);
+  opacity: 0.45;
+  animation: neon-float-2 18s ease-in-out infinite;
+}
+.hero-neon-3 {
+  top: -10%;
+  left: -10%;
+  width: 45%;
+  height: 70%;
+  background: radial-gradient(circle, #0a7a3e 0%, rgba(10,122,62,0) 65%);
+  opacity: 0.5;
+  animation: neon-float-3 22s ease-in-out infinite;
+}
+@keyframes neon-float-1 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.55; }
+  50%      { transform: translate3d(8%, 6%, 0) scale(1.18); opacity: 0.7; }
+}
+@keyframes neon-float-2 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); opacity: 0.4; }
+  50%      { transform: translate3d(-12%, 8%, 0) scale(1.25); opacity: 0.6; }
+}
+@keyframes neon-float-3 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.45; }
+  50%      { transform: translate3d(15%, 4%, 0) scale(1.15); opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-neon { animation: none !important; }
 }
 
 /* Plus <-> Play morph animasyonu */

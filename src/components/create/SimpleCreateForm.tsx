@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Dice5, Check, Music2, Loader2, Plus, Lock } from "lucide-react";
+import {
+  Dice5,
+  Check,
+  Music2,
+  Loader2,
+  Plus,
+  Lock,
+  Mic,
+  Upload,
+} from "lucide-react";
 import InspirationTags from "./InspirationTags";
 import UploadingClipCard from "@/components/UploadingClipCard";
 import { useUpload } from "@/contexts/UploadContext";
@@ -21,6 +30,7 @@ const DESCRIPTION_EXAMPLES = [
 type Props = {
   model: string;
   onTaskStarted: (taskId: string, prompt: string, title: string) => void;
+  remixFromSourceId?: string;
 };
 
 type HeroUpload = {
@@ -31,7 +41,11 @@ type HeroUpload = {
   xhr?: XMLHttpRequest;
 } | null;
 
-export default function SimpleCreateForm({ model, onTaskStarted }: Props) {
+export default function SimpleCreateForm({
+  model,
+  onTaskStarted,
+  remixFromSourceId,
+}: Props) {
   const router = useRouter();
   const { credits, costs, refresh: refreshCredits } = useCredits();
   const [description, setDescription] = useState("");
@@ -41,9 +55,22 @@ export default function SimpleCreateForm({ model, onTaskStarted }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const audioInputRef = useRef<HTMLInputElement>(null);
-  const { pending, setPending } = useUpload();
+  const { pending, setPending, openRecord } = useUpload();
   const [heroUpload, setHeroUpload] = useState<HeroUpload>(null);
   const heroStartedRef = useRef<number | null>(null);
+  const [audioMenuOpen, setAudioMenuOpen] = useState(false);
+  const audioMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!audioMenuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (!audioMenuRef.current?.contains(e.target as Node)) {
+        setAudioMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [audioMenuOpen]);
 
   const generateCost = costs.generate ?? 10;
   const hasEnoughCredits = (credits?.balance ?? 0) >= generateCost;
@@ -191,6 +218,7 @@ export default function SimpleCreateForm({ model, onTaskStarted }: Props) {
           instrumental,
           customMode: false,
           model,
+          ...(remixFromSourceId ? { remixFromSourceId } : {}),
         }),
       });
       const data = await res.json();
@@ -275,13 +303,43 @@ export default function SimpleCreateForm({ model, onTaskStarted }: Props) {
         {/* Action row */}
         <div className="flex items-center justify-between mt-4">
           <div className="flex gap-2">
-            <button
-              onClick={() => audioInputRef.current?.click()}
-              className="h-9 px-3.5 rounded-full bg-[#232323] hover:bg-[#2e2e2e] text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
-            >
-              <Plus size={14} />
-              Ses
-            </button>
+            <div className="relative" ref={audioMenuRef}>
+              <button
+                onClick={() => setAudioMenuOpen((v) => !v)}
+                className="h-9 px-3.5 rounded-full bg-[#232323] hover:bg-[#2e2e2e] text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors"
+              >
+                <Plus size={14} />
+                Ses
+              </button>
+              {audioMenuOpen && (
+                <div className="absolute bottom-[44px] left-0 bg-[#2a2a2a] rounded-[12px] py-[6px] shadow-2xl shadow-black/60 z-50 min-w-[180px] border border-[#3a3a3a]">
+                  <button
+                    onClick={() => {
+                      setAudioMenuOpen(false);
+                      openRecord();
+                    }}
+                    className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
+                  >
+                    <Mic size={15} className="text-[#ccc]" />
+                    <span className="text-white text-[13px] font-medium">
+                      Mikrofon ile kaydet
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAudioMenuOpen(false);
+                      audioInputRef.current?.click();
+                    }}
+                    className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
+                  >
+                    <Upload size={15} className="text-[#ccc]" />
+                    <span className="text-white text-[13px] font-medium">
+                      Cihazdan yükle
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setShowLyrics((v) => !v)}
               className={`h-9 px-3.5 rounded-full text-[13px] font-medium flex items-center gap-1.5 transition-colors ${

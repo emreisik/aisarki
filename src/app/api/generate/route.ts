@@ -16,9 +16,8 @@ import {
   buildSunoStyle,
   buildNegativeTags,
   resolveSunoParams,
+  sanitizeSunoStyle,
   DEFAULT_NEGATIVE_TAGS,
-  TURKISH_QUALITY_MARKERS,
-  PHONETIC_HINTS,
 } from "@/lib/turkishMusicKB";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
@@ -134,8 +133,10 @@ export async function POST(request: NextRequest) {
     const finalStyleWeight = styleWeight ?? kbParams.styleWeight;
     const finalWeirdness = weirdnessConstraint ?? kbParams.weirdnessConstraint;
     const finalVocalGender = vocalGender ?? kbParams.vocalGender;
-    // Custom mode'da kullanıcı kendi style verirse ona ek olarak KB style koy
-    const finalStyle = customMode
+    // Custom mode'da kullanıcı kendi style verirse ona ek olarak KB style koy.
+    // Son adımda sanitize — kullanıcı "oyun havası" gibi Suno filtresini
+    // tetikleyen Türkçe compound'lar yazsa bile güvenli hale gelir.
+    const rawFinalStyle = customMode
       ? style
         ? validArtistId || validGenreId || validRegionId || validMakamId
           ? `${style}, ${kbStyle}`
@@ -144,19 +145,27 @@ export async function POST(request: NextRequest) {
           ? kbStyle
           : undefined
       : undefined;
+    const finalStyle = rawFinalStyle
+      ? sanitizeSunoStyle(rawFinalStyle)
+      : undefined;
     // Negative tags: KB'den gelen + her zaman default anti-anglo
     const finalNegativeTags =
       kbNegativeTags && kbNegativeTags !== DEFAULT_NEGATIVE_TAGS
         ? kbNegativeTags
         : DEFAULT_NEGATIVE_TAGS;
 
-    // Prompt suffix (sadece simple mode'da, custom mode'da lyrics zaten yazılı)
-    const qualitySuffix = instrumental
-      ? ""
-      : `, ${TURKISH_QUALITY_MARKERS}, ${PHONETIC_HINTS}`;
+    // Non-custom mode'da Suno prompt'u max 500 karakter kabul ediyor ve
+    // diğer alanların boş olmasını istiyor. TURKISH_QUALITY_MARKERS +
+    // PHONETIC_HINTS tek başına ~700 char → limit aşılıyor, 400 dönüyor.
+    // Quality suffix'i sadece custom mode'un style alanında kullanmak anlamlı;
+    // simple mode prompt'a eklenmesi Suno'yu karıştırıyor + limiti aşıyor.
+    const SUNO_NON_CUSTOM_PROMPT_LIMIT = 500;
+    const rawPrompt = prompt || "";
     const finalPrompt = customMode
-      ? prompt || ""
-      : (prompt || "") + qualitySuffix;
+      ? rawPrompt
+      : rawPrompt.length > SUNO_NON_CUSTOM_PROMPT_LIMIT
+        ? rawPrompt.slice(0, SUNO_NON_CUSTOM_PROMPT_LIMIT)
+        : rawPrompt;
 
     // Model seçimi: kullanıcı UI'dan gönderdiyse onu kullan (valid olmak kaydıyla),
     // yoksa sanatçı persona varsa V5, yoksa V4_5ALL
@@ -174,20 +183,29 @@ export async function POST(request: NextRequest) {
         ? "V5_5"
         : "V5_5";
 
+    // Suno: non-custom mode'da SADECE prompt + zorunlu alanlar; style/title/
+    // negativeTags/styleWeight/weirdnessConstraint/vocalGender/personaId yalnız
+    // custom mode'da kabul ediliyor — diğerinde 400 dönüyor.
     const payload: Record<string, unknown> = {
       customMode,
       instrumental,
       model,
       prompt: finalPrompt,
       callBackUrl,
-      negativeTags: finalNegativeTags,
-      styleWeight: finalStyleWeight,
-      weirdnessConstraint: finalWeirdness,
-      ...(finalVocalGender ? { vocalGender: finalVocalGender } : {}),
-      ...(customMode && finalStyle ? { style: finalStyle } : {}),
-      ...(customMode && title ? { title } : {}),
-      ...(personaId ? { personaId } : {}),
-      ...(personaId ? { personaModel: personaModel || "voice_persona" } : {}),
+      ...(customMode
+        ? {
+            negativeTags: finalNegativeTags,
+            styleWeight: finalStyleWeight,
+            weirdnessConstraint: finalWeirdness,
+            ...(finalVocalGender ? { vocalGender: finalVocalGender } : {}),
+            ...(finalStyle ? { style: finalStyle } : {}),
+            ...(title ? { title } : {}),
+            ...(personaId ? { personaId } : {}),
+            ...(personaId
+              ? { personaModel: personaModel || "voice_persona" }
+              : {}),
+          }
+        : {}),
     };
 
     console.log("Calling Suno API with callBackUrl:", callBackUrl);

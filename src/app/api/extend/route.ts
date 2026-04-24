@@ -5,6 +5,7 @@ import { translateSunoError } from "@/lib/sunoErrors";
 import sql from "@/lib/db";
 import { keyToCdnUrl } from "@/lib/bunnyStorage";
 import { checkCanGenerate, deductCredits } from "@/lib/credits";
+import { sanitizeSunoStyle } from "@/lib/turkishMusicKB";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
       instrumental,
       continueAt,
       ...(prompt ? { prompt } : {}),
-      ...(style ? { style } : {}),
+      ...(style ? { style: sanitizeSunoStyle(style) } : {}),
       ...(title ? { title } : {}),
     };
 

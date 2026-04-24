@@ -6,6 +6,7 @@ import { CreditsProvider } from "@/contexts/CreditsContext";
 import AppShell from "@/components/AppShell";
 import SessionProvider from "@/components/SessionProvider";
 import PWAManager from "@/components/PWAManager";
+import RecordSheet from "@/components/RecordSheet";
 
 export const metadata: Metadata = {
   title: "Rifmo – Yapay Zeka ile Müzik Oluştur",
@@ -45,6 +46,7 @@ export default function RootLayout({
             <PlayerProvider>
               <UploadProvider>
                 <AppShell>{children}</AppShell>
+                <RecordSheet />
                 <PWAManager />
               </UploadProvider>
             </PlayerProvider>

@@ -1493,7 +1493,7 @@ export default function HomePage() {
   const [inlineInput, setInlineInput] = useState("");
   const [heroPrompt, setHeroPrompt] = useState("");
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const { setPending: setPendingUpload } = useUpload();
+  const { setPending: setPendingUpload, openRecord } = useUpload();
   const heroFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleHeroFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1668,7 +1668,7 @@ export default function HomePage() {
       map.get(key)!.songs.push(s);
     });
     return Array.from(map.values())
-      .filter((g) => g.songs.length >= 2)
+      .filter((g) => g.songs.length >= 1)
       .slice(0, 4);
   })();
 
@@ -1676,13 +1676,24 @@ export default function HomePage() {
     <div className="min-h-full bg-[#121212]">
       {/* ── Suno Hero ── */}
       <div
-        className="relative"
-        style={{
-          background:
-            "radial-gradient(ellipse at 50% 0%, #3a1c0a 0%, #1a0e06 40%, #121212 70%)",
-        }}
+        className="relative overflow-hidden"
+        style={{ background: "#06140c" }}
       >
-        <div className="pt-[16px] pb-[40px] px-[20px] flex flex-col items-center">
+        {/* Hareketli yeşil neon blob'lar */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="hero-neon hero-neon-1" />
+          <div className="hero-neon hero-neon-2" />
+          <div className="hero-neon hero-neon-3" />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(ellipse at 50% 100%, transparent 0%, #121212 75%)",
+            }}
+          />
+        </div>
+
+        <div className="relative pt-[80px] pb-[80px] px-[20px] flex flex-col items-center">
           <h1 className="text-white text-[28px] md:text-[36px] font-bold text-center leading-[1.2] mb-[28px]">
             Hayalindeki şarkıyı
             <br />
@@ -1699,7 +1710,7 @@ export default function HomePage() {
           />
 
           {/* Suno input bar */}
-          <div className="w-full max-w-[560px] bg-[#1a1a1a] rounded-[16px] border border-[#2a2a2a] overflow-hidden">
+          <div className="relative w-full max-w-[560px] bg-[#1a1a1a]/90 backdrop-blur-xl rounded-[16px] border border-[#2a2a2a]">
             {/* Üst — textarea */}
             <textarea
               value={heroPrompt}
@@ -1732,7 +1743,7 @@ export default function HomePage() {
                     <button
                       onClick={() => {
                         setShowPlusMenu(false);
-                        router.push("/create?mode=record");
+                        openRecord();
                       }}
                       className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
                     >

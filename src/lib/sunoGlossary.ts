@@ -118,9 +118,9 @@ export const REGIONAL_SUNO_PROFILES: Record<RegionId, RegionalSunoProfile> = {
     westernAnchor:
       "Middle Eastern folk ballad, Armenian duduk atmosphere, Kurdish mountain folk",
     performanceStyle:
-      "uzun hava free rhythm sections, melismatic vocal runs, raw emotional outpouring, halay line dance",
+      "free rhythm folk improvisation sections, melismatic vocal runs, raw emotional outpouring, halay line dance",
     rhythmHint:
-      "mixed meter, free rhythm uzun hava passages alternating with 4/4 halay, 100-130 BPM for halay",
+      "mixed meter, free rhythm improvisation passages alternating with 4/4 halay, 100-130 BPM for halay",
     sunoInstruments: ["bağlama", "mey", "davul", "zurna"],
     vocalStyle:
       "powerful emotional male vocals with extended melisma, raw cry-like delivery, controlled breaks",
@@ -139,7 +139,7 @@ export const REGIONAL_SUNO_PROFILES: Record<RegionId, RegionalSunoProfile> = {
     westernAnchor:
       "Balkan brass band, Romani jazz swing, festive Eastern European dance",
     performanceStyle:
-      "Roman havası festive energy, syncopated dance grooves, wedding celebration atmosphere",
+      "Romani festive dance energy, syncopated dance grooves, wedding celebration atmosphere",
     rhythmHint:
       "9/8 aksak rhythm, Romani swing feel, fast syncopated, 130-150 BPM",
     sunoInstruments: ["klarnet", "darbuka", "def"],
@@ -159,9 +159,9 @@ export const REGIONAL_SUNO_PROFILES: Record<RegionId, RegionalSunoProfile> = {
     westernAnchor:
       "Middle Eastern classical, Arabic maqam tradition, Mesopotamian folk",
     performanceStyle:
-      "uzun hava long free-rhythm passages, Urfa sıra gecesi intimate atmosphere, dramatic emotional storytelling",
+      "long free-rhythm improvisation passages, sıra gecesi intimate atmosphere, dramatic emotional storytelling",
     rhythmHint:
-      "free rhythm uzun hava, aksak halay sections, mixed meter, 90-120 BPM",
+      "free rhythm improvisation, aksak halay sections, mixed meter, 90-120 BPM",
     sunoInstruments: ["ud", "bağlama", "mey", "tef"],
     vocalStyle:
       "powerful male vocals with deep melisma, Maqam-based melodic runs, passionate dramatic delivery",

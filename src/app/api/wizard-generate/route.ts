@@ -15,6 +15,7 @@ import {
   buildSunoStyle,
   buildNegativeTags,
   resolveSunoParams,
+  sanitizeSunoStyle,
 } from "@/lib/turkishMusicKB";
 import {
   resolveArtistPreset,
@@ -306,10 +307,11 @@ Başlık:`;
         : topicText;
     const useCustomMode = hasLyrics || isInstrumental;
 
-    // Style'a Suno boost ekle (bölgesel tavır, makam scale, genre anchor)
-    const finalStyle = sunoOpt.styleBoost
-      ? `${kbStyle}, ${sunoOpt.styleBoost}`
-      : kbStyle;
+    // Style'a Suno boost ekle (bölgesel tavır, makam scale, genre anchor).
+    // Sanitize — Türkçe compound'lar ("oyun havası" vb.) Suno filtresi tetikler.
+    const finalStyle = sanitizeSunoStyle(
+      sunoOpt.styleBoost ? `${kbStyle}, ${sunoOpt.styleBoost}` : kbStyle,
+    );
 
     const ALLOWED_MODELS = new Set([
       "V4",

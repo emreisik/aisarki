@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface2: #171717;
+  --surface3: #1f1f1f;
+  --border: #262626;
+  --border-strong: #333333;
+  --text: #ffffff;
+  --text2: #a1a1aa;
+  --text3: #52525b;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --success: #10b981;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100vh;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "SF Pro Text",
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings:
+    "cv11",
+    "ss01";
+}
+
+/* Admin-specific dense table stil temeli */
+.admin-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-size: 13px;
+}
+.admin-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text2);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.admin-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.admin-table tr:hover td {
+  background: var(--surface2);
+}

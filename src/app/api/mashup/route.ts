@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { saveProcessingTask, markTaskFailed } from "@/lib/taskStore";
 import { translateSunoError } from "@/lib/sunoErrors";
 import { checkCanGenerate, deductCredits } from "@/lib/credits";
+import { sanitizeSunoStyle } from "@/lib/turkishMusicKB";
 
 const SUNO_API_KEY = process.env.SUNO_API_KEY ?? "";
 const SUNO_BASE_URL = "https://api.sunoapi.org";
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
       callBackUrl,
       model,
       ...(prompt ? { prompt } : {}),
-      ...(customMode && style ? { style } : {}),
+      ...(customMode && style ? { style: sanitizeSunoStyle(style) } : {}),
       ...(customMode && title ? { title } : {}),
     };
 

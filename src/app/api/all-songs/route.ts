@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
     const userId = session.user.id;
     const limitParam = req.nextUrl.searchParams.get("limit");
-    const limit = limitParam ? Math.min(Number(limitParam) || 0, 200) : 0;
+    const limit = limitParam ? Math.min(Number(limitParam) || 0, 1000) : 0;
 
     const [songs, processing] = await Promise.all([
       getAllSongs(userId, limit),

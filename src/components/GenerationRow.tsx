@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Loader2, Play, Pause, X } from "lucide-react";
 import { Song } from "@/types";
 
@@ -12,6 +13,18 @@ interface GenerationRowSkeletonProps {
   onCancel?: () => void;
   onRetry?: () => void;
   retrying?: boolean;
+  /** ISO string — processing started time */
+  startedAt?: string;
+}
+
+/** Tahmini ortalama üretim süresi (saniye). Suno V5 ~90-120s. */
+const ESTIMATED_TOTAL_SEC = 120;
+
+function formatElapsed(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 export function GenerationRowSkeleton({
@@ -22,7 +35,29 @@ export function GenerationRowSkeleton({
   onCancel,
   onRetry,
   retrying,
+  startedAt,
 }: GenerationRowSkeletonProps) {
+  const [elapsed, setElapsed] = useState<number>(() => {
+    if (!startedAt) return 0;
+    const t = new Date(startedAt).getTime();
+    if (!Number.isFinite(t)) return 0;
+    return Math.max(0, Math.floor((Date.now() - t) / 1000));
+  });
+
+  useEffect(() => {
+    if (failed || !startedAt) return;
+    const id = setInterval(() => {
+      const t = new Date(startedAt).getTime();
+      if (!Number.isFinite(t)) return;
+      setElapsed(Math.max(0, Math.floor((Date.now() - t) / 1000)));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [failed, startedAt]);
+
+  const progressPct =
+    startedAt && !failed
+      ? Math.min(98, (elapsed / ESTIMATED_TOTAL_SEC) * 100)
+      : 0;
   if (failed) {
     return (
       <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-red-500/5">
@@ -60,6 +95,15 @@ export function GenerationRowSkeleton({
     );
   }
 
+  const isLate = elapsed > ESTIMATED_TOTAL_SEC;
+  const statusLabel = isLate
+    ? "Hâlâ üretiliyor..."
+    : elapsed < 15
+      ? "Başlatılıyor..."
+      : elapsed < 45
+        ? "Sözler işleniyor..."
+        : "Ses üretiliyor...";
+
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl">
       <div className="relative w-11 h-11 rounded-lg overflow-hidden flex-shrink-0">
@@ -82,8 +126,27 @@ export function GenerationRowSkeleton({
         </div>
       </div>
       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-        <div className="h-3 w-32 rounded-full bg-white/[0.06] animate-pulse" />
-        <div className="h-2 w-48 max-w-full rounded-full bg-white/[0.04] animate-pulse" />
+        <div className="flex items-center gap-2">
+          <span className="text-white text-[12px] font-medium">
+            {statusLabel}
+          </span>
+          {startedAt && (
+            <span className="text-[10px] text-[#666] font-mono tabular-nums">
+              {formatElapsed(elapsed)}
+              {!isLate && ` / ~${formatElapsed(ESTIMATED_TOTAL_SEC)}`}
+            </span>
+          )}
+        </div>
+        <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-[width] duration-700 ${
+              isLate
+                ? "bg-amber-500/60 animate-pulse"
+                : "bg-gradient-to-r from-[#295b53] to-[#19b35c]"
+            }`}
+            style={{ width: `${Math.max(5, progressPct)}%` }}
+          />
+        </div>
       </div>
       {onCancel && (
         <button

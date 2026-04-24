@@ -71,7 +71,7 @@ export default function ProfilePage() {
     const username = (session?.user as { username?: string })?.username;
 
     Promise.all([
-      fetch("/api/all-songs")
+      fetch("/api/all-songs?limit=1000")
         .then((r) => r.json())
         .then((d) => setSongs(d.songs || [])),
       username

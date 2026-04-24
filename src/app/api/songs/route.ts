@@ -8,6 +8,7 @@ import {
   getTaskStatus,
   updateSongAudioKey,
   updateSongImageKey,
+  failTaskAndRefund,
 } from "@/lib/taskStore";
 import {
   uploadAudioFromUrl,
@@ -15,6 +16,7 @@ import {
   isBunnyConfigured,
 } from "@/lib/bunnyStorage";
 import { Song } from "@/types";
+import { extractRecordInfoStatus, translateSunoError } from "@/lib/sunoErrors";
 
 // Vercel timeout koruması — Suno fetch + Bunny upload için
 export const maxDuration = 60;
@@ -69,7 +71,12 @@ function rawToSong(s: RawSunoSong): Song {
   };
 }
 
-async function fetchFromSunoApi(taskId: string): Promise<Song[] | null> {
+type SunoFetchResult =
+  | { kind: "songs"; songs: Song[] }
+  | { kind: "failed"; errorTitle: string; errorMessage: string }
+  | { kind: "pending" };
+
+async function fetchFromSunoApi(taskId: string): Promise<SunoFetchResult> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
@@ -86,7 +93,7 @@ async function fetchFromSunoApi(taskId: string): Promise<Song[] | null> {
 
     if (!res.ok) {
       console.log(`[songs] Suno API ${res.status} for taskId=${taskId}`);
-      return null;
+      return { kind: "pending" };
     }
 
     const data = await res.json();
@@ -98,7 +105,29 @@ async function fetchFromSunoApi(taskId: string): Promise<Song[] | null> {
     // Suno seviyesinde hata
     if (data?.code && data.code !== 200) {
       console.log(`[songs] Suno error code=${data.code} msg=${data.msg}`);
-      return null;
+      const translated = translateSunoError(data.code, data.msg);
+      return {
+        kind: "failed",
+        errorTitle: translated.title,
+        errorMessage: translated.message,
+      };
+    }
+
+    // record-info data.status = failure (CREATE_TASK_FAILED, SENSITIVE_WORD_ERROR...)
+    const recordFailure = extractRecordInfoStatus(data);
+    if (recordFailure) {
+      console.log(
+        `[songs] record-info failure taskId=${taskId} code=${recordFailure.code} msg=${recordFailure.message}`,
+      );
+      const translated = translateSunoError(
+        recordFailure.code,
+        recordFailure.message,
+      );
+      return {
+        kind: "failed",
+        errorTitle: translated.title,
+        errorMessage: translated.message,
+      };
     }
 
     // Tüm olası response formatlarını dene
@@ -141,7 +170,7 @@ async function fetchFromSunoApi(taskId: string): Promise<Song[] | null> {
       console.log(
         `[songs] No song array found in response for taskId=${taskId}`,
       );
-      return null;
+      return { kind: "pending" };
     }
 
     const mapped = rawArr.map(rawToSong);
@@ -153,10 +182,10 @@ async function fetchFromSunoApi(taskId: string): Promise<Song[] | null> {
     if (playableComplete.length > 0) {
       maybeTriggerBunnyUpload(playableComplete, rawArr);
     }
-    return mapped;
+    return { kind: "songs", songs: mapped };
   } catch (e) {
     console.log(`[songs] fetchFromSunoApi error for taskId=${taskId}:`, e);
-    return null;
+    return { kind: "pending" };
   }
 }
 
@@ -229,9 +258,21 @@ export async function GET(request: NextRequest) {
   }
 
   // 2) Suno API'yi doğrudan sorgula
-  const songs = await fetchFromSunoApi(taskId);
+  const result = await fetchFromSunoApi(taskId);
 
-  if (songs && songs.length > 0) {
+  // record-info hata döndüyse task'ı failed olarak işaretle + kredi iadesi
+  if (result.kind === "failed") {
+    await failTaskAndRefund(taskId, result.errorTitle, result.errorMessage);
+    return NextResponse.json({
+      status: "failed",
+      songs: [],
+      errorTitle: result.errorTitle,
+      errorMessage: result.errorMessage,
+    });
+  }
+
+  if (result.kind === "songs" && result.songs.length > 0) {
+    const songs = result.songs;
     const complete = songs.filter((s) => s.status === "complete");
 
     // En az bir varyant çalınabilir hale geldiyse complete dön — kullanıcı
@@ -278,6 +319,26 @@ export async function GET(request: NextRequest) {
       songs: [],
       errorTitle: taskStatus.errorTitle || "Üretim başarısız",
       errorMessage: taskStatus.errorMessage || "Tekrar deneyebilirsin",
+    });
+  }
+
+  // 5) Stale timeout — 15 dakikadır processing'de takılı kalmış task'ları
+  // otomatik fail + kredi iade et. Suno üretimi tipik 1-3 dk; 15 dk+ ise
+  // callback büyük olasılıkla kayboldu veya Suno tarafında sorun var.
+  const STALE_SECONDS = 15 * 60;
+  if (
+    taskStatus?.status === "processing" &&
+    (taskStatus.ageSeconds ?? 0) > STALE_SECONDS
+  ) {
+    const errorTitle = "Zaman aşımı";
+    const errorMessage =
+      "Şarkı 15 dakikayı geçti ve hâlâ hazır değil. Suno yanıt vermedi. Kredin iade edildi, tekrar deneyebilirsin.";
+    await failTaskAndRefund(taskId, errorTitle, errorMessage);
+    return NextResponse.json({
+      status: "failed",
+      songs: [],
+      errorTitle,
+      errorMessage,
     });
   }
 

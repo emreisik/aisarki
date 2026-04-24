@@ -84,6 +84,38 @@ const ERROR_MAP: Record<number | string, ErrorInfo> = {
       "Şarkı üretimi tamamlanamadı. Kredilerin iade edildi. Lütfen girdiği bilgileri kontrol edip tekrar dene.",
     refunded: true,
   },
+
+  // Suno record-info string kodları (lower-case)
+  create_task_failed: {
+    title: "Üretim başlatılamadı",
+    message:
+      "Suno şarkı üretimini başlatamadı. Kredin iade edildi. Lütfen tekrar dene.",
+    refunded: true,
+  },
+  generate_audio_failed: {
+    title: "Ses üretilemedi",
+    message:
+      "Şarkı üretimi sırasında bir hata oluştu. Kredin iade edildi. Lütfen tekrar dene.",
+    refunded: true,
+  },
+  callback_exception: {
+    title: "Callback hatası",
+    message:
+      "Suno yanıtı alınırken bir sorun oluştu. Kredin iade edildi. Lütfen tekrar dene.",
+    refunded: true,
+  },
+  sensitive_word_error: {
+    title: "İçerik filtresi",
+    message:
+      "Prompt veya sözlerde Suno filtresinin engellediği bir kelime tespit edildi. İçeriği değiştirip tekrar dene.",
+    refunded: true,
+  },
+  lyrics_generate_failed: {
+    title: "Sözler üretilemedi",
+    message:
+      "Şarkı sözleri üretilemedi. Kredin iade edildi. Lütfen tekrar dene.",
+    refunded: true,
+  },
 };
 
 /**
@@ -138,8 +170,26 @@ export function translateSunoError(
 }
 
 /**
+ * Suno record-info / callback response'unda hata olduğunu gösteren status değerleri.
+ * Upper-case döner (Suno): "CREATE_TASK_FAILED", "GENERATE_AUDIO_FAILED",
+ * "CALLBACK_EXCEPTION", "SENSITIVE_WORD_ERROR", ayrıca lower-case "failed"/"error".
+ */
+const FAILURE_STATUSES = new Set([
+  "failed",
+  "error",
+  "create_task_failed",
+  "generate_audio_failed",
+  "callback_exception",
+  "sensitive_word_error",
+  "lyrics_generate_failed",
+]);
+
+/**
  * Response body'den hata olup olmadığını tespit et.
- * Suno farklı formatlarda dönebilir: { code, msg } veya nested.
+ * Üç format destekler:
+ *   1) Top-level { code, msg } (generate endpoint reject)
+ *   2) Callback body → data.status / data.errorCode
+ *   3) record-info response → data.data.status (upper-case "CREATE_TASK_FAILED" vb.)
  */
 export function extractSunoError(
   body: unknown,
@@ -147,7 +197,7 @@ export function extractSunoError(
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
 
-  // Top-level code
+  // 1) Top-level code
   if (typeof b.code === "number" && b.code !== 200) {
     return {
       code: b.code,
@@ -155,21 +205,65 @@ export function extractSunoError(
     };
   }
 
-  // Nested data.status = "failed" / "error"
   const data = b.data as Record<string, unknown> | undefined;
-  if (data) {
-    const status = (data.status as string)?.toLowerCase?.();
-    if (status === "failed" || status === "error") {
-      return {
-        code: (data.errorCode as number | string) || "task_failed",
-        message:
-          (data.errorMessage as string) ||
-          (data.error as string) ||
-          (b.msg as string) ||
-          "Task failed",
-      };
-    }
+  if (!data) return null;
+
+  // 2) Callback formatı: body.data.status
+  const directStatus = (data.status as string | undefined)?.toLowerCase();
+  if (directStatus && FAILURE_STATUSES.has(directStatus)) {
+    return {
+      code: (data.errorCode as number | string) || directStatus,
+      message:
+        (data.errorMessage as string) ||
+        (data.error as string) ||
+        (b.msg as string) ||
+        "Task failed",
+    };
   }
 
+  // 3) record-info formatı: body.data.data.status veya body.data.response.status
+  const nested =
+    (data.data as Record<string, unknown> | undefined) ||
+    (data.response as Record<string, unknown> | undefined);
+  const nestedStatus = (nested?.status as string | undefined)?.toLowerCase();
+  if (nestedStatus && FAILURE_STATUSES.has(nestedStatus)) {
+    return {
+      code: (nested?.errorCode as number | string) || nestedStatus,
+      message:
+        (nested?.errorMessage as string) ||
+        (data.errorMessage as string) ||
+        (b.msg as string) ||
+        "Task failed",
+    };
+  }
+
+  return null;
+}
+
+/**
+ * record-info response'u için özel: data.data.status değerini kontrol eder,
+ * failure ise { code, message } döner. Başarılı veya hala processing ise null.
+ */
+export function extractRecordInfoStatus(
+  body: unknown,
+): { failed: true; code?: number | string; message: string } | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as Record<string, unknown>;
+  const outer = b.data as Record<string, unknown> | undefined;
+  if (!outer) return null;
+  // Suno record-info: { code:200, data: { status: "...", errorCode, errorMessage, response: {...} } }
+  const statusRaw = (outer.status as string | undefined) || "";
+  const status = statusRaw.toLowerCase();
+  if (status && FAILURE_STATUSES.has(status)) {
+    return {
+      failed: true,
+      code: (outer.errorCode as number | string) || status,
+      message:
+        (outer.errorMessage as string) ||
+        (b.msg as string) ||
+        statusRaw ||
+        "Task failed",
+    };
+  }
   return null;
 }

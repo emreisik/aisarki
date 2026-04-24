@@ -8,7 +8,7 @@ import { Song } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useGoBack } from "@/hooks/useGoBack";
 import SongHero from "@/components/song/SongHero";
-import LyricsBlock from "@/components/song/LyricsBlock";
+import KaraokeLyrics from "@/components/song/KaraokeLyrics";
 import CommentsSection from "@/components/song/CommentsSection";
 import SimilarRail from "@/components/song/SimilarRail";
 
@@ -396,7 +396,7 @@ export default function SongClient({
           <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-4">
             Sözler
           </p>
-          <LyricsBlock text={song.prompt} />
+          <KaraokeLyrics song={song} lrc={song.lrc} fallback={song.prompt} />
         </div>
 
         {/* Aksiyonlar: Extend / Cover / Mashup */}

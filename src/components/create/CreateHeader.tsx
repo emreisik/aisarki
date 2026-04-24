@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { useCredits } from "@/contexts/CreditsContext";
 
-export type CreateMode = "simple" | "advanced";
+export type CreateMode = "simple" | "advanced" | "wizard";
 
 export const MODEL_OPTIONS = [
   { id: "V5_5", label: "v5.5" },
@@ -73,11 +73,11 @@ export default function CreateHeader({
         </span>
       </Link>
 
-      {/* Simple/Advanced toggle */}
+      {/* Simple/Wizard/Advanced toggle */}
       <div className="h-9 flex bg-transparent rounded-full border border-[#2a2a2a] p-0.5">
         <button
           onClick={() => onModeChange("simple")}
-          className={`px-4 rounded-full text-[13px] font-semibold transition-colors ${
+          className={`px-3 rounded-full text-[12px] font-semibold transition-colors ${
             mode === "simple"
               ? "bg-[#2a2a2a] text-white"
               : "text-[#aaa] hover:text-white"
@@ -86,8 +86,21 @@ export default function CreateHeader({
           Basit
         </button>
         <button
+          onClick={() => onModeChange("wizard")}
+          className={`px-3 rounded-full text-[12px] font-semibold transition-colors flex items-center gap-1 ${
+            mode === "wizard"
+              ? "bg-[#2a2a2a] text-white"
+              : "text-[#aaa] hover:text-white"
+          }`}
+        >
+          Sihirli
+          <span className="text-[9px] font-bold px-1 py-0.5 rounded-full bg-[#19b35c] text-black">
+            AI
+          </span>
+        </button>
+        <button
           onClick={() => onModeChange("advanced")}
-          className={`px-4 rounded-full text-[13px] font-semibold transition-colors ${
+          className={`px-3 rounded-full text-[12px] font-semibold transition-colors ${
             mode === "advanced"
               ? "bg-[#2a2a2a] text-white"
               : "text-[#aaa] hover:text-white"

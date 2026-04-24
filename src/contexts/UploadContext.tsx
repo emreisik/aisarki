@@ -10,14 +10,28 @@ export type PendingUpload = {
 type UploadCtx = {
   pending: PendingUpload;
   setPending: (p: PendingUpload) => void;
+  recordOpen: boolean;
+  openRecord: () => void;
+  closeRecord: () => void;
 };
 
 const Ctx = createContext<UploadCtx | null>(null);
 
 export function UploadProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingUpload>(null);
+  const [recordOpen, setRecordOpen] = useState(false);
   return (
-    <Ctx.Provider value={{ pending, setPending }}>{children}</Ctx.Provider>
+    <Ctx.Provider
+      value={{
+        pending,
+        setPending,
+        recordOpen,
+        openRecord: () => setRecordOpen(true),
+        closeRecord: () => setRecordOpen(false),
+      }}
+    >
+      {children}
+    </Ctx.Provider>
   );
 }
 
