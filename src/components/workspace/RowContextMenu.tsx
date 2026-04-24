@@ -12,14 +12,18 @@ import {
   Globe,
   Lock,
   FileAudio,
+  Scissors,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { Song } from "@/types";
 
 type MenuAction =
+  | "studio"
   | "cover"
   | "extend"
   | "mashup"
   | "stems"
+  | "sample"
   | "inspiration"
   | "reuse_prompt"
   | "download_mp3"
@@ -37,6 +41,13 @@ type Item = {
 function buildItems(song: Song): Item[] {
   const canDownload = !!(song.audioUrl || song.streamUrl);
   return [
+    {
+      id: "studio",
+      label: "Stüdyoda Aç",
+      icon: SlidersHorizontal,
+      badge: "NEW",
+      enabled: canDownload,
+    },
     { id: "cover", label: "Cover Yap", icon: RefreshCw, enabled: true },
     { id: "extend", label: "Uzat", icon: MoveRight, enabled: true },
     { id: "mashup", label: "Mashup", icon: Shuffle, enabled: true },
@@ -45,6 +56,12 @@ function buildItems(song: Song): Item[] {
       label: "Stems Ayır",
       icon: AudioLines,
       badge: "PRO",
+      enabled: canDownload,
+    },
+    {
+      id: "sample",
+      label: "Örnek Olarak Kullan",
+      icon: Scissors,
       enabled: canDownload,
     },
     {
@@ -110,7 +127,7 @@ export default function RowContextMenu({
   }, [onClose]);
 
   const menuWidth = 240;
-  const menuHeight = 360;
+  const menuHeight = 440;
   const margin = 8;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;

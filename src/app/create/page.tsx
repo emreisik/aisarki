@@ -346,6 +346,21 @@ export default function CreatePage() {
 
   const handleRowAction = useCallback(
     async (action: MenuAction, song: Song) => {
+      if (action === "studio") {
+        router.push(`/studio/${song.id}`);
+        return;
+      }
+      if (action === "sample") {
+        // "Örnek olarak kullan" → Mashup modalını bu şarkı ile aç
+        // Kullanıcı 2. şarkıyı seçip Mashup tetikleyecek
+        const uploadUrl = song.audioUrl || song.streamUrl;
+        if (!uploadUrl) {
+          alert("Şarkının ses dosyası henüz hazır değil");
+          return;
+        }
+        setDerivation({ open: true, mode: "mashup", song });
+        return;
+      }
       if (action === "reuse_prompt") {
         // Query param ile Advanced form'a prompt + style + title aktar
         const params = new URLSearchParams();
