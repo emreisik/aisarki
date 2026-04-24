@@ -12,6 +12,7 @@ import {
   Upload as UploadIcon,
   Music2,
   ChevronDown,
+  Lock,
 } from "lucide-react";
 import type { Song } from "@/types";
 import RowContextMenu, { type MenuAction } from "./RowContextMenu";
@@ -142,6 +143,15 @@ export default function WorkspaceRow({
               Yükleme
             </span>
           )}
+          {song.isPublic === false && (
+            <span
+              className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#2a2a2a] text-[#aaa]"
+              title="Yalnızca sana özel"
+            >
+              <Lock size={9} />
+              Özel
+            </span>
+          )}
         </div>
         <p className="text-[#888] text-[12.5px] line-clamp-1 mt-0.5">
           {song.style || "—"}
@@ -168,13 +178,13 @@ export default function WorkspaceRow({
         </div>
       </div>
 
-      {/* Remix/Edit + menu */}
+      {/* Remix + menu */}
       <div className="flex items-center gap-1 self-start opacity-0 group-hover:opacity-100 transition-opacity">
         <button
-          onClick={() => onAction("editor", song)}
+          onClick={() => onAction("reuse_prompt", song)}
           className="h-9 px-3 rounded-full bg-[#1f1f1f] hover:bg-[#2a2a2a] flex items-center gap-1.5 text-white text-[12px] font-medium transition-colors"
         >
-          Remix/Düzenle
+          Remix
           <ChevronDown size={12} />
         </button>
         <button
@@ -192,6 +202,7 @@ export default function WorkspaceRow({
       {menuAnchor && (
         <RowContextMenu
           anchorRect={menuAnchor}
+          song={song}
           onClose={() => setMenuAnchor(null)}
           onAction={(id) => onAction(id, song)}
         />

@@ -28,10 +28,9 @@ export interface PlanSnapshot {
     commercialUse: boolean;
     uploadMaxMinutes: number;
     stems: boolean;
+    wavDownload: boolean;
     addOnCredits: boolean;
     priorityQueue: boolean;
-    studio: boolean;
-    advancedEditor: boolean;
     earlyAccess: boolean;
     voiceTuning: boolean;
   };

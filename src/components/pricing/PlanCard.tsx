@@ -62,7 +62,7 @@ function buildFeatureList(plan: PlanDefinition): FeatureRow[] {
     });
   } else {
     // premier
-    rows.push({ ok: f.studio, text: "Stüdyoya erişim" });
+    rows.push({ ok: f.wavDownload, text: "WAV (HD) format indirme" });
     rows.push({ ok: true, text: "En iyi ve en kişisel v5.5 modeline erişim" });
     rows.push({
       ok: true,

@@ -17,6 +17,7 @@ import {
   Music2,
   Radio,
   X,
+  Gauge,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { usePlayer } from "@/contexts/PlayerContext";
@@ -157,6 +158,8 @@ function ProgressBar({
   );
 }
 
+const MOBILE_PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const;
+
 /* ── Ana Component ── */
 export default function AudioPlayer() {
   const {
@@ -174,11 +177,14 @@ export default function AudioPlayer() {
     toggleShuffle,
     repeat,
     toggleRepeat,
+    playbackRate,
+    setPlaybackRate,
   } = usePlayer();
   const { data: session } = useSession();
 
   const [liked, setLiked] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showRateSheet, setShowRateSheet] = useState(false);
   const rgb = useDominantColor(currentSong?.imageUrl);
   const router = useRouter();
 
@@ -469,6 +475,14 @@ export default function AudioPlayer() {
                 }}
               />
               <MenuItem
+                icon={<Gauge size={22} className="text-white" />}
+                label={`Hız (${playbackRate}x)`}
+                onPress={() => {
+                  setShowMenu(false);
+                  setShowRateSheet(true);
+                }}
+              />
+              <MenuItem
                 icon={<Radio size={22} className="text-white" />}
                 label="Şarkıya git"
                 onPress={() => {
@@ -504,6 +518,55 @@ export default function AudioPlayer() {
                 Kapat
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Hız Selector Bottom Sheet ── */}
+      {showRateSheet && (
+        <div
+          className="absolute inset-0 z-30 flex items-end bg-black/60"
+          onClick={() => setShowRateSheet(false)}
+        >
+          <div
+            className="w-full bg-[#181818] rounded-t-2xl p-2"
+            style={{
+              paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3">
+              <p className="text-white text-base font-semibold">Çalma Hızı</p>
+              <button
+                onClick={() => setShowRateSheet(false)}
+                className="w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center"
+              >
+                <X size={20} className="text-white" />
+              </button>
+            </div>
+            {MOBILE_PLAYBACK_RATES.map((rate) => (
+              <button
+                key={rate}
+                onClick={() => {
+                  setPlaybackRate(rate);
+                  setShowRateSheet(false);
+                }}
+                className="w-full flex items-center justify-between px-5 py-3 hover:bg-white/5 transition-colors"
+              >
+                <span
+                  className={`text-base ${
+                    rate === playbackRate
+                      ? "text-[#1db954] font-semibold"
+                      : "text-white"
+                  }`}
+                >
+                  {rate}x {rate === 1 && "(Normal)"}
+                </span>
+                {rate === playbackRate && (
+                  <span className="w-2 h-2 rounded-full bg-[#1db954]" />
+                )}
+              </button>
+            ))}
           </div>
         </div>
       )}

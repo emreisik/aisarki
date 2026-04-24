@@ -3,18 +3,18 @@ import { after } from "next/server";
 import {
   setTaskSongs,
   markTaskComplete,
-  markTaskFailed,
+  failTaskAndRefund,
   getTaskCreatedBy,
+  getTaskPayload,
   updateSongAudioKey,
   updateSongImageKey,
   updateSongTranscription,
   setPrimaryByScore,
   getTaskPrompt,
+  saveSongStems,
+  saveSongWavUrl,
 } from "@/lib/taskStore";
 import { translateSunoError, extractSunoError } from "@/lib/sunoErrors";
-import { refundCredits } from "@/lib/credits";
-import { CREDIT_COSTS, type CreditAction } from "@/lib/plans";
-import { getTaskPayload } from "@/lib/taskStore";
 import { sendPushToUser } from "@/lib/pushNotification";
 import {
   uploadAudioFromUrl,
@@ -22,7 +22,11 @@ import {
   isBunnyConfigured,
 } from "@/lib/bunnyStorage";
 import { Song } from "@/types";
-import { transcribeSong, scorePronunciation } from "@/lib/whisperService";
+import {
+  transcribeSong,
+  scorePronunciation,
+  segmentsToLrc,
+} from "@/lib/whisperService";
 
 // Vercel serverless function timeout — Bunny upload + Suno fetch için yeterli
 export const maxDuration = 60;
@@ -125,28 +129,10 @@ export async function POST(request: NextRequest) {
       console.warn(
         `[callback] Suno error code=${sunoError.code} → ${translated.title}: ${translated.message}`,
       );
-      markTaskFailed(taskId, translated.title, translated.message).catch(
-        () => { },
+      // Fail + refund — idempotent (taskId bazında duplicate refund engellenir)
+      failTaskAndRefund(taskId, translated.title, translated.message).catch(
+        (e) => console.error("[callback] failTaskAndRefund hatası:", e),
       );
-
-      // Kredi iadesi — task'ın hangi endpoint'ten geldiğine göre doğru miktarda
-      const ENDPOINT_TO_ACTION: Record<string, CreditAction> = {
-        music: "generate",
-        extend: "extend",
-        "upload-cover": "cover",
-        "upload-extend": "upload_extend",
-        mashup: "mashup",
-      };
-      getTaskPayload(taskId)
-        .then((tp) => {
-          if (!tp?.userId || !tp.endpoint) return;
-          const action = ENDPOINT_TO_ACTION[tp.endpoint];
-          if (!action) return;
-          const amount = CREDIT_COSTS[action];
-          if (amount <= 0) return;
-          return refundCredits(tp.userId, amount, taskId);
-        })
-        .catch((e) => console.error("[callback] refund hatası:", e));
 
       // Kullanıcıya push bildirimi gönder (varsa)
       getTaskCreatedBy(taskId)
@@ -159,8 +145,90 @@ export async function POST(request: NextRequest) {
             tag: `song-failed-${taskId}`,
           });
         })
-        .catch(() => { });
+        .catch(() => {});
 
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Stems / WAV callback dispatch ──
+    // Bu task'lar music generation değil — endpoint tag'ine göre işle
+    const taskPayload = await getTaskPayload(taskId);
+    const endpoint = taskPayload?.endpoint;
+
+    if (endpoint === "stems-separate" || endpoint === "stems-split") {
+      const songId = (taskPayload?.payload as Record<string, unknown> | null)
+        ?.songId as string | undefined;
+      const type = (taskPayload?.payload as Record<string, unknown> | null)
+        ?.type as "separate_vocal" | "split_stem" | undefined;
+      const removalInfo =
+        (dataObj?.vocal_removal_info as Record<string, unknown>) ||
+        (dataObj?.vocalRemovalInfo as Record<string, unknown>) ||
+        ((body.data as Record<string, unknown>)?.vocal_removal_info as Record<
+          string,
+          unknown
+        >);
+
+      if (songId && type && removalInfo) {
+        await saveSongStems(songId, type, removalInfo);
+        await markTaskComplete(taskId);
+
+        // Push bildirimi
+        getTaskCreatedBy(taskId)
+          .then((userId) => {
+            if (!userId) return;
+            return sendPushToUser(userId, {
+              title: "Stems hazır",
+              body:
+                type === "split_stem"
+                  ? "12 stem dosyan hazır"
+                  : "Vocal/enstrümantal ayrımı tamamlandı",
+              url: `/song/${songId}`,
+              tag: `stems-${taskId}`,
+            });
+          })
+          .catch(() => {});
+
+        console.log(
+          `[callback] stems(${type}) saved for song ${songId} (task ${taskId})`,
+        );
+      } else {
+        console.warn(
+          `[callback] stems callback eksik field — songId=${songId} type=${type} info=${!!removalInfo}`,
+        );
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (endpoint === "wav") {
+      const songId = (taskPayload?.payload as Record<string, unknown> | null)
+        ?.songId as string | undefined;
+      const wavUrl =
+        (dataObj?.audioWavUrl as string) ||
+        (dataObj?.audio_wav_url as string) ||
+        ((body.data as Record<string, unknown>)?.audioWavUrl as string);
+
+      if (songId && wavUrl) {
+        await saveSongWavUrl(songId, wavUrl);
+        await markTaskComplete(taskId);
+
+        getTaskCreatedBy(taskId)
+          .then((userId) => {
+            if (!userId) return;
+            return sendPushToUser(userId, {
+              title: "WAV hazır",
+              body: "HD WAV dosyan indirilmeye hazır",
+              url: `/song/${songId}`,
+              tag: `wav-${taskId}`,
+            });
+          })
+          .catch(() => {});
+
+        console.log(`[callback] wav saved for song ${songId} (task ${taskId})`);
+      } else {
+        console.warn(
+          `[callback] wav callback eksik field — songId=${songId} wavUrl=${!!wavUrl}`,
+        );
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -274,9 +342,14 @@ export async function POST(request: NextRequest) {
                 originalLyrics,
                 result.text,
               );
-              await updateSongTranscription(song.id, score, result.text);
+              // Segments varsa LRC üret (karaoke senkronizasyon için)
+              const lrc =
+                result.segments && result.segments.length > 0
+                  ? segmentsToLrc(result.segments, { title: song.title })
+                  : undefined;
+              await updateSongTranscription(song.id, score, result.text, lrc);
               console.log(
-                `[after][whisper] ${song.id} → score=${score} (${result.text.slice(0, 80)}...)`,
+                `[after][whisper] ${song.id} → score=${score} lrc=${lrc ? "✓" : "✗"} (${result.text.slice(0, 80)}...)`,
               );
             } catch (e) {
               console.warn(`[after][whisper] fail ${song.id}:`, e);
@@ -296,7 +369,7 @@ export async function POST(request: NextRequest) {
     const allComplete =
       songs.length > 0 && songs.every((s) => s.status === "complete");
     if (allComplete) {
-      markTaskComplete(taskId).catch(() => { });
+      markTaskComplete(taskId).catch(() => {});
 
       // Oluşturan kullanıcıya push bildirimi gönder
       getTaskCreatedBy(taskId)
@@ -311,7 +384,7 @@ export async function POST(request: NextRequest) {
             tag: `song-ready-${taskId}`,
           });
         })
-        .catch(() => { });
+        .catch(() => {});
     }
 
     console.log(

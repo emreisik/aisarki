@@ -14,14 +14,12 @@ export interface PlanFeatures {
   uploadMaxMinutes: number;
   /** 12 stem'e ayırma */
   stems: boolean;
+  /** WAV (HD) indirme */
+  wavDownload: boolean;
   /** Add-on kredi satın alma hakkı */
   addOnCredits: boolean;
   /** Öncelikli kuyruk, 10 eşzamanlı */
   priorityQueue: boolean;
-  /** Suno Studio erişimi */
-  studio: boolean;
-  /** Advanced editor erişimi */
-  advancedEditor: boolean;
   /** Early access to new features */
   earlyAccess: boolean;
   /** Custom voice tuning */
@@ -54,10 +52,9 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
       commercialUse: false,
       uploadMaxMinutes: 8,
       stems: false,
+      wavDownload: false,
       addOnCredits: false,
       priorityQueue: false,
-      studio: false,
-      advancedEditor: false,
       earlyAccess: false,
       voiceTuning: false,
     },
@@ -75,10 +72,9 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
       commercialUse: true,
       uploadMaxMinutes: 30,
       stems: true,
+      wavDownload: true,
       addOnCredits: true,
       priorityQueue: true,
-      studio: false,
-      advancedEditor: false,
       earlyAccess: true,
       voiceTuning: true,
     },
@@ -97,10 +93,9 @@ export const PLAN_DEFINITIONS: Record<PlanId, PlanDefinition> = {
       commercialUse: true,
       uploadMaxMinutes: 30,
       stems: true,
+      wavDownload: true,
       addOnCredits: true,
       priorityQueue: true,
-      studio: true,
-      advancedEditor: true,
       earlyAccess: true,
       voiceTuning: true,
     },
@@ -118,7 +113,11 @@ export type CreditAction =
   | "extend"
   | "mashup"
   | "upload"
-  | "upload_extend";
+  | "upload_extend"
+  | "stems_separate"
+  | "stems_split"
+  | "wav_convert"
+  | "boost_style";
 
 export const CREDIT_COSTS: Record<CreditAction, number> = {
   generate: 10,
@@ -127,6 +126,10 @@ export const CREDIT_COSTS: Record<CreditAction, number> = {
   mashup: 10,
   upload: 0,
   upload_extend: 10,
+  stems_separate: 10, // vocal + enstrümantal
+  stems_split: 50, // 12 stem
+  wav_convert: 0, // ücretsiz format dönüşümü
+  boost_style: 0, // sync, ücretsiz
 };
 
 export function getPlan(id: PlanId | string): PlanDefinition {

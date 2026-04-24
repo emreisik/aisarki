@@ -60,6 +60,37 @@ export async function ensureSchema() {
       PRIMARY KEY (follower_id, following_id)
     )
   `;
+  // Moderasyon: kullanıcı engelleme (iki taraflı etki)
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_blocks (
+      blocker_id TEXT NOT NULL,
+      blocked_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (blocker_id, blocked_id)
+    )
+  `;
+  // Feed'den gizleme (tek taraflı, kullanıcıyı engellemeden içeriğini gizler)
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_hidden (
+      user_id    TEXT NOT NULL,
+      hidden_id  TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, hidden_id)
+    )
+  `;
+  // Şikayet sistemi
+  await sql`
+    CREATE TABLE IF NOT EXISTS reports (
+      id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      reporter_id TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id   TEXT NOT NULL,
+      reason      TEXT NOT NULL,
+      note        TEXT,
+      status      TEXT NOT NULL DEFAULT 'open',
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
   // Eski tablolara eksik kolonları ekle (idempotent)
   for (const stmt of [
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS task_id TEXT`,
@@ -82,6 +113,20 @@ export async function ensureSchema() {
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS transcribed_lyrics TEXT`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS enhanced_audio_key TEXT`,
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT true`,
+    // Profil genişletmeleri (Suno-style profile)
+    sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`,
+    sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banner_url TEXT`,
+    sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS genre_tags TEXT[] NOT NULL DEFAULT '{}'::text[]`,
+    // Remix kaynağı takibi — kim kimden remix yapmış
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS remix_source_id TEXT`,
+    // Görünürlük: public feed'de görünür mü? (default true — mevcut şarkılarla uyumlu)
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE`,
+    // Zamanlanmış sözler (LRC formatı, Whisper segments → karaoke render için)
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS lrc TEXT`,
+    // Stems (vocal/enstrümantal veya 12-stem ayırma sonuçları)
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS stems_data JSONB`,
+    // WAV (HD) format dönüşüm URL'si
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS wav_url TEXT`,
   ]) {
     try {
       await stmt;
@@ -158,6 +203,11 @@ export async function ensureSchema() {
     sql`CREATE INDEX IF NOT EXISTS idx_songs_task ON songs (task_id)`,
     sql`CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows (follower_id, created_at DESC)`,
     sql`CREATE INDEX IF NOT EXISTS idx_follows_following ON follows (following_id)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocker ON user_blocks (blocker_id)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks (blocked_id)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_user_hidden_user ON user_hidden (user_id)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_reports_status_created ON reports (status, created_at DESC)`,
+    sql`CREATE INDEX IF NOT EXISTS idx_songs_remix_source ON songs (remix_source_id) WHERE remix_source_id IS NOT NULL`,
     sql`CREATE INDEX IF NOT EXISTS idx_tasks_active ON tasks (status, created_at DESC) WHERE status IN ('processing', 'failed')`,
     sql`CREATE INDEX IF NOT EXISTS idx_song_comments_song_created ON song_comments (song_id, created_at DESC)`,
     sql`CREATE INDEX IF NOT EXISTS idx_song_comments_user ON song_comments (user_id)`,
@@ -389,10 +439,49 @@ export async function markTaskFailed(
           error_title = ${errorTitle},
           error_message = ${errorMessage}
       WHERE task_id = ${taskId}
+        AND status <> 'complete'
     `;
     console.log(`[db] task ${taskId} → failed: ${errorTitle}`);
   } catch (e) {
     console.error("[db] markTaskFailed hatası:", e);
+  }
+}
+
+/**
+ * Task'ı failed olarak işaretle + task'ın endpoint'ine göre doğru miktarda
+ * kredi iadesi yap. Hem callback hem polling (record-info failure) hem de
+ * stale-task timeout için ortak path. Idempotent — aynı taskId için birden
+ * çok kez çağrılırsa iade ledger'da tekrarlanmaz (refundCredits içindeki
+ * duplicate check sayesinde).
+ */
+export async function failTaskAndRefund(
+  taskId: string,
+  errorTitle: string,
+  errorMessage: string,
+): Promise<void> {
+  await markTaskFailed(taskId, errorTitle, errorMessage);
+  try {
+    const { refundCredits } = await import("./credits");
+    const { CREDIT_COSTS } = await import("./plans");
+    const ENDPOINT_TO_ACTION: Record<string, string> = {
+      music: "generate",
+      extend: "extend",
+      "upload-cover": "cover",
+      "upload-extend": "upload_extend",
+      mashup: "mashup",
+      "stems-separate": "stems_separate",
+      "stems-split": "stems_split",
+      wav: "wav_convert",
+    };
+    const tp = await getTaskPayload(taskId);
+    if (!tp?.userId || !tp.endpoint) return;
+    const action = ENDPOINT_TO_ACTION[tp.endpoint];
+    if (!action) return;
+    const amount = (CREDIT_COSTS as Record<string, number>)[action];
+    if (!amount || amount <= 0) return;
+    await refundCredits(tp.userId, amount, taskId);
+  } catch (e) {
+    console.error("[failTaskAndRefund] refund hatası:", e);
   }
 }
 
@@ -412,18 +501,31 @@ export async function getTaskStatus(taskId: string): Promise<{
   status: string;
   errorTitle?: string;
   errorMessage?: string;
+  createdAt?: Date;
+  ageSeconds?: number;
 } | null> {
   try {
     await ensureSchema();
     const rows = await sql`
-      SELECT status, error_title, error_message
+      SELECT status, error_title, error_message, created_at
       FROM tasks WHERE task_id = ${taskId} LIMIT 1
     `;
     if (rows.length === 0) return null;
+    const createdAt =
+      rows[0].created_at instanceof Date
+        ? (rows[0].created_at as Date)
+        : rows[0].created_at
+          ? new Date(rows[0].created_at as string)
+          : undefined;
+    const ageSeconds = createdAt
+      ? Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 1000))
+      : undefined;
     return {
       status: rows[0].status as string,
       errorTitle: (rows[0].error_title as string) ?? undefined,
       errorMessage: (rows[0].error_message as string) ?? undefined,
+      createdAt,
+      ageSeconds,
     };
   } catch {
     return null;
@@ -447,6 +549,32 @@ export async function getProcessingTasks(
 ): Promise<ProcessingTask[]> {
   try {
     await ensureSchema();
+
+    // 15 dakikadır processing'de takılı task'ları otomatik fail + refund et.
+    // UI polling tetiklemese bile (ör. kullanıcı sekmeyi kapatmış) bu pull
+    // sırasında temizlenir ve açınca failed görünür.
+    const stale = userId
+      ? await sql`
+          SELECT task_id FROM tasks
+          WHERE status = 'processing'
+            AND created_by = ${userId}
+            AND created_at < NOW() - INTERVAL '15 minutes'
+          LIMIT 20
+        `
+      : [];
+    if (stale.length > 0) {
+      const errorTitle = "Zaman aşımı";
+      const errorMessage =
+        "Şarkı 15 dakikayı geçti ve hâlâ hazır değil. Kredin iade edildi, tekrar deneyebilirsin.";
+      for (const row of stale) {
+        await failTaskAndRefund(
+          row.task_id as string,
+          errorTitle,
+          errorMessage,
+        ).catch(() => {});
+      }
+    }
+
     const rows = userId
       ? await sql`
           SELECT task_id, prompt, created_at, status, error_title, error_message
@@ -568,8 +696,10 @@ function rowToSong(row: Record<string, unknown>): Song {
         ? Number(row.pronunciation_score)
         : undefined,
     transcribedLyrics: (row.transcribed_lyrics as string | null) ?? undefined,
+    lrc: (row.lrc as string | null) ?? undefined,
     enhancedAudioKey: (row.enhanced_audio_key as string | null) ?? undefined,
     isPrimary: row.is_primary != null ? Boolean(row.is_primary) : undefined,
+    isPublic: row.is_public != null ? Boolean(row.is_public) : undefined,
     creator:
       creatorId && creatorName && creatorUsername
         ? {
@@ -615,7 +745,7 @@ export async function getSongsByTaskId(taskId: string): Promise<Song[]> {
     LEFT JOIN users u ON u.id::text = s.created_by
     WHERE s.task_id = ${taskId}
       AND s.status = 'complete'
-      AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
+      AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL) AND s.takedown_at IS NULL
     ORDER BY s.created_at ASC
   `;
   return rows.map(rowToSong);
@@ -626,15 +756,16 @@ export async function getAllSongs(
   limit?: number,
 ): Promise<Song[]> {
   await ensureSchema();
-  // Neon HTTP adapter LIMIT değerini template literal'da kabul ediyor; 0 = limitsiz
-  const lim = limit && limit > 0 ? limit : 50;
+  // Neon HTTP adapter LIMIT değerini template literal'da kabul ediyor.
+  // Default: kendi profili için tüm şarkılar, discover için 500.
+  const lim = limit && limit > 0 ? limit : 500;
   const rows = userId
     ? await sql`
         SELECT
           s.id, s.title, s.style, s.audio_url, s.stream_url, s.image_url,
           s.audio_key, s.image_key, s.duration, s.status, s.task_id,
           s.play_count, s.play_count_7d, s.like_count, s.comment_count,
-          s.pronunciation_score, s.is_primary, s.created_at,
+          s.pronunciation_score, s.is_primary, s.is_public, s.created_at,
           u.id           AS creator_id,
           u.display_name AS creator_name,
           u.username     AS creator_username,
@@ -642,7 +773,7 @@ export async function getAllSongs(
         FROM songs s
         LEFT JOIN users u ON u.id::text = s.created_by
         WHERE s.created_by = ${userId}
-          AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
+          AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL) AND s.takedown_at IS NULL
         ORDER BY s.created_at DESC
         LIMIT ${lim}
       `
@@ -651,14 +782,14 @@ export async function getAllSongs(
           s.id, s.title, s.style, s.audio_url, s.stream_url, s.image_url,
           s.audio_key, s.image_key, s.duration, s.status, s.task_id,
           s.play_count, s.play_count_7d, s.like_count, s.comment_count,
-          s.pronunciation_score, s.is_primary, s.created_at,
+          s.pronunciation_score, s.is_primary, s.is_public, s.created_at,
           u.id           AS creator_id,
           u.display_name AS creator_name,
           u.username     AS creator_username,
           u.avatar_url   AS creator_image
         FROM songs s
         LEFT JOIN users u ON u.id::text = s.created_by
-        WHERE (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
+        WHERE (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL) AND s.takedown_at IS NULL
         ORDER BY s.created_at DESC
         LIMIT ${lim}
       `;
@@ -690,20 +821,68 @@ export async function updateSongImageKey(
   }
 }
 
-/** Whisper transcription sonucunu ve telaffuz skorunu DB'ye yaz */
-export async function updateSongTranscription(
+/**
+ * Stems verisini şarkıya kaydet — type bazlı merge (separate_vocal + split_stem
+ * ayrı slot'larda saklanır, biri diğerini ezmez).
+ */
+export async function saveSongStems(
   songId: string,
-  pronunciationScore: number,
-  transcribedLyrics: string,
+  type: "separate_vocal" | "split_stem",
+  info: Record<string, unknown>,
 ): Promise<void> {
   try {
     await ensureSchema();
     await sql`
       UPDATE songs
-      SET pronunciation_score = ${pronunciationScore},
-          transcribed_lyrics = ${transcribedLyrics}
+      SET stems_data = COALESCE(stems_data, '{}'::jsonb) ||
+                       jsonb_build_object(${type}, ${JSON.stringify(info)}::jsonb)
       WHERE id = ${songId}
     `;
+    console.log(`[db] song=${songId} stems(${type}) saved`);
+  } catch (e) {
+    console.error("[db] saveSongStems hatası:", e);
+  }
+}
+
+/** WAV (HD) URL'sini şarkıya kaydet. */
+export async function saveSongWavUrl(
+  songId: string,
+  wavUrl: string,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    await sql`UPDATE songs SET wav_url = ${wavUrl} WHERE id = ${songId}`;
+    console.log(`[db] song=${songId} wav_url saved`);
+  } catch (e) {
+    console.error("[db] saveSongWavUrl hatası:", e);
+  }
+}
+
+/** Whisper transcription sonucunu ve telaffuz skorunu DB'ye yaz */
+export async function updateSongTranscription(
+  songId: string,
+  pronunciationScore: number,
+  transcribedLyrics: string,
+  lrc?: string,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    if (lrc) {
+      await sql`
+        UPDATE songs
+        SET pronunciation_score = ${pronunciationScore},
+            transcribed_lyrics = ${transcribedLyrics},
+            lrc = ${lrc}
+        WHERE id = ${songId}
+      `;
+    } else {
+      await sql`
+        UPDATE songs
+        SET pronunciation_score = ${pronunciationScore},
+            transcribed_lyrics = ${transcribedLyrics}
+        WHERE id = ${songId}
+      `;
+    }
   } catch (e) {
     console.error("[db] updateSongTranscription hatası:", e);
   }
@@ -756,6 +935,7 @@ export async function upsertSongs(
   songs: Song[],
   taskId?: string,
   creatorId?: string,
+  isPublic: boolean = true,
 ): Promise<void> {
   if (songs.length === 0) return;
   await ensureSchema();
@@ -766,7 +946,7 @@ export async function upsertSongs(
   await Promise.all(
     songs.map(
       (s) => sql`
-        INSERT INTO songs (id, title, style, prompt, audio_url, stream_url, image_url, duration, status, created_at, task_id, created_by)
+        INSERT INTO songs (id, title, style, prompt, audio_url, stream_url, image_url, duration, status, created_at, task_id, created_by, is_public)
         VALUES (
           ${s.id},
           ${s.title},
@@ -779,7 +959,8 @@ export async function upsertSongs(
           ${s.status},
           ${s.createdAt},
           ${taskId ?? null},
-          ${creatorId ?? null}
+          ${creatorId ?? null},
+          ${isPublic}
         )
         ON CONFLICT (id) DO UPDATE SET
           title      = EXCLUDED.title,
@@ -809,10 +990,30 @@ export function setTaskSongs(taskId: string, songs: Song[]): void {
   const completed = songs.filter((s) => s.status === "complete");
   if (completed.length === 0) return;
 
-  sql`SELECT created_by FROM tasks WHERE task_id = ${taskId} LIMIT 1`
-    .then((rows) => {
+  sql`SELECT created_by, payload FROM tasks WHERE task_id = ${taskId} LIMIT 1`
+    .then(async (rows) => {
       const creatorId = (rows[0]?.created_by as string | null) ?? undefined;
-      return upsertSongs(completed, taskId, creatorId);
+      const payload =
+        (rows[0]?.payload as Record<string, unknown> | null) ?? null;
+      const remixSourceId =
+        payload && typeof payload.remixFromSourceId === "string"
+          ? (payload.remixFromSourceId as string)
+          : null;
+      // Default public; explicitly false → private
+      const isPublic =
+        payload && typeof payload.isPublic === "boolean"
+          ? (payload.isPublic as boolean)
+          : true;
+
+      await upsertSongs(completed, taskId, creatorId, isPublic);
+
+      if (remixSourceId) {
+        await sql`
+          UPDATE songs
+          SET remix_source_id = ${remixSourceId}
+          WHERE task_id = ${taskId} AND remix_source_id IS NULL
+        `.catch((e) => console.error("[db] remix_source_id update hatası:", e));
+      }
     })
     .catch((e) => console.error("[db] upsertSongs hatası:", e));
 }
@@ -859,20 +1060,44 @@ export async function getUserByUsername(
   };
 }
 
-export async function getUserSongs(userId: string): Promise<Song[]> {
+/**
+ * Bir kullanıcının şarkıları. viewerId verildiyse ve viewerId == userId ise
+ * private şarkılar da dahil — aksi halde sadece is_public = TRUE olanlar.
+ */
+export async function getUserSongs(
+  userId: string,
+  viewerId?: string | null,
+): Promise<Song[]> {
   await ensureSchema();
-  const rows = await sql`
-    SELECT
-      s.*,
-      u.id           AS creator_id,
-      u.display_name AS creator_name,
-      u.username     AS creator_username,
-      u.avatar_url   AS creator_image
-    FROM songs s
-    LEFT JOIN users u ON u.id::text = s.created_by
-    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL AND s.created_by = ${userId}
-    ORDER BY s.created_at DESC
-  `;
+  const isOwner = viewerId && viewerId === userId;
+  const rows = isOwner
+    ? await sql`
+        SELECT
+          s.*,
+          u.id           AS creator_id,
+          u.display_name AS creator_name,
+          u.username     AS creator_username,
+          u.avatar_url   AS creator_image
+        FROM songs s
+        LEFT JOIN users u ON u.id::text = s.created_by
+        WHERE s.created_by = ${userId}
+          AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL) AND s.takedown_at IS NULL
+        ORDER BY s.created_at DESC
+      `
+    : await sql`
+        SELECT
+          s.*,
+          u.id           AS creator_id,
+          u.display_name AS creator_name,
+          u.username     AS creator_username,
+          u.avatar_url   AS creator_image
+        FROM songs s
+        LEFT JOIN users u ON u.id::text = s.created_by
+        WHERE s.created_by = ${userId}
+          AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL) AND s.takedown_at IS NULL
+          AND s.is_public = TRUE
+        ORDER BY s.created_at DESC
+      `;
   return rows.map(rowToSong);
 }
 
@@ -950,6 +1175,13 @@ export async function getFollowFeed(
     WHERE f.follower_id::text = ${userId}
       AND s.status = 'complete'
       AND s.audio_key IS NOT NULL
+      AND s.takedown_at IS NULL
+      AND s.is_public = TRUE
+      AND s.created_by NOT IN (
+        SELECT blocked_id FROM user_blocks WHERE blocker_id = ${userId}
+        UNION ALL
+        SELECT hidden_id  FROM user_hidden WHERE user_id    = ${userId}
+      )
     ORDER BY s.created_at DESC
     LIMIT ${limit}
   `;
@@ -1043,7 +1275,8 @@ export async function getUserStats(userId: string): Promise<UserStats> {
       (SELECT COUNT(*)::int FROM songs s
          WHERE s.created_by = ${userId}
            AND s.status = 'complete'
-           AND s.audio_key IS NOT NULL) AS song_count
+           AND s.audio_key IS NOT NULL
+           AND s.takedown_at IS NULL) AS song_count
     FROM users u
     WHERE u.id::text = ${userId}
     LIMIT 1
@@ -1076,7 +1309,8 @@ export async function getTrendingSongs(
       ON sp.song_id = s.id
      AND sp.counted_as_stream = TRUE
      AND sp.played_at > NOW() - (${days}::text || ' days')::interval
-    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
+    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL AND s.takedown_at IS NULL
+      AND s.is_public = TRUE
     GROUP BY s.id, u.id
     ORDER BY trend_count DESC, s.created_at DESC
     LIMIT ${limit}
@@ -1096,7 +1330,8 @@ export async function getTopSongs(limit: number = 50): Promise<Song[]> {
       u.avatar_url   AS creator_image
     FROM songs s
     LEFT JOIN users u ON u.id::text = s.created_by
-    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
+    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL AND s.takedown_at IS NULL
+      AND s.is_public = TRUE
     ORDER BY s.play_count DESC, s.created_at DESC
     LIMIT ${limit}
   `;
@@ -1128,7 +1363,7 @@ export async function getRecentPlays(
     FROM last_plays lp
     JOIN songs s ON s.id = lp.song_id
     LEFT JOIN users u ON u.id::text = s.created_by
-    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
+    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL AND s.takedown_at IS NULL
     ORDER BY lp.played_at DESC
     LIMIT ${limit}
   `;
@@ -1161,7 +1396,8 @@ export async function getRecentAnonPlays(
     FROM last_plays lp
     JOIN songs s ON s.id = lp.song_id
     LEFT JOIN users u ON u.id::text = s.created_by
-    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL
+    WHERE s.status = 'complete' AND s.audio_key IS NOT NULL AND s.takedown_at IS NULL
+      AND s.is_public = TRUE
     ORDER BY lp.played_at DESC
     LIMIT ${limit}
   `;
@@ -1212,7 +1448,15 @@ export async function getRecommendations(
     LEFT JOIN users u ON u.id::text = s.created_by
     WHERE s.status = 'complete'
       AND s.audio_key IS NOT NULL
+      AND s.takedown_at IS NULL
+      AND s.is_public = TRUE
       AND s.id NOT IN (SELECT song_id FROM heard)
+      AND (s.created_by IS NULL OR s.created_by != ${userId})
+      AND (s.created_by IS NULL OR s.created_by NOT IN (
+        SELECT blocked_id FROM user_blocks WHERE blocker_id = ${userId}
+        UNION ALL
+        SELECT hidden_id  FROM user_hidden WHERE user_id    = ${userId}
+      ))
       AND EXISTS (
         SELECT 1 FROM tokens t
         WHERE LOWER(COALESCE(s.style, '')) LIKE '%' || t.token || '%'
@@ -1349,6 +1593,7 @@ export async function getLikedSongs(
     WHERE sl.user_id = ${userId}
       AND s.status = 'complete'
       AND s.audio_key IS NOT NULL
+      AND s.takedown_at IS NULL
     ORDER BY sl.created_at DESC
     LIMIT ${limit}
   `;
@@ -1493,6 +1738,7 @@ export async function getSimilarSongs(
     WHERE s1.id = ${songId}
       AND s2.status = 'complete'
       AND s2.audio_key IS NOT NULL
+      AND s2.takedown_at IS NULL
     ORDER BY s2.play_count DESC, s2.created_at DESC
     LIMIT ${limit}
   `;
@@ -1583,4 +1829,424 @@ export async function deletePersona(
     DELETE FROM personas WHERE id = ${id} AND user_id = ${userId}
   `;
   return true;
+}
+
+/* ══════════════════════════════════════════════
+   Suno-style profile — followers/following listeleri,
+   remix takibi, block/hide/report, profil güncelleme
+══════════════════════════════════════════════ */
+
+export interface ProfileListItem {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isFollowing: boolean;
+}
+
+type FollowRow = {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+  is_following: boolean;
+};
+
+function mapFollowRow(r: FollowRow): ProfileListItem {
+  return {
+    id: r.id,
+    username: r.username,
+    displayName: r.display_name,
+    avatarUrl: r.avatar_url,
+    isFollowing: r.is_following,
+  };
+}
+
+/** Bir kullanıcının takipçilerini listele. viewerId verilirse `isFollowing` alanı dolar. */
+export async function getFollowers(
+  userId: string,
+  viewerId?: string,
+  limit = 50,
+): Promise<ProfileListItem[]> {
+  await ensureSchema();
+  const rows = (
+    viewerId
+      ? await sql`
+        SELECT
+          u.id::text     AS id,
+          u.username     AS username,
+          u.display_name AS display_name,
+          u.avatar_url   AS avatar_url,
+          EXISTS (
+            SELECT 1 FROM follows vf
+            WHERE vf.follower_id = ${viewerId}
+              AND vf.following_id = u.id::text
+          ) AS is_following
+        FROM follows f
+        JOIN users u ON u.id::text = f.follower_id
+        WHERE f.following_id = ${userId}
+        ORDER BY f.created_at DESC
+        LIMIT ${limit}
+      `
+      : await sql`
+        SELECT
+          u.id::text     AS id,
+          u.username     AS username,
+          u.display_name AS display_name,
+          u.avatar_url   AS avatar_url,
+          false          AS is_following
+        FROM follows f
+        JOIN users u ON u.id::text = f.follower_id
+        WHERE f.following_id = ${userId}
+        ORDER BY f.created_at DESC
+        LIMIT ${limit}
+      `
+  ) as FollowRow[];
+  return rows.map(mapFollowRow);
+}
+
+/** Bir kullanıcının takip ettiklerini listele. */
+export async function getFollowing(
+  userId: string,
+  viewerId?: string,
+  limit = 50,
+): Promise<ProfileListItem[]> {
+  await ensureSchema();
+  const rows = (
+    viewerId
+      ? await sql`
+        SELECT
+          u.id::text     AS id,
+          u.username     AS username,
+          u.display_name AS display_name,
+          u.avatar_url   AS avatar_url,
+          EXISTS (
+            SELECT 1 FROM follows vf
+            WHERE vf.follower_id = ${viewerId}
+              AND vf.following_id = u.id::text
+          ) AS is_following
+        FROM follows f
+        JOIN users u ON u.id::text = f.following_id
+        WHERE f.follower_id = ${userId}
+        ORDER BY f.created_at DESC
+        LIMIT ${limit}
+      `
+      : await sql`
+        SELECT
+          u.id::text     AS id,
+          u.username     AS username,
+          u.display_name AS display_name,
+          u.avatar_url   AS avatar_url,
+          false          AS is_following
+        FROM follows f
+        JOIN users u ON u.id::text = f.following_id
+        WHERE f.follower_id = ${userId}
+        ORDER BY f.created_at DESC
+        LIMIT ${limit}
+      `
+  ) as FollowRow[];
+  return rows.map(mapFollowRow);
+}
+
+/** Kullanıcının şarkılarından esinlenilmiş remix'ler (başkalarının remix'leri). */
+export interface RemixInspiredItem {
+  remix: Song;
+  source: { id: string; title: string } | null;
+}
+
+export async function getRemixesInspiredByUser(
+  userId: string,
+  limit = 50,
+): Promise<RemixInspiredItem[]> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT
+      r.id, r.title, r.style, r.audio_url, r.stream_url, r.image_url,
+      r.audio_key, r.image_key, r.duration, r.status, r.task_id,
+      r.play_count, r.play_count_7d, r.like_count, r.comment_count,
+      r.pronunciation_score, r.is_primary, r.created_at, r.remix_source_id,
+      u.id           AS creator_id,
+      u.display_name AS creator_name,
+      u.username     AS creator_username,
+      u.avatar_url   AS creator_image,
+      src.id         AS source_id,
+      src.title      AS source_title
+    FROM songs r
+    JOIN songs src ON src.id = r.remix_source_id
+    LEFT JOIN users u ON u.id::text = r.created_by
+    WHERE src.created_by = ${userId}
+      AND r.created_by IS DISTINCT FROM ${userId}
+      AND (r.audio_key IS NOT NULL OR r.stream_url IS NOT NULL OR r.audio_url IS NOT NULL)
+    ORDER BY r.created_at DESC
+    LIMIT ${limit}
+  `) as Array<Record<string, unknown>>;
+  return rows.map((row) => ({
+    remix: rowToSong(row),
+    source: row.source_id
+      ? {
+          id: row.source_id as string,
+          title: (row.source_title as string) ?? "",
+        }
+      : null,
+  }));
+}
+
+export async function getRemixesInspiredCount(userId: string): Promise<number> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT COUNT(*)::int AS c
+    FROM songs r
+    JOIN songs src ON src.id = r.remix_source_id
+    WHERE src.created_by = ${userId}
+      AND r.created_by IS DISTINCT FROM ${userId}
+  `) as { c: number }[];
+  return rows[0]?.c ?? 0;
+}
+
+/** Top (play_count DESC) sıralı kullanıcı şarkıları. */
+export async function getUserTopSongs(
+  userId: string,
+  limit = 50,
+  viewerId?: string | null,
+): Promise<Song[]> {
+  await ensureSchema();
+  const isOwner = viewerId && viewerId === userId;
+  const rows = isOwner
+    ? await sql`
+        SELECT
+          s.*,
+          u.id           AS creator_id,
+          u.display_name AS creator_name,
+          u.username     AS creator_username,
+          u.avatar_url   AS creator_image
+        FROM songs s
+        LEFT JOIN users u ON u.id::text = s.created_by
+        WHERE s.created_by = ${userId}
+          AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
+        ORDER BY s.play_count DESC NULLS LAST, s.created_at DESC
+        LIMIT ${limit}
+      `
+    : await sql`
+        SELECT
+          s.*,
+          u.id           AS creator_id,
+          u.display_name AS creator_name,
+          u.username     AS creator_username,
+          u.avatar_url   AS creator_image
+        FROM songs s
+        LEFT JOIN users u ON u.id::text = s.created_by
+        WHERE s.created_by = ${userId}
+          AND (s.audio_key IS NOT NULL OR s.stream_url IS NOT NULL OR s.audio_url IS NOT NULL)
+          AND s.is_public = TRUE
+        ORDER BY s.play_count DESC NULLS LAST, s.created_at DESC
+        LIMIT ${limit}
+      `;
+  return rows.map(rowToSong);
+}
+
+/* ── Block / Hide ── */
+
+export async function blockUser(
+  blockerId: string,
+  blockedId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  if (blockerId === blockedId) return false;
+  await sql`
+    INSERT INTO user_blocks (blocker_id, blocked_id)
+    VALUES (${blockerId}, ${blockedId})
+    ON CONFLICT (blocker_id, blocked_id) DO NOTHING
+  `;
+  // Block uygulandığında karşılıklı follow ilişkilerini de kes
+  await sql`
+    DELETE FROM follows
+    WHERE (follower_id = ${blockerId} AND following_id = ${blockedId})
+       OR (follower_id = ${blockedId} AND following_id = ${blockerId})
+  `;
+  return true;
+}
+
+export async function unblockUser(
+  blockerId: string,
+  blockedId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  await sql`
+    DELETE FROM user_blocks
+    WHERE blocker_id = ${blockerId} AND blocked_id = ${blockedId}
+  `;
+  return true;
+}
+
+export async function isBlocked(
+  blockerId: string,
+  blockedId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT 1 FROM user_blocks
+    WHERE blocker_id = ${blockerId} AND blocked_id = ${blockedId}
+    LIMIT 1
+  `) as unknown[];
+  return rows.length > 0;
+}
+
+export async function getBlockedIds(userId: string): Promise<string[]> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT blocked_id FROM user_blocks WHERE blocker_id = ${userId}
+  `) as { blocked_id: string }[];
+  return rows.map((r) => r.blocked_id);
+}
+
+export async function hideUser(
+  userId: string,
+  hiddenId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  if (userId === hiddenId) return false;
+  await sql`
+    INSERT INTO user_hidden (user_id, hidden_id)
+    VALUES (${userId}, ${hiddenId})
+    ON CONFLICT (user_id, hidden_id) DO NOTHING
+  `;
+  return true;
+}
+
+export async function unhideUser(
+  userId: string,
+  hiddenId: string,
+): Promise<boolean> {
+  await ensureSchema();
+  await sql`
+    DELETE FROM user_hidden
+    WHERE user_id = ${userId} AND hidden_id = ${hiddenId}
+  `;
+  return true;
+}
+
+export async function getHiddenIds(userId: string): Promise<string[]> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT hidden_id FROM user_hidden WHERE user_id = ${userId}
+  `) as { hidden_id: string }[];
+  return rows.map((r) => r.hidden_id);
+}
+
+/**
+ * Feed endpoint'lerinde blocked + hidden kullanıcıları hariç tutmak için
+ * kullanılacak ID listesi. İki liste birleşimi (set).
+ */
+export async function getFeedExcludedUserIds(
+  userId: string,
+): Promise<string[]> {
+  const [blocked, hidden] = await Promise.all([
+    getBlockedIds(userId),
+    getHiddenIds(userId),
+  ]);
+  return Array.from(new Set([...blocked, ...hidden]));
+}
+
+/* ── Reports ── */
+
+export async function createReport(opts: {
+  reporterId: string;
+  targetType: "song" | "user";
+  targetId: string;
+  reason: string;
+  note?: string;
+}): Promise<string> {
+  await ensureSchema();
+  const rows = (await sql`
+    INSERT INTO reports (reporter_id, target_type, target_id, reason, note)
+    VALUES (${opts.reporterId}, ${opts.targetType}, ${opts.targetId}, ${opts.reason}, ${opts.note ?? null})
+    RETURNING id
+  `) as { id: string }[];
+  return rows[0].id;
+}
+
+/* ── Profile update (bio / banner / genre tags) ── */
+
+export async function updateProfileFields(
+  userId: string,
+  fields: {
+    bio?: string | null;
+    bannerUrl?: string | null;
+    genreTags?: string[];
+  },
+): Promise<void> {
+  await ensureSchema();
+  if (fields.bio !== undefined) {
+    await sql`UPDATE users SET bio = ${fields.bio} WHERE id::text = ${userId}`;
+  }
+  if (fields.bannerUrl !== undefined) {
+    await sql`UPDATE users SET banner_url = ${fields.bannerUrl} WHERE id::text = ${userId}`;
+  }
+  if (fields.genreTags !== undefined) {
+    // PostgreSQL text array literal'i: '{a,b,c}'
+    const arr = fields.genreTags.slice(0, 10);
+    await sql`UPDATE users SET genre_tags = ${arr} WHERE id::text = ${userId}`;
+  }
+}
+
+/**
+ * Kullanıcının son 20 şarkısının style alanından en sık geçen genre'ları çıkar.
+ * genre_tags boşsa profil UI'da fallback olarak kullanılır.
+ */
+export async function getSuggestedGenreTags(
+  userId: string,
+  limit = 5,
+): Promise<string[]> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT style
+    FROM songs
+    WHERE created_by = ${userId}
+      AND style IS NOT NULL AND style <> ''
+    ORDER BY created_at DESC
+    LIMIT 20
+  `) as { style: string }[];
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const parts = r.style
+      .split(/[,|;]/)
+      .map((p) => p.trim().toLowerCase())
+      .filter((p) => p.length > 1 && p.length < 30 && !/^\d+$/.test(p));
+    for (const p of parts) {
+      counts.set(p, (counts.get(p) ?? 0) + 1);
+    }
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([g]) => g);
+}
+
+/** Profil sayfası için kullanıcı extended bilgileri. */
+export interface UserProfileExtras {
+  bio: string | null;
+  bannerUrl: string | null;
+  genreTags: string[];
+}
+
+export async function getUserProfileExtras(
+  userId: string,
+): Promise<UserProfileExtras> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT bio, banner_url, genre_tags
+    FROM users
+    WHERE id::text = ${userId}
+    LIMIT 1
+  `) as {
+    bio: string | null;
+    banner_url: string | null;
+    genre_tags: string[] | null;
+  }[];
+  const r = rows[0];
+  return {
+    bio: r?.bio ?? null,
+    bannerUrl: r?.banner_url ?? null,
+    genreTags: r?.genre_tags ?? [],
+  };
 }

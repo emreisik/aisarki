@@ -14,6 +14,7 @@ import {
   Music2,
   Shuffle,
   Repeat,
+  Gauge,
 } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 
@@ -63,6 +64,8 @@ function useDominantColor(imageUrl?: string) {
   return gradient;
 }
 
+const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const;
+
 export default function DesktopPlayerBar() {
   const {
     currentSong,
@@ -74,12 +77,25 @@ export default function DesktopPlayerBar() {
     playNext,
     setPlayerOpen,
     audioRef,
+    playbackRate,
+    setPlaybackRate,
   } = usePlayer();
 
   const [liked, setLiked] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
+  const [showRateMenu, setShowRateMenu] = useState(false);
   const gradient = useDominantColor(currentSong?.imageUrl);
+
+  useEffect(() => {
+    if (!showRateMenu) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-rate-menu]")) setShowRateMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showRateMenu]);
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -249,8 +265,44 @@ export default function DesktopPlayerBar() {
         </div>
       </div>
 
-      {/* Right: Volume */}
+      {/* Right: Speed + Volume */}
       <div className="flex items-center justify-end gap-2 w-[30%]">
+        {/* Hız selector */}
+        <div className="relative" data-rate-menu>
+          <button
+            onClick={() => setShowRateMenu((v) => !v)}
+            className={`pressable flex items-center gap-1 h-7 px-2 rounded text-[11px] font-semibold transition-colors ${
+              playbackRate !== 1
+                ? "text-[#1db954]"
+                : "text-[#b3b3b3] hover:text-white"
+            }`}
+            title="Çalma hızı"
+          >
+            <Gauge size={14} />
+            <span className="tabular-nums">{playbackRate}x</span>
+          </button>
+          {showRateMenu && (
+            <div className="absolute bottom-full right-0 mb-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg py-1 min-w-[80px] shadow-2xl z-50">
+              {PLAYBACK_RATES.map((rate) => (
+                <button
+                  key={rate}
+                  onClick={() => {
+                    setPlaybackRate(rate);
+                    setShowRateMenu(false);
+                  }}
+                  className={`w-full px-3 py-1.5 text-[12px] text-right tabular-nums transition-colors ${
+                    rate === playbackRate
+                      ? "text-[#1db954] font-semibold bg-[#222]"
+                      : "text-white hover:bg-[#222]"
+                  }`}
+                >
+                  {rate}x
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           onClick={toggleMute}
           className="pressable text-[#b3b3b3] hover:text-white transition-colors"

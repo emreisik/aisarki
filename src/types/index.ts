@@ -31,10 +31,20 @@ export interface Song {
   pronunciationScore?: number;
   /** Whisper tarafından transcribe edilen gerçek söylenen sözler */
   transcribedLyrics?: string;
+  /** Zamanlanmış sözler (LRC formatı) — karaoke render için */
+  lrc?: string;
   /** İyileştirilmiş audio CDN key'i (Demucs+RVC pipeline çıktısı) */
   enhancedAudioKey?: string;
   /** Aynı task'taki varyantlar arasında en iyi score'lu mu? */
   isPrimary?: boolean;
+  /** Public feed'de görünür mü? (default true) */
+  isPublic?: boolean;
+  /** WAV (HD) format dönüşüm URL'si — Suno wav/generate sonucu */
+  wavUrl?: string;
+  /** Stems (vocal/enstrümantal veya 12-stem ayırma sonuçları) */
+  stemsData?: Partial<
+    Record<"separate_vocal" | "split_stem", Record<string, unknown>>
+  >;
   createdAt: string;
   creator?: SongCreator;
 }
@@ -97,6 +107,10 @@ export interface GenerateRequest {
   personaId?: string;
   /** Persona tipi: voice_persona (V5+ gerekir) veya style_persona */
   personaModel?: "style_persona" | "voice_persona";
+  /** Remix kaynağı — bu şarkıdan türetildiyse orijinalin id'si */
+  remixFromSourceId?: string;
+  /** Public feed'de görünsün mü? (default true, false = sadece sana özel) */
+  isPublic?: boolean;
 }
 
 export interface SunoGeneratePayload {

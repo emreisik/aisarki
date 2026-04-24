@@ -2,96 +2,95 @@
 
 import { useEffect, useRef } from "react";
 import {
-  ArrowUpRight,
-  SlidersHorizontal,
   RefreshCw,
   MoveRight,
   Shuffle,
-  AudioLines,
   Sparkles,
-  Gauge,
   ListMusic,
-  Scissors,
-  LayoutPanelTop,
+  Download,
+  AudioLines,
+  Globe,
+  Lock,
+  FileAudio,
 } from "lucide-react";
+import type { Song } from "@/types";
 
 type MenuAction =
-  | "studio"
-  | "editor"
   | "cover"
   | "extend"
   | "mashup"
-  | "sample"
+  | "stems"
   | "inspiration"
-  | "speed"
   | "reuse_prompt"
-  | "crop"
-  | "replace_section";
+  | "download_mp3"
+  | "download_wav"
+  | "toggle_visibility";
 
 type Item = {
   id: MenuAction;
   label: string;
-  icon: typeof ArrowUpRight;
+  icon: typeof RefreshCw;
   badge?: "NEW" | "PRO";
   enabled: boolean;
 };
 
-const ITEMS: Item[] = [
-  {
-    id: "studio",
-    label: "Stüdyoda Aç",
-    icon: ArrowUpRight,
-    badge: "NEW",
-    enabled: false,
-  },
-  {
-    id: "editor",
-    label: "Editörde Aç",
-    icon: SlidersHorizontal,
-    badge: "PRO",
-    enabled: false,
-  },
-  { id: "cover", label: "Cover Yap", icon: RefreshCw, enabled: true },
-  { id: "extend", label: "Uzat", icon: MoveRight, enabled: true },
-  { id: "mashup", label: "Mashup", icon: Shuffle, enabled: true },
-  {
-    id: "sample",
-    label: "Bu Şarkıyı Örnekle",
-    icon: AudioLines,
-    enabled: false,
-  },
-  {
-    id: "inspiration",
-    label: "İlham Olarak Kullan",
-    icon: Sparkles,
-    badge: "PRO",
-    enabled: false,
-  },
-  { id: "speed", label: "Hızı Ayarla", icon: Gauge, enabled: false },
-  {
-    id: "reuse_prompt",
-    label: "Promptu Tekrar Kullan",
-    icon: ListMusic,
-    enabled: true,
-  },
-  { id: "crop", label: "Kırp", icon: Scissors, enabled: false },
-  {
-    id: "replace_section",
-    label: "Bölümü Değiştir",
-    icon: LayoutPanelTop,
-    badge: "PRO",
-    enabled: false,
-  },
-];
+function buildItems(song: Song): Item[] {
+  const canDownload = !!(song.audioUrl || song.streamUrl);
+  return [
+    { id: "cover", label: "Cover Yap", icon: RefreshCw, enabled: true },
+    { id: "extend", label: "Uzat", icon: MoveRight, enabled: true },
+    { id: "mashup", label: "Mashup", icon: Shuffle, enabled: true },
+    {
+      id: "stems",
+      label: "Stems Ayır",
+      icon: AudioLines,
+      badge: "PRO",
+      enabled: canDownload,
+    },
+    {
+      id: "inspiration",
+      label: "İlham Olarak Kullan",
+      icon: Sparkles,
+      enabled: !!song.style,
+    },
+    {
+      id: "reuse_prompt",
+      label: "Promptu Tekrar Kullan",
+      icon: ListMusic,
+      enabled: !!(song.prompt || song.style),
+    },
+    {
+      id: "download_mp3",
+      label: "MP3 İndir",
+      icon: Download,
+      enabled: canDownload,
+    },
+    {
+      id: "download_wav",
+      label: "WAV İndir (HD)",
+      icon: FileAudio,
+      badge: "PRO",
+      enabled: canDownload,
+    },
+    {
+      id: "toggle_visibility",
+      label: song.isPublic === false ? "Yayımla" : "Yayından kaldır",
+      icon: song.isPublic === false ? Globe : Lock,
+      enabled: true,
+    },
+  ];
+}
 
 type Props = {
   anchorRect: DOMRect;
+  song: Song;
   onClose: () => void;
   onAction: (id: MenuAction) => void;
 };
 
 export default function RowContextMenu({
   anchorRect,
+  song,
   onClose,
   onAction,
 }: Props) {
@@ -111,7 +110,7 @@ export default function RowContextMenu({
   }, [onClose]);
 
   const menuWidth = 240;
-  const menuHeight = 460;
+  const menuHeight = 360;
   const margin = 8;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -124,13 +123,15 @@ export default function RowContextMenu({
   if (left < margin) left = margin;
   if (left + menuWidth > vw - margin) left = vw - margin - menuWidth;
 
+  const items = buildItems(song);
+
   return (
     <div
       ref={ref}
       style={{ position: "fixed", top, left, width: menuWidth }}
       className="z-[200] bg-[#1a1a1a] border border-[#2a2a2a] rounded-[14px] py-1.5 shadow-2xl shadow-black/60"
     >
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const Icon = item.icon;
         const disabled = !item.enabled;
         return (

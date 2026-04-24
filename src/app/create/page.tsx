@@ -8,6 +8,9 @@ import CreateHeader, {
 } from "@/components/create/CreateHeader";
 import SimpleCreateForm from "@/components/create/SimpleCreateForm";
 import AdvancedCreateForm from "@/components/create/AdvancedCreateForm";
+import WizardCreateForm from "@/components/create/WizardCreateForm";
+import DerivationModal from "@/components/create/DerivationModal";
+import StemsModal from "@/components/create/StemsModal";
 import WorkspaceToolbar, {
   type SortKey,
   type FilterToggle,
@@ -15,7 +18,8 @@ import WorkspaceToolbar, {
 import WorkspaceRow from "@/components/workspace/WorkspaceRow";
 import { type MenuAction } from "@/components/workspace/RowContextMenu";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { useRouter } from "next/navigation";
+import { useUpload } from "@/contexts/UploadContext";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface ProcessingTaskState {
   taskId: string;
@@ -34,10 +38,37 @@ const VARIANT_COUNT = 2;
 export default function CreatePage() {
   const { playSong, currentSong } = usePlayer();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { openRecord } = useUpload();
+  const recordParamHandledRef = useRef(false);
+
+  useEffect(() => {
+    if (recordParamHandledRef.current) return;
+    if (searchParams.get("mode") === "record") {
+      recordParamHandledRef.current = true;
+      openRecord();
+      const url = new URL(window.location.href);
+      url.searchParams.delete("mode");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [searchParams, openRecord]);
 
   // Create form state
   const [mode, setMode] = useState<CreateMode>("simple");
   const [model, setModel] = useState<string>("V4_5ALL");
+  const remixFromSourceId = searchParams.get("remixFrom") || undefined;
+  // ?reuse=1 paramı varsa Advanced moda zorla — context menüsünden gelen flow
+  useEffect(() => {
+    if (searchParams.get("reuse") === "1") {
+      setMode("advanced");
+    }
+  }, [searchParams]);
+
+  const [stemsModal, setStemsModal] = useState<{
+    open: boolean;
+    song: Song | null;
+  }>({ open: false, song: null });
+  const [wavGenerating, setWavGenerating] = useState<string | null>(null);
 
   // Workspace state
   const [query, setQuery] = useState("");
@@ -53,6 +84,11 @@ export default function CreatePage() {
   const [processingTasks, setProcessingTasks] = useState<ProcessingTaskState[]>(
     [],
   );
+  const [derivation, setDerivation] = useState<{
+    open: boolean;
+    mode: "extend" | "cover" | "mashup";
+    song: Song | null;
+  }>({ open: false, mode: "extend", song: null });
   const [songs, setSongs] = useState<Song[]>([]);
   const pollingRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
@@ -289,96 +325,200 @@ export default function CreatePage() {
     [retryingTaskId],
   );
 
+  const downloadFile = useCallback(
+    (url: string, title: string, ext: string) => {
+      const safeTitle = (title || "song")
+        .replace(/[^\p{L}\p{N}\s.-]+/gu, "")
+        .trim()
+        .slice(0, 60)
+        .replace(/\s+/g, "_");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${safeTitle || "song"}.${ext}`;
+      a.rel = "noopener";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    },
+    [],
+  );
+
   const handleRowAction = useCallback(
     async (action: MenuAction, song: Song) => {
       if (action === "reuse_prompt") {
-        setMode("advanced");
-        // Advanced form kendi state'ini yönetiyor — query param ile iletmek isterseniz
-        // gelecekte ek bir event bus düşünülebilir. Şimdilik sadece kullanıcıyı yönlendir.
+        // Query param ile Advanced form'a prompt + style + title aktar
+        const params = new URLSearchParams();
+        params.set("reuse", "1");
+        if (song.prompt) params.set("prompt", song.prompt);
+        if (song.style) params.set("style", song.style);
+        if (song.title) params.set("title", song.title);
+        router.replace(`/create?${params.toString()}`);
         return;
       }
-      if (action === "extend") {
-        const defaultAt = Math.max(1, Math.floor(song.duration ?? 60));
-        const ans = window.prompt(
-          "Hangi saniyeden itibaren uzatılsın?",
-          String(defaultAt),
-        );
-        if (ans == null) return;
-        const continueAt = Number(ans);
-        if (!Number.isFinite(continueAt) || continueAt <= 0) {
-          alert("Geçerli bir saniye gir (ör. 60)");
+      if (action === "extend" || action === "cover" || action === "mashup") {
+        if (action !== "extend") {
+          const uploadUrl = song.audioUrl || song.streamUrl;
+          if (!uploadUrl) {
+            alert("Şarkının ses dosyası henüz hazır değil");
+            return;
+          }
+        }
+        setDerivation({ open: true, mode: action, song });
+        return;
+      }
+      if (action === "stems") {
+        setStemsModal({ open: true, song });
+        return;
+      }
+      if (action === "inspiration") {
+        const seed = song.style || song.prompt || "";
+        if (!seed) {
+          alert("Bu şarkıdan ilham çıkarılamadı");
           return;
         }
         try {
-          const res = await fetch("/api/extend", {
+          const res = await fetch("/api/inspiration", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              songId: song.id,
-              continueAt,
-              model,
-            }),
+            body: JSON.stringify({ content: seed }),
           });
           const data = await res.json();
-          if (!res.ok) {
-            alert(data.error || "Uzatma başarısız");
+          if (!res.ok || !data.result) {
+            alert(data.error || "İlham üretilemedi");
             return;
           }
-          const taskId = data?.data?.taskId;
-          if (taskId) {
-            handleTaskStarted(
-              taskId,
-              song.prompt || song.style || song.title,
-              `Uzatma — ${song.title}`,
-            );
-          }
+          // Detaylı style metnini Advanced forma yolla
+          const params = new URLSearchParams();
+          params.set("reuse", "1");
+          params.set("style", data.result);
+          if (song.title) params.set("title", `${song.title} (ilham)`);
+          router.replace(`/create?${params.toString()}`);
         } catch {
           alert("Bağlantı hatası");
         }
         return;
       }
-      if (action === "cover") {
-        const uploadUrl = song.audioUrl || song.streamUrl;
-        if (!uploadUrl) {
+      if (action === "download_mp3") {
+        const url = song.audioUrl || song.streamUrl;
+        if (!url) {
           alert("Şarkının ses dosyası henüz hazır değil");
           return;
         }
+        downloadFile(url, song.title || "song", "mp3");
+        return;
+      }
+      if (action === "download_wav") {
+        if (wavGenerating) return;
+        const songWithWav = song as Song & { wavUrl?: string };
+        if (songWithWav.wavUrl) {
+          downloadFile(songWithWav.wavUrl, song.title || "song", "wav");
+          return;
+        }
+        // WAV yoksa cache GET dene, yoksa POST ile üretim başlat
         try {
-          const res = await fetch("/api/upload-cover", {
+          const cached = await fetch(`/api/wav?songId=${song.id}`).then((r) =>
+            r.json(),
+          );
+          if (cached.wavUrl) {
+            downloadFile(cached.wavUrl, song.title || "song", "wav");
+            setSongs((prev) =>
+              prev.map((s) =>
+                s.id === song.id
+                  ? ({ ...s, wavUrl: cached.wavUrl } as Song)
+                  : s,
+              ),
+            );
+            return;
+          }
+          setWavGenerating(song.id);
+          const res = await fetch("/api/wav", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              uploadUrl,
-              model,
-              ...(song.style ? { style: song.style } : {}),
-              ...(song.title ? { title: song.title } : {}),
-            }),
+            body: JSON.stringify({ songId: song.id }),
           });
           const data = await res.json();
           if (!res.ok) {
-            alert(data.error || "Cover başarısız");
+            alert(data.error || "WAV üretimi başarısız");
+            setWavGenerating(null);
             return;
           }
-          const taskId = data?.data?.taskId;
-          if (taskId) {
-            handleTaskStarted(
-              taskId,
-              song.style || song.title,
-              `Cover — ${song.title}`,
-            );
+          if (data.cached && data.wavUrl) {
+            downloadFile(data.wavUrl, song.title || "song", "wav");
+            setWavGenerating(null);
+            return;
           }
+          // Background polling — ~3-4 dk sürer
+          alert(
+            "WAV dönüşümü başlatıldı. Hazır olunca tekrar 'WAV İndir' tuşuna bas.",
+          );
+          // 5 dk polling — hazır olunca otomatik indirelim
+          const startedAt = Date.now();
+          const poll = async () => {
+            if (Date.now() - startedAt > 5 * 60 * 1000) {
+              setWavGenerating(null);
+              return;
+            }
+            try {
+              const r = await fetch(`/api/wav?songId=${song.id}`);
+              const d = await r.json();
+              if (d.wavUrl) {
+                downloadFile(d.wavUrl, song.title || "song", "wav");
+                setSongs((prev) =>
+                  prev.map((s) =>
+                    s.id === song.id ? ({ ...s, wavUrl: d.wavUrl } as Song) : s,
+                  ),
+                );
+                setWavGenerating(null);
+                return;
+              }
+            } catch {
+              /* sessizce */
+            }
+            setTimeout(poll, 8000);
+          };
+          setTimeout(poll, 12000);
         } catch {
           alert("Bağlantı hatası");
+          setWavGenerating(null);
         }
         return;
       }
-      if (action === "mashup") {
-        alert("Mashup için ikinci bir şarkı seç — yakında panel açılacak");
-        return;
+      if (action === "toggle_visibility") {
+        const nextPublic = song.isPublic === false ? true : false;
+        // Optimistik güncelle
+        setSongs((prev) =>
+          prev.map((s) =>
+            s.id === song.id ? { ...s, isPublic: nextPublic } : s,
+          ),
+        );
+        try {
+          const res = await fetch(`/api/song/${song.id}/visibility`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isPublic: nextPublic }),
+          });
+          if (!res.ok) {
+            // Geri al
+            setSongs((prev) =>
+              prev.map((s) =>
+                s.id === song.id ? { ...s, isPublic: !nextPublic } : s,
+              ),
+            );
+            const data = await res.json().catch(() => ({}));
+            alert(data.error || "Görünürlük değiştirilemedi");
+          }
+        } catch {
+          setSongs((prev) =>
+            prev.map((s) =>
+              s.id === song.id ? { ...s, isPublic: !nextPublic } : s,
+            ),
+          );
+          alert("Bağlantı hatası");
+        }
       }
-      alert("Bu özellik yakında");
     },
-    [handleTaskStarted, model],
+    [router, downloadFile, wavGenerating],
   );
 
   // Filtered / sorted / paginated songs
@@ -451,11 +591,18 @@ export default function CreatePage() {
           />
           <div className="h-px bg-[#1a1a1a] mb-4" />
           {mode === "simple" ? (
-            <SimpleCreateForm model={model} onTaskStarted={handleTaskStarted} />
+            <SimpleCreateForm
+              model={model}
+              onTaskStarted={handleTaskStarted}
+              remixFromSourceId={remixFromSourceId}
+            />
+          ) : mode === "wizard" ? (
+            <WizardCreateForm model={model} onTaskStarted={handleTaskStarted} />
           ) : (
             <AdvancedCreateForm
               model={model}
               onTaskStarted={handleTaskStarted}
+              remixFromSourceId={remixFromSourceId}
             />
           )}
         </div>
@@ -492,6 +639,7 @@ export default function CreatePage() {
                   <GenerationRowSkeleton
                     key={`${task.taskId}:${i}`}
                     imageHint={task.imageUrl}
+                    startedAt={i === 0 ? task.startedAt : undefined}
                     onCancel={
                       i === 0
                         ? () => handleDismissFailed(task.taskId)
@@ -524,6 +672,21 @@ export default function CreatePage() {
           )}
         </div>
       </div>
+
+      <DerivationModal
+        open={derivation.open}
+        mode={derivation.mode}
+        song={derivation.song}
+        model={model}
+        onClose={() => setDerivation((d) => ({ ...d, open: false }))}
+        onTaskStarted={handleTaskStarted}
+      />
+
+      <StemsModal
+        open={stemsModal.open}
+        song={stemsModal.song}
+        onClose={() => setStemsModal({ open: false, song: null })}
+      />
     </div>
   );
 }

@@ -34,6 +34,13 @@ interface PlayerCtx {
   toggleShuffle: () => void;
   repeat: RepeatMode;
   toggleRepeat: () => void;
+  playbackRate: number;
+  setPlaybackRate: (rate: number) => void;
+  /** Sıraya ek şarkı (normal playlist sonundan önce çalınır) */
+  queue: Song[];
+  addToQueue: (song: Song) => void;
+  removeFromQueue: (id: string) => void;
+  clearQueue: () => void;
 }
 
 const PlayerContext = createContext<PlayerCtx | null>(null);
@@ -68,6 +75,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [showGate, setShowGate] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<RepeatMode>("none");
+  const [playbackRate, setPlaybackRateState] = useState(1);
+  const [queue, setQueue] = useState<Song[]>([]);
+  const queueRef = useRef<Song[]>([]);
+  queueRef.current = queue;
   const gateTriggeredRef = useRef(false); // şarkı başına bir kez göster
   const shuffleRef = useRef(false);
   const repeatRef = useRef<RepeatMode>("none");
@@ -170,6 +181,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     audioRef.current.src = playableUrl;
     audioRef.current.load();
+    // Playback rate'i şarkı değişiminde koru (yeni audio kaynağı default 1.0'a döner)
+    audioRef.current.playbackRate = playbackRate;
 
     // audioUrl (Bunny) yoksa callback sırasında upload kaçmış — self-heal tetikle.
     // Sessizce arka planda çalışır, sonraki yüklemede kalıcı URL hazır olur.
@@ -417,7 +430,28 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const addToQueue = useCallback((song: Song) => {
+    setQueue((q) => {
+      if (q.some((s) => s.id === song.id)) return q;
+      return [...q, song];
+    });
+    if ("vibrate" in navigator) navigator.vibrate(10);
+  }, []);
+
+  const removeFromQueue = useCallback((id: string) => {
+    setQueue((q) => q.filter((s) => s.id !== id));
+  }, []);
+
+  const clearQueue = useCallback(() => setQueue([]), []);
+
   const playNext = useCallback(() => {
+    // Sırada şarkı varsa önce onu çal
+    if (queueRef.current.length > 0) {
+      const [next, ...rest] = queueRef.current;
+      setQueue(rest);
+      setCurrentSong(next);
+      return;
+    }
     const pl = playlistRef.current;
     if (pl.length === 0) return;
     setCurrentIndex((prev) => {
@@ -505,7 +539,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       try {
         navigator.mediaSession.setPositionState({
           duration: d,
-          playbackRate: 1,
+          playbackRate: audioRef.current?.playbackRate ?? 1,
           position: t,
         });
       } catch {}
@@ -523,6 +557,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setPlaying(false);
+    // Sırada şarkı varsa önce onu çal (ended sonrası)
+    if (queueRef.current.length > 0) {
+      const [next, ...rest] = queueRef.current;
+      setQueue(rest);
+      setCurrentSong(next);
+      return;
+    }
     const pl = playlistRef.current;
     setCurrentIndex((prev) => {
       if (shuffleRef.current) {
@@ -615,6 +656,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         toggleShuffle,
         repeat,
         toggleRepeat,
+        queue,
+        addToQueue,
+        removeFromQueue,
+        clearQueue,
+        playbackRate,
+        setPlaybackRate: (rate: number) => {
+          const clamped = Math.max(0.25, Math.min(4, rate));
+          setPlaybackRateState(clamped);
+          if (audioRef.current) audioRef.current.playbackRate = clamped;
+        },
       }}
     >
       {/* Kalıcı audio element — hiç unmount olmaz */}
