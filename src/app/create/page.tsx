@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+  Suspense,
+} from "react";
 import { Song } from "@/types";
 import { GenerationRowSkeleton } from "@/components/GenerationRow";
 import CreateHeader, {
@@ -38,7 +45,19 @@ interface ProcessingTaskState {
 const PAGE_SIZE = 10;
 const VARIANT_COUNT = 2;
 
-export default function CreatePage() {
+export default function CreatePageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center" />
+      }
+    >
+      <CreatePage />
+    </Suspense>
+  );
+}
+
+function CreatePage() {
   const { playSong, currentSong } = usePlayer();
   const router = useRouter();
   const searchParams = useSearchParams();
