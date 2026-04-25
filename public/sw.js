@@ -1,4 +1,4 @@
-const CACHE = "rifmo-v2";
+const CACHE = "rifmo-v3";
 const PRECACHE = ["/", "/discover", "/create", "/playlists", "/manifest.json"];
 
 // ── Install ───────────────────────────────────────────────────────
@@ -26,7 +26,18 @@ self.addEventListener("activate", (e) => {
 });
 
 // ── Fetch ─────────────────────────────────────────────────────────
+// Tek tip offline yanıtı — fetch fail durumlarında SW'in uncaught reject
+// etmemesi için her dalda fallback Response döndürülüyor.
+const OFFLINE_RESPONSE = () =>
+  new Response("", {
+    status: 503,
+    statusText: "Service Unavailable (offline)",
+  });
+
 self.addEventListener("fetch", (e) => {
+  // POST/PUT/DELETE → SW'e gerek yok, direkt browser'a bırak
+  if (e.request.method !== "GET") return;
+
   const url = new URL(e.request.url);
 
   // API, ses dosyaları ve dış kaynaklar → her zaman network
@@ -50,14 +61,22 @@ self.addEventListener("fetch", (e) => {
   // Navigasyon → network-first, offline'da cache
   if (e.request.mode === "navigate") {
     e.respondWith(
-      fetch(e.request).catch(() => caches.match("/") ?? fetch(e.request)),
+      fetch(e.request).catch(async () => {
+        const cached = await caches.match("/");
+        return cached || OFFLINE_RESPONSE();
+      }),
     );
     return;
   }
 
-  // Statik dosyalar → cache-first
+  // Statik dosyalar → cache-first, network fail olursa offline response
   e.respondWith(
-    caches.match(e.request).then((cached) => cached ?? fetch(e.request)),
+    caches
+      .match(e.request)
+      .then(
+        (cached) => cached || fetch(e.request).catch(() => OFFLINE_RESPONSE()),
+      )
+      .catch(() => OFFLINE_RESPONSE()),
   );
 });
 
