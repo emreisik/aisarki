@@ -17,7 +17,7 @@ import { useUpload } from "@/contexts/UploadContext";
 import { useCredits } from "@/contexts/CreditsContext";
 import { useToast } from "@/contexts/ToastContext";
 import { localizeApiError } from "@/lib/sunoErrors";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const DESCRIPTION_EXAMPLES = [
   "Gece yarısı sahilde yürüyüş, lo-fi chill hop",
@@ -49,6 +49,7 @@ export default function SimpleCreateForm({
   remixFromSourceId,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const { credits, costs, refresh: refreshCredits } = useCredits();
   const [description, setDescription] = useState("");
@@ -260,6 +261,75 @@ export default function SimpleCreateForm({
       setLoading(false);
     }
   };
+
+  // ── Anasayfa hero'dan gelen ?prompt=...&auto=1 — otomatik üretim ──
+  const autoConsumedRef = useRef(false);
+  useEffect(() => {
+    if (autoConsumedRef.current) return;
+    const promptParam = searchParams.get("prompt");
+    const autoParam = searchParams.get("auto");
+    if (!promptParam) return;
+
+    autoConsumedRef.current = true;
+    setDescription(promptParam);
+
+    // URL'yi temizle (refresh'te tekrar tetiklenmesin)
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      ["prompt", "auto"].forEach((k) => url.searchParams.delete(k));
+      window.history.replaceState({}, "", url.toString());
+    }
+
+    // auto=1 + yeterli kredi varsa otomatik üret
+    if (autoParam === "1" && hasEnoughCredits && !loading) {
+      // setDescription async; bir tick bekle ki state oturduğunda submit etsin
+      // (Aynı render'da generate fetch'i için description'ı doğrudan kullanırız)
+      const trimmed = promptParam.trim();
+      if (!trimmed) return;
+      setLoading(true);
+      setError("");
+      (async () => {
+        try {
+          const res = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: trimmed,
+              instrumental: false,
+              customMode: false,
+              model,
+              ...(remixFromSourceId ? { remixFromSourceId } : {}),
+            }),
+          });
+          const data = await res.json();
+          if (res.status === 402) {
+            const e = localizeApiError(data, "Kredi yetersiz");
+            toast.error(e.title, e.message);
+            router.push("/pricing");
+            return;
+          }
+          if (!res.ok) {
+            const e = localizeApiError(data, "Hata oluştu");
+            toast.error(e.title, e.message);
+            return;
+          }
+          const taskId = data?.data?.taskId;
+          if (!taskId) {
+            toast.error("Görev başlatılamadı");
+            return;
+          }
+          onTaskStarted(taskId, trimmed, trimmed.slice(0, 40));
+          setDescription("");
+          refreshCredits();
+        } catch {
+          toast.error("Bağlantı hatası");
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, hasEnoughCredits]);
 
   const canCreate =
     description.trim().length > 0 && !loading && hasEnoughCredits;

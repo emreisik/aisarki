@@ -1726,7 +1726,7 @@ export default function HomePage() {
                 if (e.key === "Enter" && !e.shiftKey && heroPrompt.trim()) {
                   e.preventDefault();
                   router.push(
-                    `/create?prompt=${encodeURIComponent(heroPrompt.trim())}`,
+                    `/create?prompt=${encodeURIComponent(heroPrompt.trim())}&auto=1`,
                   );
                 }
               }}
@@ -1801,7 +1801,7 @@ export default function HomePage() {
                   onClick={() => {
                     if (heroPrompt.trim()) {
                       router.push(
-                        `/create?prompt=${encodeURIComponent(heroPrompt.trim())}`,
+                        `/create?prompt=${encodeURIComponent(heroPrompt.trim())}&auto=1`,
                       );
                     } else {
                       router.push("/create");
