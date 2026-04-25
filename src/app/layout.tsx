@@ -3,6 +3,7 @@ import "./globals.css";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { UploadProvider } from "@/contexts/UploadContext";
 import { CreditsProvider } from "@/contexts/CreditsContext";
+import { ToastProvider } from "@/contexts/ToastContext";
 import AppShell from "@/components/AppShell";
 import SessionProvider from "@/components/SessionProvider";
 import PWAManager from "@/components/PWAManager";
@@ -42,15 +43,17 @@ export default function RootLayout({
       </head>
       <body className="h-full">
         <SessionProvider>
-          <CreditsProvider>
-            <PlayerProvider>
-              <UploadProvider>
-                <AppShell>{children}</AppShell>
-                <RecordSheet />
-                <PWAManager />
-              </UploadProvider>
-            </PlayerProvider>
-          </CreditsProvider>
+          <ToastProvider>
+            <CreditsProvider>
+              <PlayerProvider>
+                <UploadProvider>
+                  <AppShell>{children}</AppShell>
+                  <RecordSheet />
+                  <PWAManager />
+                </UploadProvider>
+              </PlayerProvider>
+            </CreditsProvider>
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>

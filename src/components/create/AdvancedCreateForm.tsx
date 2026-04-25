@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCredits } from "@/contexts/CreditsContext";
+import { useToast } from "@/contexts/ToastContext";
+import { localizeApiError } from "@/lib/sunoErrors";
 import { useUpload } from "@/contexts/UploadContext";
 import LyricsWizardModal from "./LyricsWizardModal";
 import { ARTIST_PRESETS, GENRES, REGIONS, MAKAMS } from "@/lib/turkishMusicKB";
@@ -111,6 +113,7 @@ export default function AdvancedCreateForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { credits, costs, refresh: refreshCredits } = useCredits();
+  const toast = useToast();
   const { openRecord } = useUpload();
   const [audioMenuOpen, setAudioMenuOpen] = useState(false);
   const audioMenuRef = useRef<HTMLDivElement>(null);
@@ -331,17 +334,23 @@ export default function AdvancedCreateForm({
       });
       const data = await res.json();
       if (res.status === 402) {
-        setError(data.error || "Kredi yetersiz");
+        const e = localizeApiError(data, "Kredi yetersiz");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         router.push("/pricing");
         return;
       }
       if (!res.ok) {
-        setError(data.error || "Hata oluştu");
+        const e = localizeApiError(data, "Hata oluştu");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         return;
       }
       const taskId = data?.data?.taskId;
       if (!taskId) {
-        setError(data.error || data.msg || "Görev başlatılamadı");
+        const e = localizeApiError(data, "Görev başlatılamadı");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         return;
       }
       onTaskStarted(taskId, style.trim(), (title || style).trim().slice(0, 40));

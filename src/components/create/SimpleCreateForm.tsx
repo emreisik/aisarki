@@ -15,6 +15,8 @@ import InspirationTags from "./InspirationTags";
 import UploadingClipCard from "@/components/UploadingClipCard";
 import { useUpload } from "@/contexts/UploadContext";
 import { useCredits } from "@/contexts/CreditsContext";
+import { useToast } from "@/contexts/ToastContext";
+import { localizeApiError } from "@/lib/sunoErrors";
 import { useRouter } from "next/navigation";
 
 const DESCRIPTION_EXAMPLES = [
@@ -47,6 +49,7 @@ export default function SimpleCreateForm({
   remixFromSourceId,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const { credits, costs, refresh: refreshCredits } = useCredits();
   const [description, setDescription] = useState("");
   const [instrumental, setInstrumental] = useState(false);
@@ -223,17 +226,23 @@ export default function SimpleCreateForm({
       });
       const data = await res.json();
       if (res.status === 402) {
-        setError(data.error || "Kredi yetersiz");
+        const e = localizeApiError(data, "Kredi yetersiz");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         router.push("/pricing");
         return;
       }
       if (!res.ok) {
-        setError(data.error || "Hata oluştu");
+        const e = localizeApiError(data, "Hata oluştu");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         return;
       }
       const taskId = data?.data?.taskId;
       if (!taskId) {
-        setError(data.error || data.msg || "Görev başlatılamadı");
+        const e = localizeApiError(data, "Görev başlatılamadı");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         return;
       }
       onTaskStarted(

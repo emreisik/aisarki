@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { X, Loader2, Music2, Scissors, Disc3, Shuffle } from "lucide-react";
 import { Song } from "@/types";
+import { useToast } from "@/contexts/ToastContext";
+import { localizeApiError } from "@/lib/sunoErrors";
 
 type Mode = "extend" | "cover" | "mashup";
 
@@ -50,6 +52,7 @@ export default function DerivationModal({
   onClose,
   onTaskStarted,
 }: Props) {
+  const toast = useToast();
   const [continueAt, setContinueAt] = useState<number>(60);
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("");
@@ -171,12 +174,16 @@ export default function DerivationModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "İşlem başarısız");
+        const e = localizeApiError(data, "İşlem başarısız");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         return;
       }
       const taskId = data?.data?.taskId;
       if (!taskId) {
-        setError(data.error || data.msg || "Task başlatılamadı");
+        const e = localizeApiError(data, "Task başlatılamadı");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         return;
       }
       onTaskStarted(

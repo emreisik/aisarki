@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/contexts/ToastContext";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useGoBack } from "@/hooks/useGoBack";
 import { useSession } from "next-auth/react";
@@ -81,6 +82,7 @@ export default function PlaylistPage({
   const { playSong, currentSong, playing, togglePlay } = usePlayer();
   const { data: session } = useSession();
   const router = useRouter();
+  const toast = useToast();
   const goBack = useGoBack("/playlists");
 
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
@@ -190,9 +192,9 @@ export default function PlaylistPage({
     try {
       const res = await fetch(`/api/playlists/${id}`, { method: "DELETE" });
       if (res.ok) router.push("/playlists");
-      else alert("Silinemedi — tekrar dene");
+      else toast.error("Silinemedi", "Lütfen tekrar dene.");
     } catch {
-      alert("Bağlantı hatası");
+      toast.error("Bağlantı hatası");
     } finally {
       setDeleting(false);
     }

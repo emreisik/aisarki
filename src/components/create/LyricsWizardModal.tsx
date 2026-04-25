@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { X, Sparkles, Loader2 } from "lucide-react";
+import { useToast } from "@/contexts/ToastContext";
+import { localizeApiError } from "@/lib/sunoErrors";
 
 type Props = {
   open: boolean;
@@ -34,6 +36,7 @@ export default function LyricsWizardModal({
   regionId,
   makamId,
 }: Props) {
+  const toast = useToast();
   const [topic, setTopic] = useState("");
   const [mood, setMood] = useState<string>("");
   const [customNotes, setCustomNotes] = useState("");
@@ -77,7 +80,9 @@ export default function LyricsWizardModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Sözler üretilemedi");
+        const e = localizeApiError(data, "Sözler üretilemedi");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         return;
       }
       setResult(data.lyrics || "");

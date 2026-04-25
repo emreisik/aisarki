@@ -41,6 +41,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/contexts/ToastContext";
+import { localizeApiError } from "@/lib/sunoErrors";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useUpload } from "@/contexts/UploadContext";
@@ -1483,6 +1485,7 @@ export default function HomePage() {
   const { data: session } = useSession();
   const { likedIds, toggleLiked } = useLikedIds();
   const router = useRouter();
+  const toast = useToast();
 
   const [allSongs, setAllSongs] = useState<Song[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -1561,18 +1564,19 @@ export default function HomePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "Şarkı oluşturulamadı");
+        const e = localizeApiError(data, "Şarkı oluşturulamadı");
+        toast.error(e.title, e.message);
         return;
       }
       setSelectedCat(null);
       setInlineInput("");
       router.push("/create");
     } catch {
-      alert("Bağlantı hatası");
+      toast.error("Bağlantı hatası");
     } finally {
       setInlineGenerating(false);
     }
-  }, [selectedCat, inlineInput, inlineGenerating, session, router]);
+  }, [selectedCat, inlineInput, inlineGenerating, session, router, toast]);
 
   useEffect(() => {
     fetch("/api/all-songs?limit=30")

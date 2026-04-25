@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCredits } from "@/contexts/CreditsContext";
+import { useToast } from "@/contexts/ToastContext";
+import { localizeApiError } from "@/lib/sunoErrors";
 import {
   MOOD_CARDS,
   GENRE_CARDS,
@@ -44,6 +46,7 @@ const STEP_LABELS: Record<Step, string> = {
 
 export default function WizardCreateForm({ model, onTaskStarted }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const { credits, costs, refresh: refreshCredits } = useCredits();
 
   const [step, setStep] = useState<Step>(1);
@@ -115,17 +118,23 @@ export default function WizardCreateForm({ model, onTaskStarted }: Props) {
       });
       const data = await res.json();
       if (res.status === 402) {
-        setError(data.error || "Kredi yetersiz");
+        const e = localizeApiError(data, "Kredi yetersiz");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         router.push("/pricing");
         return;
       }
       if (!res.ok) {
-        setError(data.error || "Hata oluştu");
+        const e = localizeApiError(data, "Hata oluştu");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         return;
       }
       const taskId = data?.data?.taskId;
       if (!taskId) {
-        setError(data.error || data.msg || "Görev başlatılamadı");
+        const e = localizeApiError(data, "Görev başlatılamadı");
+        setError(`${e.title}${e.message ? `: ${e.message}` : ""}`);
+        toast.error(e.title, e.message);
         return;
       }
       const selectedGenre = GENRE_CARDS.find((g) => g.id === genreId);

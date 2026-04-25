@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCredits } from "@/contexts/CreditsContext";
+import { useToast } from "@/contexts/ToastContext";
 import { Loader2, ExternalLink, RefreshCw } from "lucide-react";
 import { formatUsd, PLAN_DEFINITIONS, type PlanId } from "@/lib/plans";
 
@@ -70,6 +71,7 @@ export default function BillingPageWrapper() {
 
 function BillingPage() {
   const router = useRouter();
+  const toast = useToast();
   const searchParams = useSearchParams();
   const { credits, plan, refresh: refreshCredits } = useCredits();
   const [subData, setSubData] = useState<SubscriptionData | null>(null);
@@ -120,7 +122,7 @@ function BillingPage() {
       if (res.ok && data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error || "Portal açılamadı");
+        toast.error("Portal açılamadı", data.error);
       }
     } finally {
       setPortalLoading(false);

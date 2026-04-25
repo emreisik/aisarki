@@ -131,6 +131,31 @@ export function translateSunoError(
 
   // Mesaj içeriğinden çıkarım
   const msg = (rawMessage ?? "").toLowerCase();
+
+  // Yüklenen dosyada telif korumalı sözler — cover/upload-extend için en sık hata
+  if (
+    (msg.includes("uploaded audio") || msg.includes("upload")) &&
+    (msg.includes("copyrighted") || msg.includes("copyright"))
+  ) {
+    return {
+      title: "Telifli içerik tespit edildi",
+      message:
+        "Yüklediğin ses dosyası telif korumalı sözler içeriyor. Lütfen farklı bir dosya yükleyip tekrar dene.",
+      refunded: true,
+    };
+  }
+  // Tag içinde sanatçı adı (Suno upload filtresinin sık verdiği)
+  if (
+    (msg.includes("tags") || msg.includes("tag")) &&
+    msg.includes("artist name")
+  ) {
+    return {
+      title: "Tarz alanında sanatçı adı",
+      message:
+        "Tarz/etiket alanında bir sanatçı adı algılandı (Suno telif politikası). Lütfen ismi kaldırıp sadece tarz olarak tarif et.",
+      refunded: true,
+    };
+  }
   if (msg.includes("artist name") || msg.includes("sanatçı")) {
     return ERROR_MAP[533];
   }
@@ -155,7 +180,11 @@ export function translateSunoError(
   if (msg.includes("insufficient") || msg.includes("credit")) {
     return ERROR_MAP[429];
   }
-  if (msg.includes("rate") || msg.includes("frequency")) {
+  if (
+    msg.includes("rate limit") ||
+    msg.includes("too many requests") ||
+    msg.includes("frequency")
+  ) {
     return ERROR_MAP[430];
   }
 
@@ -167,6 +196,52 @@ export function translateSunoError(
       : "Şarkı üretilemedi. Kredin iade edildi. Lütfen tekrar dene.",
     refunded: true,
   };
+}
+
+/**
+ * Frontend yardımcısı — API'den gelen `error` (string veya {error, errorTitle})
+ * payload'ını her zaman kullanıcıya gösterilebilir Türkçe { title, message } olarak
+ * normalize eder. Mesaj İngilizce Suno hatasıysa translateSunoError ile çevrilir.
+ */
+export function localizeApiError(
+  payload:
+    | string
+    | {
+        error?: string;
+        errorTitle?: string;
+        errorMessage?: string;
+        msg?: string;
+        message?: string;
+        code?: number | string;
+      }
+    | null
+    | undefined,
+  fallbackTitle: string = "Bir hata oluştu",
+): { title: string; message?: string } {
+  if (!payload) return { title: fallbackTitle };
+  if (typeof payload === "string") {
+    return localizeApiError({ error: payload }, fallbackTitle);
+  }
+  // errorTitle/errorMessage zaten Türkçeleştirilmiş geldi
+  if (payload.errorTitle || payload.errorMessage) {
+    return {
+      title: payload.errorTitle ?? fallbackTitle,
+      message: payload.errorMessage,
+    };
+  }
+  const raw = payload.error || payload.msg || payload.message || "";
+  // Karakter setine bak — non-ASCII (Türkçe diakritikler) varsa çoğunlukla
+  // backend zaten translate etmiş demektir.
+  const looksTurkish = /[çğıöşüÇĞİÖŞÜ]/.test(raw);
+  if (raw && looksTurkish) {
+    return { title: fallbackTitle, message: raw };
+  }
+  // İngilizce raw mesaj — translateSunoError'dan geçir
+  if (raw) {
+    const t = translateSunoError(payload.code, raw);
+    return { title: t.title, message: t.message };
+  }
+  return { title: fallbackTitle };
 }
 
 /**
