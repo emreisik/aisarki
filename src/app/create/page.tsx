@@ -11,6 +11,7 @@ import AdvancedCreateForm from "@/components/create/AdvancedCreateForm";
 import WizardCreateForm from "@/components/create/WizardCreateForm";
 import DerivationModal from "@/components/create/DerivationModal";
 import StemsModal from "@/components/create/StemsModal";
+import SoundsGenerator from "@/components/SoundsGenerator";
 import WorkspaceToolbar, {
   type SortKey,
   type FilterToggle,
@@ -72,6 +73,7 @@ export default function CreatePage() {
     song: Song | null;
   }>({ open: false, song: null });
   const [wavGenerating, setWavGenerating] = useState<string | null>(null);
+  const [loopsModalOpen, setLoopsModalOpen] = useState(false);
 
   // Workspace state
   const [query, setQuery] = useState("");
@@ -629,7 +631,7 @@ export default function CreatePage() {
         }
       }
     },
-    [router, downloadFile, wavGenerating, toast],
+    [router, downloadFile, wavGenerating, toast, handleTaskStarted, model],
   );
 
   // Filtered / sorted / paginated songs
@@ -731,6 +733,7 @@ export default function CreatePage() {
             page={page}
             totalPages={totalPages}
             onPageChange={setPage}
+            onOpenLoops={() => setLoopsModalOpen(true)}
           />
 
           <div className="mt-4 flex flex-col gap-0.5">
@@ -798,6 +801,44 @@ export default function CreatePage() {
         song={stemsModal.song}
         onClose={() => setStemsModal({ open: false, song: null })}
       />
+
+      {/* Loop / Sound üretim modal */}
+      {loopsModalOpen && (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setLoopsModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-[#0f0f0f] border border-[#222] rounded-2xl shadow-2xl flex flex-col max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#1a1a1a] flex-shrink-0">
+              <div>
+                <h2 className="text-white text-base font-semibold">
+                  Loop / Ses Üret
+                </h2>
+                <p className="text-[#777] text-xs mt-0.5">
+                  Kısa ses, drum loop, bassline, ambient pad…
+                </p>
+              </div>
+              <button
+                onClick={() => setLoopsModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-[#1a1a1a] flex items-center justify-center text-white text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <SoundsGenerator
+                onTaskStarted={(taskId, prompt, title) => {
+                  handleTaskStarted(taskId, prompt, title);
+                  setLoopsModalOpen(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

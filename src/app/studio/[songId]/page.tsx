@@ -66,6 +66,9 @@ export default function StudioPage({
   const [exporting, setExporting] = useState(false);
   const [extending, setExtending] = useState(false);
   const [showEq, setShowEq] = useState(false);
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [extendPrompt, setExtendPrompt] = useState("");
+  const [extendStyle, setExtendStyle] = useState("");
 
   // Şarkı bilgisini yükle
   useEffect(() => {
@@ -310,7 +313,11 @@ export default function StudioPage({
     }
   };
 
-  const handleExtendFromRegion = async () => {
+  const handleExtendFromRegion = async (overrides?: {
+    prompt?: string;
+    style?: string;
+    title?: string;
+  }) => {
     if (!region || !song || extending) return;
     setExtending(true);
     try {
@@ -335,9 +342,9 @@ export default function StudioPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           uploadUrl: uploadData.url,
-          prompt: song.prompt || song.title,
-          style: song.style,
-          title: `${song.title} (remix)`,
+          prompt: overrides?.prompt || song.prompt || song.title,
+          style: overrides?.style || song.style,
+          title: overrides?.title || `${song.title} (remix)`,
           continueAt: region.end - region.start,
           model: "V5_5",
         }),
@@ -358,6 +365,7 @@ export default function StudioPage({
       toast.error("Beklenmeyen hata");
     } finally {
       setExtending(false);
+      setExtendModalOpen(false);
     }
   };
 
@@ -632,7 +640,11 @@ export default function StudioPage({
           </button>
 
           <button
-            onClick={handleExtendFromRegion}
+            onClick={() => {
+              setExtendPrompt(song.prompt || "");
+              setExtendStyle(song.style || "");
+              setExtendModalOpen(true);
+            }}
             disabled={!region || extending}
             className="h-12 rounded-full font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             style={{
@@ -669,6 +681,90 @@ export default function StudioPage({
           </div>
         </div>
       </div>
+
+      {/* Extend Modal — region'dan AI ile uzatma için prompt + style özelleştirme */}
+      {extendModalOpen && song && region && (
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => !extending && setExtendModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-[#0f0f0f] border border-[#222] rounded-2xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-[#1a1a1a]">
+              <h2 className="text-white text-base font-semibold">
+                Bu bölümden AI ile uzat
+              </h2>
+              <p className="text-[#777] text-xs mt-0.5">
+                Seçili {fmt(region.end - region.start)} bölümünden başlayarak
+                yeni devamı üretilecek
+              </p>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-white text-[11px] font-semibold uppercase tracking-wide mb-2">
+                  Sözler / Prompt
+                </label>
+                <textarea
+                  value={extendPrompt}
+                  onChange={(e) => setExtendPrompt(e.target.value)}
+                  placeholder="Devamını nasıl olsun? Boş bırakırsan orijinal sözler kullanılır."
+                  rows={4}
+                  className="w-full bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg px-3 py-2 text-white text-[13px] placeholder:text-[#555] focus:outline-none focus:border-[#19b35c]"
+                />
+              </div>
+              <div>
+                <label className="block text-white text-[11px] font-semibold uppercase tracking-wide mb-2">
+                  Stil
+                </label>
+                <input
+                  type="text"
+                  value={extendStyle}
+                  onChange={(e) => setExtendStyle(e.target.value)}
+                  placeholder="Örn: arabesk, lo-fi chill, türk pop"
+                  className="w-full bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg px-3 py-2 text-white text-[13px] placeholder:text-[#555] focus:outline-none focus:border-[#19b35c]"
+                />
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-[#1a1a1a] flex gap-2 justify-end">
+              <button
+                onClick={() => setExtendModalOpen(false)}
+                disabled={extending}
+                className="h-10 px-4 rounded-full bg-[#1a1a1a] hover:bg-[#222] text-white text-[13px] font-semibold disabled:opacity-40"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={() =>
+                  handleExtendFromRegion({
+                    prompt: extendPrompt.trim() || undefined,
+                    style: extendStyle.trim() || undefined,
+                  })
+                }
+                disabled={extending}
+                className="h-10 px-4 rounded-full font-semibold text-white text-[13px] flex items-center gap-2 disabled:opacity-40"
+                style={{
+                  background:
+                    "linear-gradient(45deg, #082122 0%, #295b53 40%, #19b35c 75%, #fcff9a 100%)",
+                }}
+              >
+                {extending ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Başlatılıyor…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    Üret · 10 kredi
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

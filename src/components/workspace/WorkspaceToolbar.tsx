@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Drum,
 } from "lucide-react";
 
 export type SortKey = "newest" | "oldest" | "most_played";
@@ -35,6 +36,7 @@ type Props = {
   page: number;
   totalPages: number;
   onPageChange: (p: number) => void;
+  onOpenLoops?: () => void;
 };
 
 export default function WorkspaceToolbar({
@@ -48,6 +50,7 @@ export default function WorkspaceToolbar({
   page,
   totalPages,
   onPageChange,
+  onOpenLoops,
 }: Props) {
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -91,6 +94,18 @@ export default function WorkspaceToolbar({
           Filtreler ({activeFilterCount})
           <ChevronDown size={12} />
         </button>
+
+        {/* Loop / Sound üret */}
+        {onOpenLoops && (
+          <button
+            onClick={onOpenLoops}
+            className="h-10 px-4 rounded-full border border-[#1f1f1f] bg-[#141414] hover:bg-[#1a1a1a] flex items-center gap-1.5 text-white text-[13px] font-medium transition-colors"
+            title="Kısa loop / ses efekti üret (drum loop, bassline, ambient...)"
+          >
+            <Drum size={13} />
+            Loop Üret
+          </button>
+        )}
 
         {/* Sort */}
         <div className="relative" ref={sortRef}>

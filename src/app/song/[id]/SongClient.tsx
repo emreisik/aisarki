@@ -88,6 +88,11 @@ export default function SongClient({
   // Comment count (hero badge'de göstermek için)
   const [commentCount, setCommentCount] = useState(0);
 
+  // Suno word-level timestamped lyrics — varsa karaoke kelime-kelime gösterir
+  const [alignedWords, setAlignedWords] = useState<
+    Array<{ word: string; startS: number; endS: number; success?: boolean }>
+  >([]);
+
   // Dominant renk — hero gradient
   const rgb = useDominantColor(song?.imageUrl);
 
@@ -110,6 +115,41 @@ export default function SongClient({
       cancelled = true;
     };
   }, [id]);
+
+  // Word-level timestamped lyrics fetch — kullanıcının kendi şarkısı + complete ise
+  useEffect(() => {
+    if (!song || song.status !== "complete") return;
+    if (!session?.user?.id || song.creator?.id !== session.user.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // Önce cache GET
+        const cached = await fetch(
+          `/api/timestamped-lyrics?songId=${song.id}`,
+        ).then((r) => r.json());
+        const cachedWords =
+          cached?.lyrics?.alignedWords || cached?.lyrics?.aligned_words;
+        if (cachedWords && Array.isArray(cachedWords)) {
+          if (!cancelled) setAlignedWords(cachedWords);
+          return;
+        }
+        // Yoksa Suno'dan çek + cache'e yaz
+        const res = await fetch("/api/timestamped-lyrics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ songId: song.id }),
+        });
+        const data = await res.json();
+        const words = data?.lyrics?.alignedWords || data?.lyrics?.aligned_words;
+        if (!cancelled && Array.isArray(words)) setAlignedWords(words);
+      } catch {
+        /* sessizce — Whisper LRC fallback'i kullanılır */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [song, session?.user?.id]);
 
   // Liked durumu (login varsa)
   useEffect(() => {
@@ -396,7 +436,12 @@ export default function SongClient({
           <p className="text-[#a7a7a7] text-xs font-bold uppercase tracking-widest mb-4">
             Sözler
           </p>
-          <KaraokeLyrics song={song} lrc={song.lrc} fallback={song.prompt} />
+          <KaraokeLyrics
+            song={song}
+            lrc={song.lrc}
+            alignedWords={alignedWords.length > 0 ? alignedWords : undefined}
+            fallback={song.prompt}
+          />
         </div>
 
         {/* Aksiyonlar: Extend / Cover / Mashup */}

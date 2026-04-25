@@ -55,21 +55,92 @@ function findActiveIndex(lines: Line[], t: number): number {
   return ans;
 }
 
+interface AlignedWord {
+  word: string;
+  startS: number;
+  endS: number;
+  success?: boolean;
+}
+
 type Props = {
   song: Song;
   /** LRC metni — yoksa fallback lyrics render edilir */
   lrc?: string;
+  /** Suno word-level lyrics — varsa LRC'den önceliklidir (kelime-kelime karaoke) */
+  alignedWords?: AlignedWord[];
   /** Fallback sözler (LRC yoksa veya şarkı aktif player'da değilse) */
   fallback?: string | null;
 };
 
-export default function KaraokeLyrics({ song, lrc, fallback }: Props) {
+/**
+ * AlignedWords'ten line-level Line[] üret.
+ * Suno cümleleri zaten ayırmış olmuyor — kelimeleri yeni satırla
+ * ayırıyor ("\n" word olarak gelir). Boş kelime = satır sonu.
+ */
+function alignedWordsToLines(words: AlignedWord[]): Line[] {
+  const lines: Line[] = [];
+  let buffer: string[] = [];
+  let bufferStart: number | null = null;
+  for (const w of words) {
+    const text = (w.word ?? "").trim();
+    const isBreak = text === "" || text === "\n";
+    if (isBreak) {
+      if (bufferStart !== null && buffer.length > 0) {
+        lines.push({ time: bufferStart, text: buffer.join(" ").trim() });
+      }
+      buffer = [];
+      bufferStart = null;
+      continue;
+    }
+    if (bufferStart === null) bufferStart = w.startS;
+    buffer.push(text);
+  }
+  if (bufferStart !== null && buffer.length > 0) {
+    lines.push({ time: bufferStart, text: buffer.join(" ").trim() });
+  }
+  return lines;
+}
+
+/** Word-level: t saniyesindeki aktif kelime indeksi */
+function findActiveWordIndex(words: AlignedWord[], t: number): number {
+  let lo = 0;
+  let hi = words.length - 1;
+  let ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (words[mid].startS <= t) {
+      ans = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return ans;
+}
+
+export default function KaraokeLyrics({
+  song,
+  lrc,
+  alignedWords,
+  fallback,
+}: Props) {
   const { currentSong, currentTime, audioRef } = usePlayer();
-  const lines = useMemo(() => (lrc ? parseLrc(lrc) : []), [lrc]);
+  const lines = useMemo(() => {
+    if (alignedWords && alignedWords.length > 0)
+      return alignedWordsToLines(alignedWords);
+    return lrc ? parseLrc(lrc) : [];
+  }, [lrc, alignedWords]);
   const isActiveInPlayer = currentSong?.id === song.id;
   const activeIdx = useMemo(
     () => (isActiveInPlayer ? findActiveIndex(lines, currentTime) : -1),
     [lines, currentTime, isActiveInPlayer],
+  );
+  const activeWordIdx = useMemo(
+    () =>
+      isActiveInPlayer && alignedWords
+        ? findActiveWordIndex(alignedWords, currentTime)
+        : -1,
+    [alignedWords, currentTime, isActiveInPlayer],
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -147,9 +218,16 @@ export default function KaraokeLyrics({ song, lrc, fallback }: Props) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[#1db954] text-[11px] font-bold uppercase tracking-widest">
-          Senkron Sözler
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[#1db954] text-[11px] font-bold uppercase tracking-widest">
+            Senkron Sözler
+          </span>
+          {alignedWords && alignedWords.length > 0 && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#19b35c]/15 text-[#19b35c] tracking-wide">
+              KELİME-KELİME
+            </span>
+          )}
+        </div>
         {!isActiveInPlayer && (
           <span className="text-[#555] text-[11px]">
             Senkron için şarkıyı çal
@@ -164,6 +242,18 @@ export default function KaraokeLyrics({ song, lrc, fallback }: Props) {
           {lines.map((line, i) => {
             const isActive = i === activeIdx;
             const isPast = i < activeIdx;
+            const nextLineTime = lines[i + 1]?.time ?? Infinity;
+            // Sadece aktif satırda + word data varsa kelime-kelime highlight
+            const lineWords =
+              isActive && alignedWords
+                ? alignedWords.filter(
+                    (w) =>
+                      w.startS >= line.time &&
+                      w.startS < nextLineTime &&
+                      (w.word ?? "").trim() !== "" &&
+                      (w.word ?? "") !== "\n",
+                  )
+                : null;
             return (
               <button
                 key={`${line.time}-${i}`}
@@ -180,7 +270,32 @@ export default function KaraokeLyrics({ song, lrc, fallback }: Props) {
                       : "text-[#9a9a9a] text-[15px]"
                 } ${isActiveInPlayer ? "cursor-pointer hover:text-white" : "cursor-default"}`}
               >
-                {line.text}
+                {lineWords && lineWords.length > 0 ? (
+                  <span>
+                    {lineWords.map((w, wi) => {
+                      const wIdx = alignedWords!.indexOf(w);
+                      const isWordPast = wIdx < activeWordIdx;
+                      const isWordActive = wIdx === activeWordIdx;
+                      return (
+                        <span
+                          key={`${line.time}-${wi}`}
+                          className={`inline-block transition-colors duration-150 ${
+                            isWordActive
+                              ? "text-[#fcff9a]"
+                              : isWordPast
+                                ? "text-white"
+                                : "text-white/60"
+                          }`}
+                        >
+                          {w.word}
+                          {wi < lineWords.length - 1 ? " " : ""}
+                        </span>
+                      );
+                    })}
+                  </span>
+                ) : (
+                  line.text
+                )}
               </button>
             );
           })}
