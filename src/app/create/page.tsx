@@ -19,6 +19,8 @@ import WorkspaceRow from "@/components/workspace/WorkspaceRow";
 import { type MenuAction } from "@/components/workspace/RowContextMenu";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useUpload } from "@/contexts/UploadContext";
+import { useToast } from "@/contexts/ToastContext";
+import { localizeApiError } from "@/lib/sunoErrors";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface ProcessingTaskState {
@@ -40,6 +42,7 @@ export default function CreatePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { openRecord } = useUpload();
+  const toast = useToast();
   const recordParamHandledRef = useRef(false);
 
   useEffect(() => {
@@ -314,15 +317,16 @@ export default function CreatePage() {
         if (res.ok) {
           setProcessingTasks((prev) => prev.filter((t) => t.taskId !== taskId));
         } else {
-          alert(data.error || "Yeniden başlatılamadı");
+          const e = localizeApiError(data, "Yeniden başlatılamadı");
+          toast.error(e.title, e.message);
         }
       } catch {
-        alert("Bağlantı hatası");
+        toast.error("Bağlantı hatası");
       } finally {
         setRetryingTaskId(null);
       }
     },
-    [retryingTaskId],
+    [retryingTaskId, toast],
   );
 
   const downloadFile = useCallback(
@@ -355,7 +359,7 @@ export default function CreatePage() {
         // Kullanıcı 2. şarkıyı seçip Mashup tetikleyecek
         const uploadUrl = song.audioUrl || song.streamUrl;
         if (!uploadUrl) {
-          alert("Şarkının ses dosyası henüz hazır değil");
+          toast.error("Şarkının ses dosyası henüz hazır değil");
           return;
         }
         setDerivation({ open: true, mode: "mashup", song });
@@ -375,7 +379,7 @@ export default function CreatePage() {
         if (action !== "extend") {
           const uploadUrl = song.audioUrl || song.streamUrl;
           if (!uploadUrl) {
-            alert("Şarkının ses dosyası henüz hazır değil");
+            toast.error("Şarkının ses dosyası henüz hazır değil");
             return;
           }
         }
@@ -386,10 +390,96 @@ export default function CreatePage() {
         setStemsModal({ open: true, song });
         return;
       }
+      if (action === "add_vocals" || action === "add_instrumental") {
+        const uploadUrl = song.audioUrl || song.streamUrl;
+        if (!uploadUrl) {
+          toast.error("Şarkının ses dosyası henüz hazır değil");
+          return;
+        }
+        try {
+          const endpoint =
+            action === "add_vocals"
+              ? "/api/add-vocals"
+              : "/api/add-instrumental";
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uploadUrl,
+              title:
+                action === "add_vocals"
+                  ? `${song.title} (vokal eklenmiş)`
+                  : `${song.title} (enstrümantal eklenmiş)`,
+              prompt: song.prompt,
+              style: song.style,
+              model: model || "V5_5",
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            const e = localizeApiError(data, "İşlem başlatılamadı");
+            toast.error(e.title, e.message);
+            return;
+          }
+          const taskId = data.data?.taskId;
+          if (taskId) {
+            handleTaskStarted(
+              taskId,
+              song.prompt || song.title,
+              action === "add_vocals"
+                ? `${song.title} (vokal)`
+                : `${song.title} (enstrümantal)`,
+            );
+            toast.success(
+              action === "add_vocals"
+                ? "Vokal ekleniyor"
+                : "Enstrümantal ekleniyor",
+              "Workspace'te ilerlemeyi takip edebilirsin.",
+            );
+          }
+        } catch {
+          toast.error("Bağlantı hatası");
+        }
+        return;
+      }
+      if (action === "music_video") {
+        try {
+          // Önce cache GET
+          const cached = await fetch(`/api/music-video?songId=${song.id}`).then(
+            (r) => r.json(),
+          );
+          if (cached.mp4Url) {
+            window.open(cached.mp4Url, "_blank");
+            return;
+          }
+          const res = await fetch("/api/music-video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ songId: song.id }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            const e = localizeApiError(data, "Video başlatılamadı");
+            toast.error(e.title, e.message);
+            return;
+          }
+          if (data.cached && data.mp4Url) {
+            window.open(data.mp4Url, "_blank");
+            return;
+          }
+          toast.success(
+            "Video üretiliyor",
+            "Hazır olduğunda push bildirim gelecek.",
+          );
+        } catch {
+          toast.error("Bağlantı hatası");
+        }
+        return;
+      }
       if (action === "inspiration") {
         const seed = song.style || song.prompt || "";
         if (!seed) {
-          alert("Bu şarkıdan ilham çıkarılamadı");
+          toast.error("Bu şarkıdan ilham çıkarılamadı");
           return;
         }
         try {
@@ -400,7 +490,8 @@ export default function CreatePage() {
           });
           const data = await res.json();
           if (!res.ok || !data.result) {
-            alert(data.error || "İlham üretilemedi");
+            const e = localizeApiError(data, "İlham üretilemedi");
+            toast.error(e.title, e.message);
             return;
           }
           // Detaylı style metnini Advanced forma yolla
@@ -410,14 +501,14 @@ export default function CreatePage() {
           if (song.title) params.set("title", `${song.title} (ilham)`);
           router.replace(`/create?${params.toString()}`);
         } catch {
-          alert("Bağlantı hatası");
+          toast.error("Bağlantı hatası");
         }
         return;
       }
       if (action === "download_mp3") {
         const url = song.audioUrl || song.streamUrl;
         if (!url) {
-          alert("Şarkının ses dosyası henüz hazır değil");
+          toast.error("Şarkının ses dosyası henüz hazır değil");
           return;
         }
         downloadFile(url, song.title || "song", "mp3");
@@ -454,7 +545,8 @@ export default function CreatePage() {
           });
           const data = await res.json();
           if (!res.ok) {
-            alert(data.error || "WAV üretimi başarısız");
+            const e = localizeApiError(data, "WAV üretimi başarısız");
+            toast.error(e.title, e.message);
             setWavGenerating(null);
             return;
           }
@@ -464,8 +556,9 @@ export default function CreatePage() {
             return;
           }
           // Background polling — ~3-4 dk sürer
-          alert(
-            "WAV dönüşümü başlatıldı. Hazır olunca tekrar 'WAV İndir' tuşuna bas.",
+          toast.info(
+            "WAV dönüşümü başlatıldı",
+            "Hazır olunca otomatik indirilecek (~3-4 dk).",
           );
           // 5 dk polling — hazır olunca otomatik indirelim
           const startedAt = Date.now();
@@ -494,7 +587,7 @@ export default function CreatePage() {
           };
           setTimeout(poll, 12000);
         } catch {
-          alert("Bağlantı hatası");
+          toast.error("Bağlantı hatası");
           setWavGenerating(null);
         }
         return;
@@ -521,7 +614,10 @@ export default function CreatePage() {
               ),
             );
             const data = await res.json().catch(() => ({}));
-            alert(data.error || "Görünürlük değiştirilemedi");
+            const e = localizeApiError(data, "Görünürlük değiştirilemedi");
+            toast.error(e.title, e.message);
+          } else {
+            toast.success(nextPublic ? "Yayımlandı" : "Yayından kaldırıldı");
           }
         } catch {
           setSongs((prev) =>
@@ -529,11 +625,11 @@ export default function CreatePage() {
               s.id === song.id ? { ...s, isPublic: !nextPublic } : s,
             ),
           );
-          alert("Bağlantı hatası");
+          toast.error("Bağlantı hatası");
         }
       }
     },
-    [router, downloadFile, wavGenerating],
+    [router, downloadFile, wavGenerating, toast],
   );
 
   // Filtered / sorted / paginated songs

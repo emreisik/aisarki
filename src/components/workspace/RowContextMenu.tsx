@@ -14,6 +14,9 @@ import {
   FileAudio,
   Scissors,
   SlidersHorizontal,
+  Mic2,
+  Guitar,
+  Video,
 } from "lucide-react";
 import type { Song } from "@/types";
 
@@ -26,6 +29,9 @@ type MenuAction =
   | "sample"
   | "inspiration"
   | "reuse_prompt"
+  | "add_vocals"
+  | "add_instrumental"
+  | "music_video"
   | "download_mp3"
   | "download_wav"
   | "toggle_visibility";
@@ -62,6 +68,25 @@ function buildItems(song: Song): Item[] {
       id: "sample",
       label: "Örnek Olarak Kullan",
       icon: Scissors,
+      enabled: canDownload,
+    },
+    {
+      id: "add_vocals",
+      label: "Vokal Ekle",
+      icon: Mic2,
+      enabled: canDownload,
+    },
+    {
+      id: "add_instrumental",
+      label: "Enstrümantal Ekle",
+      icon: Guitar,
+      enabled: canDownload,
+    },
+    {
+      id: "music_video",
+      label: "Müzik Videosu Üret",
+      icon: Video,
+      badge: "NEW",
       enabled: canDownload,
     },
     {
@@ -127,7 +152,7 @@ export default function RowContextMenu({
   }, [onClose]);
 
   const menuWidth = 240;
-  const menuHeight = 440;
+  const menuHeight = 540;
   const margin = 8;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;

@@ -13,6 +13,7 @@ import {
   getTaskPrompt,
   saveSongStems,
   saveSongWavUrl,
+  saveSongMp4Url,
 } from "@/lib/taskStore";
 import { translateSunoError, extractSunoError } from "@/lib/sunoErrors";
 import { sendPushToUser } from "@/lib/pushNotification";
@@ -227,6 +228,41 @@ export async function POST(request: NextRequest) {
       } else {
         console.warn(
           `[callback] wav callback eksik field — songId=${songId} wavUrl=${!!wavUrl}`,
+        );
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (endpoint === "mp4") {
+      const songId = (taskPayload?.payload as Record<string, unknown> | null)
+        ?.songId as string | undefined;
+      const mp4Url =
+        (dataObj?.videoUrl as string) ||
+        (dataObj?.video_url as string) ||
+        (dataObj?.mp4Url as string) ||
+        (dataObj?.mp4_url as string) ||
+        ((body.data as Record<string, unknown>)?.videoUrl as string);
+
+      if (songId && mp4Url) {
+        await saveSongMp4Url(songId, mp4Url);
+        await markTaskComplete(taskId);
+
+        getTaskCreatedBy(taskId)
+          .then((userId) => {
+            if (!userId) return;
+            return sendPushToUser(userId, {
+              title: "Müzik videon hazır",
+              body: "Şarkın için video üretildi",
+              url: `/song/${songId}`,
+              tag: `mp4-${taskId}`,
+            });
+          })
+          .catch(() => {});
+
+        console.log(`[callback] mp4 saved for song ${songId} (task ${taskId})`);
+      } else {
+        console.warn(
+          `[callback] mp4 callback eksik field — songId=${songId} mp4Url=${!!mp4Url}`,
         );
       }
       return NextResponse.json({ ok: true });

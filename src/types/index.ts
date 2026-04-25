@@ -41,10 +41,14 @@ export interface Song {
   isPublic?: boolean;
   /** WAV (HD) format dönüşüm URL'si — Suno wav/generate sonucu */
   wavUrl?: string;
+  /** Music video MP4 URL'si — Suno mp4/generate sonucu */
+  mp4Url?: string;
   /** Stems (vocal/enstrümantal veya 12-stem ayırma sonuçları) */
   stemsData?: Partial<
     Record<"separate_vocal" | "split_stem", Record<string, unknown>>
   >;
+  /** Suno word-level timestamped lyrics — karaoke senkronu için */
+  timestampedLyrics?: Record<string, unknown>;
   createdAt: string;
   creator?: SongCreator;
 }

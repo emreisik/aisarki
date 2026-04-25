@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, use } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/contexts/ToastContext";
+import { localizeApiError } from "@/lib/sunoErrors";
 import {
   ArrowLeft,
   Play,
@@ -14,6 +16,9 @@ import {
   Music2,
   Sparkles,
   Repeat,
+  SlidersHorizontal,
+  Compass,
+  AudioWaveform,
 } from "lucide-react";
 import type { Song } from "@/types";
 import type WaveSurfer from "wavesurfer.js";
@@ -38,6 +43,7 @@ export default function StudioPage({
 }) {
   const { songId } = use(params);
   const router = useRouter();
+  const toast = useToast();
   const waveformRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WaveSurfer | null>(null);
   const regionsPluginRef = useRef<unknown>(null);
@@ -53,8 +59,13 @@ export default function StudioPage({
   const [volume, setVolume] = useState(100);
   const [fadeIn, setFadeIn] = useState(0);
   const [fadeOut, setFadeOut] = useState(0);
+  const [pan, setPan] = useState(0); // -1 sol, 0 merkez, 1 sağ
+  const [pitch, setPitch] = useState(0); // semiton cinsinden, -12..+12
+  // 6-band parametric EQ — Hz: 60, 230, 910, 3600, 14000 + low-shelf/high-shelf
+  const [eqGains, setEqGains] = useState<number[]>([0, 0, 0, 0, 0, 0]);
   const [exporting, setExporting] = useState(false);
   const [extending, setExtending] = useState(false);
+  const [showEq, setShowEq] = useState(false);
 
   // Şarkı bilgisini yükle
   useEffect(() => {
@@ -221,7 +232,11 @@ export default function StudioPage({
     const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer.slice(0));
 
     const segDuration = region.end - region.start;
-    const segFrames = Math.floor(segDuration * audioBuffer.sampleRate);
+    // Pitch shift: playbackRate ile yapılan basit shift süreyi de etkiler.
+    // Frekans / 2^(semitones/12) — yüksek pitch = hızlı çalma + kısa süre.
+    const pitchRate = Math.pow(2, pitch / 12);
+    const renderDuration = segDuration / pitchRate;
+    const segFrames = Math.floor(renderDuration * audioBuffer.sampleRate);
     const offline = new OfflineAudioContext(
       audioBuffer.numberOfChannels,
       segFrames,
@@ -230,25 +245,38 @@ export default function StudioPage({
 
     const source = offline.createBufferSource();
     source.buffer = audioBuffer;
+    source.playbackRate.value = pitchRate;
 
-    // Gain node (volume + fade envelope)
+    // EQ chain — 6-band parametric
+    const eqBands = buildEqChain(offline, eqGains);
+
+    // Pan node (stereo balance)
+    const panner = offline.createStereoPanner();
+    panner.pan.value = Math.max(-1, Math.min(1, pan));
+
+    // Master gain (volume + fade envelope)
     const gain = offline.createGain();
     const vol = volume / 100;
     gain.gain.value = vol;
 
-    // Fade in
     if (fadeIn > 0) {
       gain.gain.setValueAtTime(0, 0);
-      gain.gain.linearRampToValueAtTime(vol, Math.min(fadeIn, segDuration));
+      gain.gain.linearRampToValueAtTime(vol, Math.min(fadeIn, renderDuration));
     }
-    // Fade out
     if (fadeOut > 0) {
-      const fadeStartTime = Math.max(0, segDuration - fadeOut);
+      const fadeStartTime = Math.max(0, renderDuration - fadeOut);
       gain.gain.setValueAtTime(vol, fadeStartTime);
-      gain.gain.linearRampToValueAtTime(0, segDuration);
+      gain.gain.linearRampToValueAtTime(0, renderDuration);
     }
 
-    source.connect(gain).connect(offline.destination);
+    // Bağlama: source → eq[0] → eq[1] → ... → pan → gain → destination
+    let prev: AudioNode = source;
+    for (const band of eqBands) {
+      prev.connect(band);
+      prev = band;
+    }
+    prev.connect(panner).connect(gain).connect(offline.destination);
+
     source.start(0, region.start, segDuration);
 
     const rendered = await offline.startRendering();
@@ -276,7 +304,7 @@ export default function StudioPage({
       URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
-      alert("Export sırasında hata oluştu");
+      toast.error("Export sırasında hata oluştu");
     } finally {
       setExporting(false);
     }
@@ -296,7 +324,8 @@ export default function StudioPage({
       });
       const uploadData = await upload.json();
       if (!upload.ok || !uploadData.url) {
-        alert(uploadData.error || "Segment yüklenemedi");
+        const e = localizeApiError(uploadData, "Segment yüklenemedi");
+        toast.error(e.title, e.message);
         return;
       }
 
@@ -315,16 +344,18 @@ export default function StudioPage({
       });
       const extendData = await extend.json();
       if (!extend.ok) {
-        alert(extendData.error || "Extend başlatılamadı");
+        const e = localizeApiError(extendData, "Extend başlatılamadı");
+        toast.error(e.title, e.message);
         return;
       }
-      alert(
-        "Extend başlatıldı — Create sayfasında ilerlemeyi takip edebilirsin",
+      toast.success(
+        "Extend başlatıldı",
+        "Create sayfasında ilerlemeyi takip edebilirsin.",
       );
       router.push("/create");
     } catch (e) {
       console.error(e);
-      alert("Beklenmeyen hata");
+      toast.error("Beklenmeyen hata");
     } finally {
       setExtending(false);
     }
@@ -468,7 +499,117 @@ export default function StudioPage({
               className="w-full accent-[#19b35c]"
             />
           </EffectCard>
+
+          <EffectCard
+            icon={<Compass size={14} />}
+            title="Stereo Pan"
+            value={
+              pan === 0
+                ? "Merkez"
+                : pan < 0
+                  ? `${Math.round(-pan * 100)}% sol`
+                  : `${Math.round(pan * 100)}% sağ`
+            }
+          >
+            <input
+              type="range"
+              min={-1}
+              max={1}
+              step={0.05}
+              value={pan}
+              onChange={(e) => setPan(Number(e.target.value))}
+              className="w-full accent-[#19b35c]"
+            />
+          </EffectCard>
+
+          <EffectCard
+            icon={<AudioWaveform size={14} />}
+            title="Pitch (Yarım ton)"
+            value={pitch === 0 ? "Normal" : `${pitch > 0 ? "+" : ""}${pitch}`}
+          >
+            <input
+              type="range"
+              min={-12}
+              max={12}
+              step={1}
+              value={pitch}
+              onChange={(e) => setPitch(Number(e.target.value))}
+              className="w-full accent-[#19b35c]"
+            />
+          </EffectCard>
+
+          <button
+            onClick={() => setShowEq((v) => !v)}
+            className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-4 hover:bg-[#141414] transition-colors text-left"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 text-white text-[12px] font-semibold">
+                <SlidersHorizontal size={14} />
+                6-Band EQ
+              </div>
+              <span className="text-[#888] text-[11px]">
+                {eqGains.some((g) => g !== 0)
+                  ? "Aktif"
+                  : showEq
+                    ? "Gizle"
+                    : "Aç"}
+              </span>
+            </div>
+            <p className="text-[#666] text-[11px]">Bas/Mid/Treble dengeleme</p>
+          </button>
         </div>
+
+        {/* 6-band EQ panel */}
+        {showEq && (
+          <div className="rounded-xl border border-[#1a1a1a] bg-[#0f0f0f] p-5 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white text-[13px] font-semibold flex items-center gap-2">
+                <SlidersHorizontal size={14} />
+                6-Band Parametric EQ
+              </h3>
+              <button
+                onClick={() => setEqGains([0, 0, 0, 0, 0, 0])}
+                className="text-[#888] hover:text-white text-[11px] flex items-center gap-1"
+              >
+                <RotateCcw size={11} />
+                Sıfırla
+              </button>
+            </div>
+            <div className="grid grid-cols-6 gap-3">
+              {EQ_BANDS.map((band, idx) => (
+                <div
+                  key={band.label}
+                  className="flex flex-col items-center gap-2"
+                >
+                  <span className="text-[#888] text-[10px] tabular-nums">
+                    {eqGains[idx] > 0 ? "+" : ""}
+                    {eqGains[idx]}dB
+                  </span>
+                  <input
+                    type="range"
+                    min={-12}
+                    max={12}
+                    step={1}
+                    value={eqGains[idx]}
+                    onChange={(e) => {
+                      const next = [...eqGains];
+                      next[idx] = Number(e.target.value);
+                      setEqGains(next);
+                    }}
+                    className="h-32 accent-[#19b35c]"
+                    style={{
+                      writingMode: "vertical-lr" as never,
+                      WebkitAppearance: "slider-vertical",
+                    }}
+                  />
+                  <span className="text-white text-[10px] font-semibold">
+                    {band.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -614,4 +755,41 @@ function writeStr(view: DataView, offset: number, str: string) {
   for (let i = 0; i < str.length; i++) {
     view.setUint8(offset + i, str.charCodeAt(i));
   }
+}
+
+/**
+ * 6-band parametric EQ:
+ * - Band 0: Low-shelf @ 80Hz   (sub-bass)
+ * - Band 1: Peaking @ 200Hz    (bass)
+ * - Band 2: Peaking @ 800Hz    (low-mid)
+ * - Band 3: Peaking @ 2.5kHz   (mid/presence)
+ * - Band 4: Peaking @ 6kHz     (high-mid)
+ * - Band 5: High-shelf @ 12kHz (treble)
+ */
+const EQ_BANDS: Array<{
+  label: string;
+  freq: number;
+  type: BiquadFilterType;
+  q: number;
+}> = [
+  { label: "80 Hz", freq: 80, type: "lowshelf", q: 1 },
+  { label: "200 Hz", freq: 200, type: "peaking", q: 1 },
+  { label: "800 Hz", freq: 800, type: "peaking", q: 1 },
+  { label: "2.5 kHz", freq: 2500, type: "peaking", q: 1 },
+  { label: "6 kHz", freq: 6000, type: "peaking", q: 1 },
+  { label: "12 kHz", freq: 12000, type: "highshelf", q: 1 },
+];
+
+function buildEqChain(
+  ctx: BaseAudioContext,
+  gains: number[],
+): BiquadFilterNode[] {
+  return EQ_BANDS.map((band, idx) => {
+    const node = ctx.createBiquadFilter();
+    node.type = band.type;
+    node.frequency.value = band.freq;
+    node.Q.value = band.q;
+    node.gain.value = gains[idx] ?? 0;
+    return node;
+  });
 }

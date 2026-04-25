@@ -127,6 +127,10 @@ export async function ensureSchema() {
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS stems_data JSONB`,
     // WAV (HD) format dönüşüm URL'si
     sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS wav_url TEXT`,
+    // Music video MP4 URL'si
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS mp4_url TEXT`,
+    // Suno word-level timestamped lyrics (karaoke için)
+    sql`ALTER TABLE songs ADD COLUMN IF NOT EXISTS timestamped_lyrics JSONB`,
   ]) {
     try {
       await stmt;
@@ -472,6 +476,7 @@ export async function failTaskAndRefund(
       "stems-separate": "stems_separate",
       "stems-split": "stems_split",
       wav: "wav_convert",
+      mp4: "wav_convert", // ücretsiz, refund yok ama mapping olsun
     };
     const tp = await getTaskPayload(taskId);
     if (!tp?.userId || !tp.endpoint) return;
@@ -855,6 +860,20 @@ export async function saveSongWavUrl(
     console.log(`[db] song=${songId} wav_url saved`);
   } catch (e) {
     console.error("[db] saveSongWavUrl hatası:", e);
+  }
+}
+
+/** Music video MP4 URL'sini şarkıya kaydet. */
+export async function saveSongMp4Url(
+  songId: string,
+  mp4Url: string,
+): Promise<void> {
+  try {
+    await ensureSchema();
+    await sql`UPDATE songs SET mp4_url = ${mp4Url} WHERE id = ${songId}`;
+    console.log(`[db] song=${songId} mp4_url saved`);
+  } catch (e) {
+    console.error("[db] saveSongMp4Url hatası:", e);
   }
 }
 
