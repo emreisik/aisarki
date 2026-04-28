@@ -134,13 +134,12 @@ export interface GenrePreset {
 
 // ── Default Suno parametreleri ───────────────────────────────────────────────
 
-/** Her isteğe eklenen anti-anglo negative tag baseline */
+/** Her isteğe eklenen anti-anglo negative tag baseline (Suno limit ~200 char) */
 export const DEFAULT_NEGATIVE_TAGS =
-  "western pop, american pop, k-pop, latin music, autotune, synthetic vocal, robotic voice, anglo accent, english pronunciation, generic edm, mumble rap, flat i-vowel merging";
+  "western pop, autotune, anglo accent, english pronunciation";
 
-/** Türk vokal kalite ipuçları — pozitif quality markers (sanatçı adı yok) */
-export const TURKISH_QUALITY_MARKERS =
-  "natural authentic Turkish vocals, real organic instruments, genuine emotional voice, warm analog tone, not autotuned, professional studio production, authentic Turkish pronunciation with proper diacritics, clear Turkish diction, no Anglo accent";
+/** Türk vokal kalite ipuçları — kısa ve net (Suno style limit ~200 char) */
+export const TURKISH_QUALITY_MARKERS = "natural Turkish vocals";
 
 /**
  * Suno'nun Türkçe telaffuzunu iyileştirmek için fonetik ipuçları.
@@ -899,8 +898,14 @@ export function applyRegionalLehce(text: string, regionId: RegionId): string {
  * sterilize eder. Export edilir; generate/wizard-generate route'ları da
  * kullanıcı input'unu buradan geçirir.
  */
+/**
+ * Suno style alanı için hard limit. V5/V5.5 ~200 char istiyor; üzeri 400 reject.
+ * Limit aşılırsa virgülle ayrılmış parçalardan SON parçaları at (önemli olan baştadır).
+ */
+const SUNO_STYLE_MAX = 180;
+
 export function sanitizeSunoStyle(style: string): string {
-  return style
+  const cleaned = style
     .replace(/\buzun hava\b/gi, "free rhythm folk improvisation")
     .replace(/\broman hava[sı]?\b/gi, "Romani dance")
     .replace(/\boyun hava[sı]?\b/gi, "folk dance")
@@ -909,6 +914,39 @@ export function sanitizeSunoStyle(style: string): string {
     .replace(/,\s*,/g, ",")
     .replace(/\s{2,}/g, " ")
     .trim();
+  if (cleaned.length <= SUNO_STYLE_MAX) return cleaned;
+  // Comma-separated parçalardan dolduğu kadar al, gerisi düşsün
+  const parts = cleaned
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const kept: string[] = [];
+  let len = 0;
+  for (const p of parts) {
+    const next = len === 0 ? p.length : len + 2 + p.length;
+    if (next > SUNO_STYLE_MAX) break;
+    kept.push(p);
+    len = next;
+  }
+  return kept.join(", ");
+}
+
+/** NegativeTags için aynı budget — Suno ~200 char limit */
+const SUNO_NEGATIVE_MAX = 180;
+export function sanitizeNegativeTags(tags: string): string {
+  const parts = tags
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const kept: string[] = [];
+  let len = 0;
+  for (const p of parts) {
+    const next = len === 0 ? p.length : len + 2 + p.length;
+    if (next > SUNO_NEGATIVE_MAX) break;
+    kept.push(p);
+    len = next;
+  }
+  return kept.join(", ");
 }
 
 export function buildSunoStyle(input: {
@@ -948,7 +986,7 @@ export function buildNegativeTags(input: {
       .map((s) => s.trim())
       .filter(Boolean),
   );
-  return Array.from(unique).join(", ");
+  return sanitizeNegativeTags(Array.from(unique).join(", "));
 }
 
 /** Birleşik style weight + weirdness — artist > genre > default */

@@ -353,8 +353,12 @@ Başlık:`;
         era,
         styleLen: finalStyle.length,
         promptLen: finalPrompt.length,
+        negativeTagsLen: kbNegativeTags.length,
         hasLyrics,
         useCustomMode,
+        // İlk 80 karakter — sade ve net olmasını doğrulamak için
+        stylePreview: finalStyle.slice(0, 80),
+        negPreview: kbNegativeTags.slice(0, 80),
       }),
     );
 
