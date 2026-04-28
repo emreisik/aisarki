@@ -351,33 +351,98 @@ Başlık:`;
     ] as GenreId[]);
     const isFolk = validGenreId && FOLK_GENRES.has(validGenreId);
 
+    // ── Folk performance directive bloğu — Suno'yu folk interpretation'a kilitle ──
+    // Suno V5+ batılı model: "Turkish folk" terimini iyi anlamıyor. Çözüm:
+    // 1. Western anchor (rebetiko, Celtic ballad) → tanıdık referans
+    // 2. Specific instruments (saz, kaval) → enstrümantasyonu zorla
+    // 3. Tempo + Mood → duygu ve hız Suno'ya açıkça gider
+    // 4. Region varsa rhythm hint (7/8 horon, 9/8 zeybek) → ritmik karakter
     let folkPerformanceHeader = "";
     let folkStyleAddon = "";
     if (isFolk) {
-      // Suno docs: bracketed performance directives lyrics başında çok etkili
+      const moodEnglish = MOOD_EMOTION_LABELS[mood] || "deep emotional";
+      const moodMap: Record<string, string> = {
+        Hüzün: "deep longing, hasret melancholy, mournful soul",
+        Sevinç: "warm joy, hopeful brightness, celebratory",
+        Aşk: "passionate longing, deep love, devotional",
+        Yalnızlık: "solitary contemplation, lonely night, isolated",
+        Gurur: "proud dignified, defiant strength",
+        Özlem: "deep nostalgia, hasret yearning, missing home",
+        Hasret: "deep longing, missing the beloved, painful absence",
+        Vuslat: "reunion bliss, fulfilled love",
+        Tövbe: "repentant sorrow, spiritual seeking",
+        Hayranlık: "awe-struck reverence",
+      };
+      const moodCue = moodMap[moodEnglish] || moodEnglish;
+
+      const regionRhythmHint = validRegionId
+        ? validRegionId === "karadeniz"
+          ? "7/8 horon rhythm, fast"
+          : validRegionId === "ege"
+            ? "9/8 zeybek rhythm, slow heavy"
+            : validRegionId === "ic_anadolu"
+              ? "free rhythm rubato, sparse"
+              : validRegionId === "trakya"
+                ? "9/8 aksak Romani rhythm"
+                : validRegionId === "doğu"
+                  ? "halay rhythm with free improvisation"
+                  : "traditional folk meter"
+        : "free rhythm rubato";
+
       const tempo =
         validGenreId === "halk_turku"
-          ? "60-80 BPM, slow rubato"
-          : "70-90 BPM, contemplative";
+          ? validRegionId === "karadeniz"
+            ? "140 BPM, fast horon"
+            : validRegionId === "ege"
+              ? "85 BPM, heavy zeybek"
+              : "70 BPM, slow rubato"
+          : validGenreId === "ilahi_sufi"
+            ? "75 BPM, contemplative"
+            : "85 BPM, ottoman classical";
+
+      // Western anchor — Suno'nun gerçekten anladığı dil
+      const westernAnchor =
+        validGenreId === "halk_turku"
+          ? "Greek rebetiko meets Balkan folk ballad, Celtic mountain folk vibe"
+          : validGenreId === "ilahi_sufi"
+            ? "Sufi devotional meditative, Gregorian-like sustained"
+            : "Persian classical, refined Ottoman maqam";
+
+      const instruments =
+        validGenreId === "halk_turku"
+          ? "solo saz (bağlama Turkish lute), kaval flute, sparse acoustic, no electronic"
+          : validGenreId === "ilahi_sufi"
+            ? "ney flute, kanun, daf frame drum, no rhythm section"
+            : "ud, kanun, kemençe, classical strings";
+
       const vocalCue =
         validGenreId === "halk_turku"
-          ? "[melismatic Turkish folk vocals, traditional ornamentation, çatlatma breaks, uzun nağme phrasing]"
+          ? "powerful melismatic male vocal with çatlatma cracks, traditional Anatolian folk ornamentation, uzun nağme phrasing, raw emotional"
           : validGenreId === "ilahi_sufi"
-            ? "[devotional melismatic vocals, deep meditative phrasing, sustained notes]"
-            : "[classical Ottoman melismatic vocals, refined ornamentation, breathy emotional control]";
-      folkPerformanceHeader = `${vocalCue}\n[Tempo: ${tempo}]\n\n`;
-      // Style budget kritik — folk için bu vocal cue ÖNCELİK alsın (180 char hard cap)
+            ? "devotional melismatic vocals, deep meditative phrasing, sustained notes, breathing pauses"
+            : "classical Ottoman melismatic vocals, refined ornamentation, breathy emotional control";
+
+      // Suno docs: lyrics başında bracketed directive bloğu çok güçlü
+      folkPerformanceHeader =
+        `[Genre: Turkish ${validGenreId === "halk_turku" ? "Anatolian folk türkü" : validGenreId === "ilahi_sufi" ? "Sufi ilahi devotional" : "classical TSM"}]\n` +
+        `[Style: ${westernAnchor}]\n` +
+        `[Instruments: ${instruments}]\n` +
+        `[Vocals: ${vocalCue}]\n` +
+        `[Tempo: ${tempo}, ${regionRhythmHint}]\n` +
+        `[Mood: ${moodCue}]\n\n`;
+
+      // Style addon — sanitize 180'e kırpınca KRİTİK cue korunsun (öncelikli)
       folkStyleAddon =
         validGenreId === "halk_turku"
-          ? "melismatic Turkish folk vocals, slow rubato"
+          ? "Anatolian Turkish folk türkü, melismatic male vocal, solo saz"
           : validGenreId === "ilahi_sufi"
-            ? "devotional melismatic vocals, slow"
-            : "classical Ottoman vocals, melismatic";
+            ? "Turkish Sufi ilahi devotional, ney flute, melismatic vocal"
+            : "Turkish classical TSM ottoman, melismatic, ud kanun";
     }
 
     const hasLyrics = sunoOpt.optimizedLyrics.trim().length > 0;
-    // Folk için lyrics başına performance directive bloğu yerleştir.
-    // Bu Suno'nun melodic/melismatic interpretation'ına geçmesini sağlıyor.
+    // Folk için lyrics başına zengin performance directive bloğu yerleştir.
+    // Bu Suno'yu folk interpretation'a kilitliyor (pop'a kaymasın).
     const lyricsWithDirectives =
       hasLyrics && isFolk
         ? folkPerformanceHeader + sunoOpt.optimizedLyrics
@@ -405,7 +470,30 @@ Başlık:`;
     ]);
     const validatedModel =
       bodyModel && ALLOWED_MODELS.has(bodyModel) ? bodyModel : undefined;
-    const model = validatedModel ?? (artistId ? "V5" : "V4_5ALL");
+    // Folk için V5/V5.5 batılı pop'a kayıyor — V4_5ALL Türk müziğinde çok daha
+    // tutarlı sonuçlar veriyor. Model seçimi önceliği: kullanıcı seçimi > folk
+    // kuralı > artist preset > default.
+    const model =
+      validatedModel ?? (isFolk ? "V4_5ALL" : artistId ? "V5" : "V4_5ALL");
+
+    // Folk için styleWeight'i sıkı tut — Suno style'a daha bağlı kalsın,
+    // weirdness'i düşür — ortodoks folk yorumlama
+    const finalStyleWeight = isFolk
+      ? Math.max(0.85, kbParams.styleWeight)
+      : kbParams.styleWeight;
+    const finalWeirdness = isFolk
+      ? Math.min(0.15, kbParams.weirdnessConstraint)
+      : kbParams.weirdnessConstraint;
+
+    // Folk için negativeTags'i agresifleştir — pop/electronic kaymasını engelle
+    const finalNegativeTags = isFolk
+      ? `${kbNegativeTags}, pop production, electronic drums, modern beat, club music, EDM, trap, autotune, synth pad`
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s, i, a) => s && a.indexOf(s) === i)
+          .join(", ")
+          .slice(0, 180)
+      : kbNegativeTags;
 
     const callBackUrl = getCallbackUrl(request);
 
@@ -415,9 +503,9 @@ Başlık:`;
       model,
       prompt: finalPrompt,
       callBackUrl,
-      negativeTags: kbNegativeTags,
-      styleWeight: kbParams.styleWeight,
-      weirdnessConstraint: kbParams.weirdnessConstraint,
+      negativeTags: finalNegativeTags,
+      styleWeight: finalStyleWeight,
+      weirdnessConstraint: finalWeirdness,
       ...(useCustomMode ? { style: finalStyle } : {}),
       ...(generatedTitle ? { title: generatedTitle } : {}),
       ...(finalVocalGender ? { vocalGender: finalVocalGender } : {}),
