@@ -201,7 +201,50 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join("; ");
 
-    const lyricsSystemPrompt = `Sen dünya çapında bir Türk müzik sözü yazarısın. Her tarzda profesyonel, söylenebilir, duygusal derinliği olan sözler yazarsın.
+    // Folk/türkü için ayrı sade prompt — over-engineered kurallar yerine
+    // melodik söylenebilirlik ve duygu öncelikli. Suno'nun "okuma" yapmasını
+    // engellemek için kısa satır + uzun sesli ile biten kelime + tekrarlı hook.
+    const FOLK_GENRE_IDS = new Set(["halk_turku", "ilahi_sufi", "tsm"]);
+    const isFolkPrompt = validGenreId && FOLK_GENRE_IDS.has(validGenreId);
+
+    const lyricsSystemPrompt = isFolkPrompt
+      ? `Sen Anadolu türkü geleneğinde söz yazan bir ozansın. Sade, duygusal, söylenebilir türkü sözleri yazarsın.
+
+⛔ Gerçek sanatçı adı kullanma.
+⛔ Şehirli/teknolojik kelimeler kullanma.
+⛔ Karmaşık edebi süs yapma — toprak gibi sade ol.
+
+═══ TÜRKÜ KURALLARI ═══
+
+KISA SATIRLAR: 7-11 hece arası. Her satır kısa, akıcı, nefessiz söylenebilir olsun.
+
+NAĞMELİ SATIRLAR: Her satır mümkünse uzun sesliyle bitsin (-a, -e, -ı, -i, -o, -u, -ü, -ım, -ın). Suno'nun melisma yapması için. Örnek:
+✓ "Dağların ardında yârim a"  (uzun a ile biter, melodik)
+✗ "Dağlarda yârim var benim"  (kapalı, düz okunur)
+
+SADE DİL: Halk dili — "yâri", "gönül", "garip", "kara gözlüm", "dağlar", "yayla", "dere". Ozanca sen dili.
+
+YAPI:
+[Verse 1] — 4 kısa satır, manzara/sahne (dağ, dere, yayla, sabah)
+[Verse 2] — 4 satır, duyguyu derinleştir
+[Chorus] — 2-3 satır, akılda kalıcı, kısa, ses ses tekrarla
+[Verse 3] — 4 satır, kabullenme/sonuç
+[Outro] — 2 satır, sessiz kapanış
+
+KAFİYE: Doğal, zorlamasız. Anlamı feda etme. abab veya cccb şeması.
+
+DUYGU: Tek bir duygu yoğunlaşsın (özlem, hasret, vuslat, kabullenme). Çatlak ses, içten yakarış hissi ver — ama abartma.
+
+═══ FORMAT ═══
+
+Bölümleri köşeli parantezle başlat: [Verse 1], [Chorus] gibi.
+Bölümler arasında boş satır bırak.
+Satır başında noktalama işareti kullanma.
+Türkçe diyakritikleri eksiksiz kullan (ç, ğ, ı, ö, ş, ü).
+Chorus'u her tekrarda BİREBİR aynı yaz.
+
+Sadece sözleri yaz — açıklama, başlık veya yorum ekleme.`
+      : `Sen dünya çapında bir Türk müzik sözü yazarısın. Her tarzda profesyonel, söylenebilir, duygusal derinliği olan sözler yazarsın.
 
 ⛔ KRİTİK: Gerçek sanatçı/şarkıcı adı KULLANMA.
 ⛔ KLİŞE YASAK: Şu kalıpları ASLA kullanma: ${clicheList}
@@ -297,20 +340,59 @@ Başlık:`;
       genreId: validGenreId,
     });
 
+    // ── Türkü/folk genre detect — vokal "okuma" sorununu çözmek için ──
+    // Suno türkü için melismatic vocal + slow tempo + traditional ornamentation
+    // cue'ları olmadan default olarak hızlı/düz okuyor. Lyrics ve style'a
+    // folk-specific performance directive enjekte ediyoruz.
+    const FOLK_GENRES: Set<GenreId> = new Set([
+      "halk_turku",
+      "ilahi_sufi",
+      "tsm",
+    ] as GenreId[]);
+    const isFolk = validGenreId && FOLK_GENRES.has(validGenreId);
+
+    let folkPerformanceHeader = "";
+    let folkStyleAddon = "";
+    if (isFolk) {
+      // Suno docs: bracketed performance directives lyrics başında çok etkili
+      const tempo =
+        validGenreId === "halk_turku"
+          ? "60-80 BPM, slow rubato"
+          : "70-90 BPM, contemplative";
+      const vocalCue =
+        validGenreId === "halk_turku"
+          ? "[melismatic Turkish folk vocals, traditional ornamentation, çatlatma breaks, uzun nağme phrasing]"
+          : validGenreId === "ilahi_sufi"
+            ? "[devotional melismatic vocals, deep meditative phrasing, sustained notes]"
+            : "[classical Ottoman melismatic vocals, refined ornamentation, breathy emotional control]";
+      folkPerformanceHeader = `${vocalCue}\n[Tempo: ${tempo}]\n\n`;
+      // Style budget kritik — folk için bu vocal cue ÖNCELİK alsın (180 char hard cap)
+      folkStyleAddon =
+        validGenreId === "halk_turku"
+          ? "melismatic Turkish folk vocals, slow rubato"
+          : validGenreId === "ilahi_sufi"
+            ? "devotional melismatic vocals, slow"
+            : "classical Ottoman vocals, melismatic";
+    }
+
     const hasLyrics = sunoOpt.optimizedLyrics.trim().length > 0;
-    // customMode'da quality markers zaten style'da (buildSunoStyle ekliyor)
-    // prompt alanı sadece lyrics veya konu metni içermeli
+    // Folk için lyrics başına performance directive bloğu yerleştir.
+    // Bu Suno'nun melodic/melismatic interpretation'ına geçmesini sağlıyor.
+    const lyricsWithDirectives =
+      hasLyrics && isFolk
+        ? folkPerformanceHeader + sunoOpt.optimizedLyrics
+        : sunoOpt.optimizedLyrics;
+
     const finalPrompt = isInstrumental
       ? ""
       : hasLyrics
-        ? sunoOpt.optimizedLyrics
+        ? lyricsWithDirectives
         : topicText;
     const useCustomMode = hasLyrics || isInstrumental;
 
-    // Style'a Suno boost ekle (bölgesel tavır, makam scale, genre anchor).
-    // Sanitize — Türkçe compound'lar ("oyun havası" vb.) Suno filtresi tetikler.
+    // Style — folk addon ÖN PLANDA (sanitize 180'e kırpınca kritik cue korunsun)
     const finalStyle = sanitizeSunoStyle(
-      sunoOpt.styleBoost ? `${kbStyle}, ${sunoOpt.styleBoost}` : kbStyle,
+      [folkStyleAddon, kbStyle, sunoOpt.styleBoost].filter(Boolean).join(", "),
     );
 
     const ALLOWED_MODELS = new Set([
