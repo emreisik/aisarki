@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { localizeApiError } from "@/lib/sunoErrors";
@@ -103,7 +104,12 @@ export default function LyricsWizardModal({
     onClose();
   };
 
-  return (
+  // Portal: parent stacking context'inden kaçmak için modal'ı document.body'e
+  // render et. Aksi halde transform/filter/will-change kullanan parent'lar
+  // modal'ın z-index'ini ezebiliyor (workspace row'ları üste çıkıyordu).
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -251,6 +257,7 @@ export default function LyricsWizardModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
