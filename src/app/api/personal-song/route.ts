@@ -255,27 +255,64 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = (await request.json()) as {
-      freeText: string;
+      // Yol 1: Doğal dil — Claude ile parse edilir
+      freeText?: string;
+      // Yol 2: Structured input — direkt occasion template'i kullanılır
+      // (anasayfa modal'ından gelen form bu yolu kullanır, intent extraction atlanır)
+      direct?: {
+        occasion: OccasionId;
+        isim?: string;
+        ikinci_isim?: string;
+        iliski?: string;
+        yas?: number;
+        detay?: string;
+        duygu_tonu?: string;
+      };
       genre?: GenreId;
       model?: string;
     };
-    const { freeText, genre: overrideGenre, model: bodyModel } = body;
+    const { freeText, direct, genre: overrideGenre, model: bodyModel } = body;
 
-    if (!freeText || freeText.trim().length === 0) {
+    let intent: ExtractedIntent;
+    let originalUserPrompt: string;
+
+    if (direct && direct.occasion && direct.occasion in OCCASIONS) {
+      // Form'dan gelen structured veri — intent extraction'a gerek yok
+      intent = {
+        occasion: direct.occasion,
+        isim: direct.isim?.trim() || null,
+        ikinci_isim: direct.ikinci_isim?.trim() || null,
+        iliski: direct.iliski?.trim() || null,
+        yas: typeof direct.yas === "number" ? direct.yas : null,
+        detay: direct.detay?.trim() || null,
+        duygu_tonu: direct.duygu_tonu || OCCASIONS[direct.occasion].defaultMood,
+        onerilen_genre: null,
+      };
+      // Suno task'ında prompt olarak kaydedilecek özet (DB için)
+      originalUserPrompt = [
+        `${OCCASIONS[direct.occasion].label}`,
+        intent.isim ? `· ${intent.isim}` : "",
+        intent.detay ? `: ${intent.detay}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+    } else if (freeText && freeText.trim().length > 0) {
+      if (freeText.length > 1500) {
+        return NextResponse.json(
+          { error: "Açıklama çok uzun, 1500 karakteri geçmesin" },
+          { status: 400 },
+        );
+      }
+      // Doğal dil yolu — Claude ile parse
+      intent = await extractIntent(freeText.trim());
+      originalUserPrompt = freeText.trim();
+    } else {
       return NextResponse.json(
-        { error: "Şarkı için bir açıklama yazman gerekiyor" },
+        { error: "Şarkı için bir açıklama veya seçim gerekli" },
         { status: 400 },
       );
     }
-    if (freeText.length > 1500) {
-      return NextResponse.json(
-        { error: "Açıklama çok uzun, 1500 karakteri geçmesin" },
-        { status: 400 },
-      );
-    }
 
-    // ── 1. Intent extraction ──
-    const intent = await extractIntent(freeText.trim());
     const occasion = OCCASIONS[intent.occasion] || OCCASIONS.genel;
 
     // ── 2. Genre seçimi: override > Claude önerisi > occasion default ──
@@ -330,7 +367,7 @@ export async function POST(request: NextRequest) {
     if (process.env.ANTHROPIC_API_KEY) {
       try {
         const titleSystemPrompt = `Kısa, şiirsel Türkçe şarkı başlığı üret. Maksimum 5 kelime. Sadece başlığı yaz, hiçbir açıklama yapma. Tırnak işareti kullanma.`;
-        const titleUser = `Vesile: ${occasion.label}\nKişi: ${intent.isim || "—"}\nKonu: ${intent.detay || freeText.slice(0, 100)}\n\nBaşlık:`;
+        const titleUser = `Vesile: ${occasion.label}\nKişi: ${intent.isim || "—"}\nKonu: ${intent.detay || originalUserPrompt.slice(0, 100)}\n\nBaşlık:`;
 
         const lyricsSystemPrompt = `Sen Türkçe şarkı sözü yazan profesyonel bir söz yazarısın. Sade, içten, söylenebilir, duygusal sözler yazarsın.
 
@@ -391,12 +428,12 @@ Sadece sözleri yaz — açıklama, başlık, yorum YOK.`;
         console.error("[personal-song] Claude failed:", e);
         generatedTitle = intent.isim
           ? `${intent.isim}'in Şarkısı`
-          : freeText.slice(0, 30);
+          : originalUserPrompt.slice(0, 30);
       }
     } else {
       generatedTitle = intent.isim
         ? `${intent.isim}'in Şarkısı`
-        : freeText.slice(0, 30);
+        : originalUserPrompt.slice(0, 30);
     }
 
     // ── 5. Style + performance header ──
@@ -424,7 +461,7 @@ Sadece sözleri yaz — açıklama, başlık, yorum YOK.`;
     // Suno limitleri
     const SUNO_NON_CUSTOM = 500;
     const SUNO_CUSTOM = 4500;
-    const rawPrompt = hasLyrics ? lyricsWithDirectives : freeText.trim();
+    const rawPrompt = hasLyrics ? lyricsWithDirectives : originalUserPrompt;
     const finalPrompt = useCustomMode
       ? rawPrompt.length > SUNO_CUSTOM
         ? rawPrompt.slice(0, SUNO_CUSTOM)
@@ -511,7 +548,7 @@ Sadece sözleri yaz — açıklama, başlık, yorum YOK.`;
       if (taskId) {
         saveProcessingTask(
           taskId,
-          freeText.trim(),
+          originalUserPrompt,
           session.user.id,
           { ...body, intent } as unknown as Record<string, unknown>,
           "music",
@@ -533,7 +570,7 @@ Sadece sözleri yaz — açıklama, başlık, yorum YOK.`;
     if (taskId) {
       saveProcessingTask(
         taskId,
-        freeText.trim(),
+        originalUserPrompt,
         session.user.id,
         { ...body, intent } as unknown as Record<string, unknown>,
         "music",

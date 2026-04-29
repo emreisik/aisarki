@@ -47,6 +47,7 @@ import { localizeApiError } from "@/lib/sunoErrors";
 import { Song, Playlist } from "@/types";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { useUpload } from "@/contexts/UploadContext";
+import PersonalSongModal from "@/components/PersonalSongModal";
 import { useSession } from "next-auth/react";
 import { useLikedIds } from "@/hooks/useLikedIds";
 
@@ -1501,8 +1502,52 @@ export default function HomePage() {
   const { setPending: setPendingUpload, openRecord } = useUpload();
   const heroFileInputRef = useRef<HTMLInputElement>(null);
 
-  // İlham veren ipucu kartları — tıklayınca textarea'ya yapışır
-  // Kullanıcı yazmakta zorlanmasın diye 8 hazır örnek (en sık kullanım vesileleri)
+  // Vesile kartları — anasayfada büyük grid olarak gösterilir.
+  // Her kart tıklanınca PersonalSongModal açılır, kullanıcı 2-3 alan
+  // doldurup şarkıyı oluşturur.
+  type OccasionCardId =
+    | "dogum_gunu"
+    | "anneler_gunu"
+    | "yil_donumu"
+    | "babalar_gunu"
+    | "sevgililer_gunu"
+    | "bebek_hosgeldin"
+    | "asker_ugurlama"
+    | "dugun_nisan"
+    | "ninni";
+  const OCCASION_CARDS: Array<{
+    id: OccasionCardId;
+    icon: string;
+    label: string;
+    desc: string;
+  }> = [
+    { id: "dogum_gunu", icon: "🎂", label: "Doğum Günü", desc: "Adıyla özel" },
+    { id: "anneler_gunu", icon: "👩", label: "Anneye", desc: "Sıcak duygular" },
+    {
+      id: "yil_donumu",
+      icon: "💍",
+      label: "Yıldönümü",
+      desc: "Birlikte yıllar",
+    },
+    { id: "babalar_gunu", icon: "👨", label: "Babaya", desc: "Minnet dolu" },
+    { id: "sevgililer_gunu", icon: "❤️", label: "Sevgiliye", desc: "Romantik" },
+    { id: "bebek_hosgeldin", icon: "👶", label: "Bebeğe", desc: "Hoşgeldin" },
+    { id: "dugun_nisan", icon: "👰", label: "Düğün", desc: "İki isim" },
+    {
+      id: "asker_ugurlama",
+      icon: "🪖",
+      label: "Askere",
+      desc: "Sağ salim dön",
+    },
+    { id: "ninni", icon: "🌙", label: "Ninni", desc: "Yumuşak uyutucu" },
+  ];
+
+  const [pickedOccasion, setPickedOccasion] = useState<OccasionCardId | null>(
+    null,
+  );
+
+  // ESKİ ipucu chip'leri — şu an kullanılmıyor (vesile grid'i tarafından
+  // değiştirildi) ama serbest yazma eski varyantlar için referans olarak duruyor.
   const HERO_HINTS: Array<{ icon: string; label: string; sample: string }> = [
     {
       icon: "🎂",
@@ -1799,142 +1844,67 @@ export default function HomePage() {
             onChange={handleHeroFilePick}
           />
 
-          {/* Suno input bar */}
-          <div className="relative w-full max-w-[560px] bg-[#1a1a1a]/90 backdrop-blur-xl rounded-[16px] border border-[#2a2a2a]">
-            {/* Üst — textarea */}
-            <textarea
-              value={heroPrompt}
-              onChange={(e) => setHeroPrompt(e.target.value)}
-              placeholder={PLACEHOLDERS[placeholderIdx]}
-              rows={2}
-              className="w-full bg-transparent px-[16px] pt-[14px] pb-[4px] text-white text-[15px] placeholder-[#555] focus:outline-none resize-none leading-[22px]"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && heroPrompt.trim()) {
-                  e.preventDefault();
-                  submitHero();
-                }
-              }}
-            />
+          {/* ── Vesile Grid'i — anasayfanın asıl giriş noktası ──
+              Kullanıcı kart'a tıklar → modal açılır → 2-3 alan doldurur →
+              kişiselleştirilmiş şarkı backend tarafında otomatik üretilir.
+              Üç tıkla "Serra için doğum günü şarkısı" hazır. */}
+          <p className="text-[#bbb] text-[14px] md:text-[15px] text-center mb-5 max-w-[520px] leading-relaxed">
+            Kime şarkı yapmak istiyorsun? Bir vesile seç, gerisini biz
+            halledelim.
+          </p>
 
-            {/* Alt — butonlar */}
-            <div className="flex items-center justify-between px-[10px] pb-[10px] pt-[4px]">
-              {/* Sol — + menü */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowPlusMenu((v) => !v)}
-                  className="w-[40px] h-[40px] rounded-full border border-[#3a3a3a] flex items-center justify-center pressable hover:bg-[#2a2a2a] transition-colors"
-                >
-                  <Plus size={18} className="text-[#999]" />
-                </button>
-                {showPlusMenu && (
-                  <div className="absolute bottom-[52px] left-[-4px] bg-[#2a2a2a] rounded-[12px] py-[6px] shadow-2xl shadow-black/60 z-[100] min-w-[170px] border border-[#3a3a3a]">
-                    <button
-                      onClick={() => {
-                        setShowPlusMenu(false);
-                        openRecord();
-                      }}
-                      className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
-                    >
-                      <Mic2 size={16} className="text-[#ccc]" />
-                      <span className="text-white text-[14px] font-medium">
-                        Kayıt
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        heroFileInputRef.current?.click();
-                        setShowPlusMenu(false);
-                      }}
-                      className="flex items-center gap-[10px] px-[14px] py-[10px] hover:bg-[#333] transition-colors w-full text-left pressable"
-                    >
-                      <Upload size={16} className="text-[#ccc]" />
-                      <span className="text-white text-[14px] font-medium">
-                        Yükle
-                      </span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Sağ — rastgele + oluştur */}
-              <div className="flex items-center gap-[8px]">
-                {/* Rastgele buton */}
-                <button
-                  onClick={() => {
-                    const randoms = [
-                      "Enerjik dans şarkısı, yaz havası",
-                      "Hüzünlü arabesk, gece yağmuru",
-                      "Akustik folk, dağ başı, özlem",
-                      "Neşeli pop, arkadaşlarla yolculuk",
-                      "Romantik slow, yıldızlı gece",
-                      "Türkçe rap, sokak hikayesi",
-                      "Sufi ilahi, huzur ve tefekkür",
-                    ];
-                    setHeroPrompt(
-                      randoms[Math.floor(Math.random() * randoms.length)],
-                    );
-                  }}
-                  className="w-[40px] h-[40px] rounded-full border border-[#3a3a3a] flex items-center justify-center pressable hover:bg-[#2a2a2a] transition-colors"
-                  title="Rastgele prompt"
-                >
-                  <Shuffle size={18} className="text-[#999]" />
-                </button>
-
-                {/* Create butonu */}
-                <button
-                  onClick={() => {
-                    const trimmed = heroPrompt.trim();
-                    if (!trimmed) {
-                      router.push("/create");
-                      return;
-                    }
-                    submitHero();
-                  }}
-                  disabled={heroSubmitting}
-                  className="flex items-center gap-[6px] pl-[16px] pr-[20px] py-[10px] rounded-full font-bold text-[14px] text-white pressable active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
-                  style={{
-                    background:
-                      "linear-gradient(45deg, #082122 0%, #295b53 40%, #19b35c 75%, #fcff9a 100%)",
-                  }}
-                >
-                  {heroSubmitting ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      Hazırlanıyor…
-                    </>
-                  ) : (
-                    <>
-                      <Music2 size={15} />
-                      Oluştur
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 gap-3 max-w-[640px] w-full">
+            {OCCASION_CARDS.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setPickedOccasion(c.id)}
+                className="group relative bg-[#161616]/90 backdrop-blur-xl border border-[#1f1f1f] rounded-[18px] p-4 md:p-5 flex flex-col items-center gap-1.5 hover:border-[#19b35c]/40 hover:bg-[#1a1a1a] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] shadow-lg shadow-black/30"
+              >
+                <span className="text-[28px] md:text-[32px] mb-1 group-hover:scale-110 transition-transform">
+                  {c.icon}
+                </span>
+                <span className="text-white text-[13px] md:text-[14px] font-semibold leading-tight">
+                  {c.label}
+                </span>
+                <span className="text-[#666] text-[10px] md:text-[11px] leading-tight">
+                  {c.desc}
+                </span>
+              </button>
+            ))}
           </div>
 
-          {/* İlham veren ipucu kartları — kullanıcı boş textarea'ya bakarken
-              fikir alsın diye. Tıklanınca textarea'ya örnek metin yapışır,
-              kullanıcı isim/detay değiştirip Oluştur'a basar. */}
-          <div className="mt-5 max-w-[640px] mx-auto">
-            <p className="text-[#666] text-[11px] font-semibold uppercase tracking-widest mb-3 text-center">
-              İlham — bir fikre tıkla, üzerine yaz
-            </p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {HERO_HINTS.map((h) => (
-                <button
-                  key={h.label}
-                  onClick={() => setHeroPrompt(h.sample)}
-                  className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/80 border border-[#2a2a2a] text-[#bbb] text-[12px] font-medium hover:bg-[#222] hover:text-white hover:border-[#3a3a3a] transition-colors"
-                >
-                  <span className="text-[14px]">{h.icon}</span>
-                  {h.label}
-                </button>
-              ))}
-            </div>
+          {/* Alternatif: kayıt yap, dosya yükle, gelişmiş — küçük chip satırı */}
+          <div className="flex items-center gap-2 mt-6 flex-wrap justify-center">
+            <button
+              onClick={openRecord}
+              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white transition-colors"
+            >
+              <Mic2 size={12} />
+              Kayıt yap
+            </button>
+            <button
+              onClick={() => heroFileInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white transition-colors"
+            >
+              <Upload size={12} />
+              Dosya yükle
+            </button>
+            <Link
+              href="/create"
+              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white transition-colors"
+            >
+              Gelişmiş seçenekler
+            </Link>
           </div>
         </div>
       </div>
+
+      {/* Vesile modal — kart tıklanınca açılır */}
+      <PersonalSongModal
+        open={pickedOccasion !== null}
+        occasion={pickedOccasion}
+        onClose={() => setPickedOccasion(null)}
+      />
 
       {/* Selamlama hero'ya taşındı */}
 
