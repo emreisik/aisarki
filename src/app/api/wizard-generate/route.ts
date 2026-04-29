@@ -448,12 +448,25 @@ Başlık:`;
         ? folkPerformanceHeader + sunoOpt.optimizedLyrics
         : sunoOpt.optimizedLyrics;
 
-    const finalPrompt = isInstrumental
+    // Suno limit'leri: non-custom 500 char, custom 5000 char.
+    // Lyrics oluşamadıysa (Claude erişilemedi vb.) topicText prompt olur — bunu
+    // kırparak 413 'Prompt too long' hatasını önle.
+    const SUNO_NON_CUSTOM_LIMIT = 500;
+    const SUNO_CUSTOM_LIMIT = 4500;
+
+    const useCustomMode = hasLyrics || isInstrumental;
+    const rawPrompt = isInstrumental
       ? ""
       : hasLyrics
         ? lyricsWithDirectives
         : topicText;
-    const useCustomMode = hasLyrics || isInstrumental;
+    const finalPrompt = useCustomMode
+      ? rawPrompt.length > SUNO_CUSTOM_LIMIT
+        ? rawPrompt.slice(0, SUNO_CUSTOM_LIMIT)
+        : rawPrompt
+      : rawPrompt.length > SUNO_NON_CUSTOM_LIMIT
+        ? rawPrompt.slice(0, SUNO_NON_CUSTOM_LIMIT)
+        : rawPrompt;
 
     // Style — folk addon ÖN PLANDA (sanitize 180'e kırpınca kritik cue korunsun)
     const finalStyle = sanitizeSunoStyle(
