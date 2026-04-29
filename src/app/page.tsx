@@ -38,6 +38,7 @@ import {
   Plus,
   Shuffle,
   Upload,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -1495,20 +1496,94 @@ export default function HomePage() {
   } | null>(null);
   const [inlineInput, setInlineInput] = useState("");
   const [heroPrompt, setHeroPrompt] = useState("");
-  const [heroGenre, setHeroGenre] = useState<string | null>(null);
+  const [heroSubmitting, setHeroSubmitting] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const { setPending: setPendingUpload, openRecord } = useUpload();
   const heroFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Hızlı tarz seçici — chip seçildiğinde wizard akışına yönlendirilir
-  const HERO_GENRES: Array<{ id: string; label: string; mood: string }> = [
-    { id: "halk_turku", label: "Türkü", mood: "huzunlu" },
-    { id: "arabesk", label: "Arabesk", mood: "huzunlu" },
-    { id: "ilahi_sufi", label: "İlahi", mood: "huzurlu" },
-    { id: "sehir_pop", label: "Pop", mood: "romantik" },
-    { id: "rap", label: "Rap", mood: "isyankar" },
-    { id: "akustik", label: "Akustik", mood: "ozlem" },
+  // İlham veren ipucu kartları — tıklayınca textarea'ya yapışır
+  // Kullanıcı yazmakta zorlanmasın diye 8 hazır örnek (en sık kullanım vesileleri)
+  const HERO_HINTS: Array<{ icon: string; label: string; sample: string }> = [
+    {
+      icon: "🎂",
+      label: "Doğum Günü",
+      sample:
+        "Serra için 30. yaş doğum günü şarkısı, kahve sever, mavi gözleri var",
+    },
+    {
+      icon: "👩",
+      label: "Anneye",
+      sample:
+        "Annem Fatma için Anneler Günü şarkısı, her sabah çay demlerdi, en iyi yemekleri o yapardı",
+    },
+    {
+      icon: "💍",
+      label: "Yıldönümü",
+      sample:
+        "Eşim Ayşe için 5. evlilik yıldönümü şarkısı, ilk tanıştığımız kafede hâlâ kahve içiyoruz",
+    },
+    {
+      icon: "👨",
+      label: "Babaya",
+      sample:
+        "Babam için Babalar Günü şarkısı, balık tutmayı öğretti, sessizdi ama hep yanımdaydı",
+    },
+    {
+      icon: "❤️",
+      label: "Sevgiliye",
+      sample:
+        "Sevgilim Burak için sürpriz şarkı, beni güldürmesi, birlikte kahvaltılarımız",
+    },
+    {
+      icon: "👶",
+      label: "Bebeğe",
+      sample: "Yeni doğan kızım Defne için hoşgeldin şarkısı, küçücük elleri",
+    },
+    {
+      icon: "🪖",
+      label: "Askere",
+      sample: "Oğlum Mehmet'in askere uğurlama şarkısı, sağ salim dönsün",
+    },
+    {
+      icon: "🌙",
+      label: "Ninni",
+      sample: "Bebeğim Ela için ninni, yumuşak ve uyutucu",
+    },
   ];
+
+  // Hero submit — direkt /api/personal-song'a fetch + /create'e yönlendir
+  const submitHero = async () => {
+    const trimmed = heroPrompt.trim();
+    if (!trimmed || heroSubmitting) return;
+    setHeroSubmitting(true);
+    try {
+      const res = await fetch("/api/personal-song", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ freeText: trimmed }),
+      });
+      const data = await res.json();
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (res.status === 402) {
+        router.push("/pricing");
+        return;
+      }
+      if (!res.ok) {
+        // Hata olduğunda /create'e prompt'u taşıyalım, kullanıcı orada düzenlesin
+        router.push(`/create?prompt=${encodeURIComponent(trimmed)}&auto=1`);
+        return;
+      }
+      // Başarılı: /create'e yönlendir, workspace task'ı polling ile yakalar
+      router.push("/create");
+    } catch {
+      router.push(`/create?prompt=${encodeURIComponent(trimmed)}&auto=1`);
+    } finally {
+      setHeroSubmitting(false);
+    }
+  };
 
   const handleHeroFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1736,17 +1811,7 @@ export default function HomePage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && heroPrompt.trim()) {
                   e.preventDefault();
-                  const trimmed = heroPrompt.trim();
-                  if (heroGenre) {
-                    const g = HERO_GENRES.find((x) => x.id === heroGenre);
-                    router.push(
-                      `/create?wizardAuto=1&prompt=${encodeURIComponent(trimmed)}&genre=${heroGenre}&mood=${g?.mood ?? "huzunlu"}`,
-                    );
-                  } else {
-                    router.push(
-                      `/create?prompt=${encodeURIComponent(trimmed)}&auto=1`,
-                    );
-                  }
+                  submitHero();
                 }
               }}
             />
@@ -1823,49 +1888,50 @@ export default function HomePage() {
                       router.push("/create");
                       return;
                     }
-                    if (heroGenre) {
-                      const g = HERO_GENRES.find((x) => x.id === heroGenre);
-                      router.push(
-                        `/create?wizardAuto=1&prompt=${encodeURIComponent(trimmed)}&genre=${heroGenre}&mood=${g?.mood ?? "huzunlu"}`,
-                      );
-                    } else {
-                      router.push(
-                        `/create?prompt=${encodeURIComponent(trimmed)}&auto=1`,
-                      );
-                    }
+                    submitHero();
                   }}
-                  className="flex items-center gap-[6px] pl-[16px] pr-[20px] py-[10px] rounded-full font-bold text-[14px] text-white pressable active:scale-95 transition-transform"
+                  disabled={heroSubmitting}
+                  className="flex items-center gap-[6px] pl-[16px] pr-[20px] py-[10px] rounded-full font-bold text-[14px] text-white pressable active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{
                     background:
                       "linear-gradient(45deg, #082122 0%, #295b53 40%, #19b35c 75%, #fcff9a 100%)",
                   }}
                 >
-                  <Music2 size={15} />
-                  Oluştur
+                  {heroSubmitting ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      Hazırlanıyor…
+                    </>
+                  ) : (
+                    <>
+                      <Music2 size={15} />
+                      Oluştur
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Hızlı tarz seçici — chip seçilirse Wizard akışına yönlenir
-              ve orkestra düzenlemesi (intro/ara geçiş/outro) otomatik aktif olur */}
-          <div className="flex flex-wrap gap-2 justify-center mt-4 max-w-[560px]">
-            {HERO_GENRES.map((g) => {
-              const active = heroGenre === g.id;
-              return (
+          {/* İlham veren ipucu kartları — kullanıcı boş textarea'ya bakarken
+              fikir alsın diye. Tıklanınca textarea'ya örnek metin yapışır,
+              kullanıcı isim/detay değiştirip Oluştur'a basar. */}
+          <div className="mt-5 max-w-[640px] mx-auto">
+            <p className="text-[#666] text-[11px] font-semibold uppercase tracking-widest mb-3 text-center">
+              İlham — bir fikre tıkla, üzerine yaz
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {HERO_HINTS.map((h) => (
                 <button
-                  key={g.id}
-                  onClick={() => setHeroGenre(active ? null : g.id)}
-                  className={`px-3 h-8 rounded-full text-[12px] font-semibold border transition-colors ${
-                    active
-                      ? "bg-[#19b35c] text-black border-[#19b35c]"
-                      : "border-[#2a2a2a] text-[#aaa] hover:text-white hover:border-[#3a3a3a]"
-                  }`}
+                  key={h.label}
+                  onClick={() => setHeroPrompt(h.sample)}
+                  className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/80 border border-[#2a2a2a] text-[#bbb] text-[12px] font-medium hover:bg-[#222] hover:text-white hover:border-[#3a3a3a] transition-colors"
                 >
-                  {g.label}
+                  <span className="text-[14px]">{h.icon}</span>
+                  {h.label}
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
       </div>
