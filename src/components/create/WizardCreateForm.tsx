@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,7 +10,7 @@ import {
   Check,
   Sparkles,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCredits } from "@/contexts/CreditsContext";
 import { useToast } from "@/contexts/ToastContext";
 import { localizeApiError } from "@/lib/sunoErrors";
@@ -46,6 +46,7 @@ const STEP_LABELS: Record<Step, string> = {
 
 export default function WizardCreateForm({ model, onTaskStarted }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const { credits, costs, refresh: refreshCredits } = useCredits();
 
@@ -161,6 +162,96 @@ export default function WizardCreateForm({ model, onTaskStarted }: Props) {
       setLoading(false);
     }
   };
+
+  // ── Anasayfa hero'dan gelen ?wizardAuto=1&prompt=...&genre=...&mood=... ──
+  // Genre + mood + theme'i prefill et + otomatik submit (Wizard adımlarını atla)
+  const wizardAutoConsumedRef = useRef(false);
+  useEffect(() => {
+    if (wizardAutoConsumedRef.current) return;
+    if (searchParams.get("wizardAuto") !== "1") return;
+
+    const promptParam = searchParams.get("prompt") || "";
+    const genreParam = searchParams.get("genre") || "";
+    const moodParam = searchParams.get("mood") || "";
+
+    if (!genreParam || !moodParam) return;
+    wizardAutoConsumedRef.current = true;
+
+    // URL'yi temizle
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      ["wizardAuto", "prompt", "genre", "mood"].forEach((k) =>
+        url.searchParams.delete(k),
+      );
+      window.history.replaceState({}, "", url.toString());
+    }
+
+    // State'leri prefill et + otomatik submit
+    setMood(moodParam as WizardMoodId);
+    setGenreId(genreParam as GenreId);
+    setTheme("custom");
+    setThemeText(promptParam);
+    setVocalGender(resolveDefaultVocalGender(genreParam as GenreId));
+
+    if (!hasEnoughCredits) return;
+
+    // State setlerinin oturması için bir mikro-delay sonra submit
+    setLoading(true);
+    setError("");
+    (async () => {
+      try {
+        const body: WizardGenerateRequest = {
+          mood: moodParam as WizardMoodId,
+          genreId: genreParam as GenreId,
+          theme: "custom",
+          themeText: promptParam,
+          vocalGender: resolveDefaultVocalGender(genreParam as GenreId),
+          era: "modern",
+          model,
+        };
+        const res = await fetch("/api/wizard-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.status === 402) {
+          const e = localizeApiError(data, "Kredi yetersiz");
+          toast.error(e.title, e.message);
+          router.push("/pricing");
+          return;
+        }
+        if (!res.ok) {
+          const e = localizeApiError(data, "Hata oluştu");
+          toast.error(e.title, e.message);
+          return;
+        }
+        const taskId = data?.data?.taskId;
+        if (!taskId) {
+          toast.error("Görev başlatılamadı");
+          return;
+        }
+        const selectedGenre = GENRE_CARDS.find((g) => g.id === genreParam);
+        onTaskStarted(
+          taskId,
+          promptParam,
+          `${selectedGenre?.label ?? genreParam}`.slice(0, 50),
+        );
+        // Reset
+        setStep(1);
+        setMood(null);
+        setGenreId(null);
+        setTheme("ask");
+        setThemeText("");
+        refreshCredits();
+      } catch {
+        toast.error("Bağlantı hatası");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, hasEnoughCredits]);
 
   return (
     <div>

@@ -1495,9 +1495,20 @@ export default function HomePage() {
   } | null>(null);
   const [inlineInput, setInlineInput] = useState("");
   const [heroPrompt, setHeroPrompt] = useState("");
+  const [heroGenre, setHeroGenre] = useState<string | null>(null);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const { setPending: setPendingUpload, openRecord } = useUpload();
   const heroFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Hızlı tarz seçici — chip seçildiğinde wizard akışına yönlendirilir
+  const HERO_GENRES: Array<{ id: string; label: string; mood: string }> = [
+    { id: "halk_turku", label: "Türkü", mood: "huzunlu" },
+    { id: "arabesk", label: "Arabesk", mood: "huzunlu" },
+    { id: "ilahi_sufi", label: "İlahi", mood: "huzurlu" },
+    { id: "sehir_pop", label: "Pop", mood: "romantik" },
+    { id: "rap", label: "Rap", mood: "isyankar" },
+    { id: "akustik", label: "Akustik", mood: "ozlem" },
+  ];
 
   const handleHeroFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1725,9 +1736,17 @@ export default function HomePage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && heroPrompt.trim()) {
                   e.preventDefault();
-                  router.push(
-                    `/create?prompt=${encodeURIComponent(heroPrompt.trim())}&auto=1`,
-                  );
+                  const trimmed = heroPrompt.trim();
+                  if (heroGenre) {
+                    const g = HERO_GENRES.find((x) => x.id === heroGenre);
+                    router.push(
+                      `/create?wizardAuto=1&prompt=${encodeURIComponent(trimmed)}&genre=${heroGenre}&mood=${g?.mood ?? "huzunlu"}`,
+                    );
+                  } else {
+                    router.push(
+                      `/create?prompt=${encodeURIComponent(trimmed)}&auto=1`,
+                    );
+                  }
                 }
               }}
             />
@@ -1799,12 +1818,20 @@ export default function HomePage() {
                 {/* Create butonu */}
                 <button
                   onClick={() => {
-                    if (heroPrompt.trim()) {
+                    const trimmed = heroPrompt.trim();
+                    if (!trimmed) {
+                      router.push("/create");
+                      return;
+                    }
+                    if (heroGenre) {
+                      const g = HERO_GENRES.find((x) => x.id === heroGenre);
                       router.push(
-                        `/create?prompt=${encodeURIComponent(heroPrompt.trim())}&auto=1`,
+                        `/create?wizardAuto=1&prompt=${encodeURIComponent(trimmed)}&genre=${heroGenre}&mood=${g?.mood ?? "huzunlu"}`,
                       );
                     } else {
-                      router.push("/create");
+                      router.push(
+                        `/create?prompt=${encodeURIComponent(trimmed)}&auto=1`,
+                      );
                     }
                   }}
                   className="flex items-center gap-[6px] pl-[16px] pr-[20px] py-[10px] rounded-full font-bold text-[14px] text-white pressable active:scale-95 transition-transform"
@@ -1818,6 +1845,27 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Hızlı tarz seçici — chip seçilirse Wizard akışına yönlenir
+              ve orkestra düzenlemesi (intro/ara geçiş/outro) otomatik aktif olur */}
+          <div className="flex flex-wrap gap-2 justify-center mt-4 max-w-[560px]">
+            {HERO_GENRES.map((g) => {
+              const active = heroGenre === g.id;
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => setHeroGenre(active ? null : g.id)}
+                  className={`px-3 h-8 rounded-full text-[12px] font-semibold border transition-colors ${
+                    active
+                      ? "bg-[#19b35c] text-black border-[#19b35c]"
+                      : "border-[#2a2a2a] text-[#aaa] hover:text-white hover:border-[#3a3a3a]"
+                  }`}
+                >
+                  {g.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

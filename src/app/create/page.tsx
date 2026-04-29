@@ -81,9 +81,12 @@ function CreatePage() {
   const [model, setModel] = useState<string>("V4_5ALL");
   const remixFromSourceId = searchParams.get("remixFrom") || undefined;
   // ?reuse=1 paramı varsa Advanced moda zorla — context menüsünden gelen flow
+  // ?wizardAuto=1 paramı varsa Wizard moda zorla — anasayfa hero'sundan gelen flow
   useEffect(() => {
     if (searchParams.get("reuse") === "1") {
       setMode("advanced");
+    } else if (searchParams.get("wizardAuto") === "1") {
+      setMode("wizard");
     }
   }, [searchParams]);
 
