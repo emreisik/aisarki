@@ -224,12 +224,16 @@ NAĞMELİ SATIRLAR: Her satır mümkünse uzun sesliyle bitsin (-a, -e, -ı, -i,
 
 SADE DİL: Halk dili — "yâri", "gönül", "garip", "kara gözlüm", "dağlar", "yayla", "dere". Ozanca sen dili.
 
-YAPI:
+YAPI (Orkestra düzenlemesi — instrumental bölümleri MUTLAKA ekle):
+[Intro: solo bağlama veya ney free rhythm, 8 bars] — söz yok, sadece direktif
 [Verse 1] — 4 kısa satır, manzara/sahne (dağ, dere, yayla, sabah)
 [Verse 2] — 4 satır, duyguyu derinleştir
+[Instrumental break: kaval solo with bağlama, 4 bars] — söz yok, ara geçiş
 [Chorus] — 2-3 satır, akılda kalıcı, kısa, ses ses tekrarla
 [Verse 3] — 4 satır, kabullenme/sonuç
-[Outro] — 2 satır, sessiz kapanış
+[Outro: bağlama fading, 4 bars] — söz yok, kapanış
+
+ÖNEMLİ: [Intro], [Instrumental break], [Outro] satırları sadece direktiftir. Bu bölümlere SÖZ yazma — Suno bu bölümlerde enstrümantal çalsın diye direktif veriyoruz.
 
 KAFİYE: Doğal, zorlamasız. Anlamı feda etme. abab veya cccb şeması.
 
@@ -410,10 +414,10 @@ Başlık:`;
 
       const instruments =
         validGenreId === "halk_turku"
-          ? "solo saz (bağlama Turkish lute), kaval flute, sparse acoustic, no electronic"
+          ? "bağlama saz (Turkish lute), kaval end-blown flute, mey reed pipe, kemençe bowed lute, davul frame drum, layered acoustic ensemble"
           : validGenreId === "ilahi_sufi"
-            ? "ney flute, kanun, daf frame drum, no rhythm section"
-            : "ud, kanun, kemençe, classical strings";
+            ? "ney flute, kanun zither, ud, daf frame drum, kudüm, layered devotional ensemble"
+            : "ud lute, kanun zither, ney flute, kemençe, tambur, kudüm, classical Ottoman ensemble";
 
       const vocalCue =
         validGenreId === "halk_turku"
@@ -422,11 +426,21 @@ Başlık:`;
             ? "devotional melismatic vocals, deep meditative phrasing, sustained notes, breathing pauses"
             : "classical Ottoman melismatic vocals, refined ornamentation, breathy emotional control";
 
+      // Orkestral arrangement direktifi — intro, ara geçiş, outro
+      // Suno bu cue ile flat şarkı yerine sahne sahne yapılandırılmış kompozisyon üretir
+      const arrangement =
+        validGenreId === "halk_turku"
+          ? "free-rhythm bağlama solo intro, ornamented kaval interlude between verses, build-up with kemençe and davul, full ensemble at chorus, fading bağlama outro"
+          : validGenreId === "ilahi_sufi"
+            ? "ney flute taksim intro, sustained drone with kanun cascade, daf rhythm building gradually, layered choral chorus, slow ney fade outro"
+            : "ud taksim intro free rhythm, kanun and kemençe melodic dialogue interlude, full Ottoman ensemble at chorus, refined kudüm rhythm, ney solo outro";
+
       // Suno docs: lyrics başında bracketed directive bloğu çok güçlü
       folkPerformanceHeader =
         `[Genre: Turkish ${validGenreId === "halk_turku" ? "Anatolian folk türkü" : validGenreId === "ilahi_sufi" ? "Sufi ilahi devotional" : "classical TSM"}]\n` +
         `[Style: ${westernAnchor}]\n` +
         `[Instruments: ${instruments}]\n` +
+        `[Arrangement: ${arrangement}]\n` +
         `[Vocals: ${vocalCue}]\n` +
         `[Tempo: ${tempo}, ${regionRhythmHint}]\n` +
         `[Mood: ${moodCue}]\n\n`;
@@ -434,18 +448,79 @@ Başlık:`;
       // Style addon — sanitize 180'e kırpınca KRİTİK cue korunsun (öncelikli)
       folkStyleAddon =
         validGenreId === "halk_turku"
-          ? "Anatolian Turkish folk türkü, melismatic male vocal, solo saz"
+          ? "Anatolian Turkish folk türkü, melismatic male vocal, layered orchestral folk ensemble"
           : validGenreId === "ilahi_sufi"
-            ? "Turkish Sufi ilahi devotional, ney flute, melismatic vocal"
-            : "Turkish classical TSM ottoman, melismatic, ud kanun";
+            ? "Turkish Sufi ilahi devotional, ney flute, layered ensemble"
+            : "Turkish classical TSM ottoman, melismatic, full ensemble";
     }
 
     const hasLyrics = sunoOpt.optimizedLyrics.trim().length > 0;
-    // Folk için lyrics başına zengin performance directive bloğu yerleştir.
-    // Bu Suno'yu folk interpretation'a kilitliyor (pop'a kaymasın).
+
+    /**
+     * Folk için orchestral arrangement enjeksiyonu — lyrics içine
+     * Suno'nun kavradığı [Intro], [Instrumental break], [Outro] bloklarını
+     * yerleştir. Suno bu directives ile flat şarkı yerine sahneli kompozisyon
+     * üretir (intro solo + ara geçiş + outro fade). Claude bunları zaten
+     * koymamışsa otomatik enjekte ediyoruz.
+     */
+    function injectArrangementBlocks(
+      lyrics: string,
+      genre: string | undefined,
+    ): string {
+      const intro =
+        genre === "halk_turku"
+          ? "[Intro: solo bağlama melody, free rhythm rubato, ornamented improvisation, 8 bars]"
+          : genre === "ilahi_sufi"
+            ? "[Intro: ney flute taksim, free rhythm meditation, sustained drone, 8 bars]"
+            : "[Intro: ud taksim free rhythm, kanun arpeggios, refined Ottoman opening, 8 bars]";
+
+      const breakBlock =
+        genre === "halk_turku"
+          ? "[Instrumental break: kaval flute solo with bağlama accompaniment, ornamented melodic dialogue, 4 bars]"
+          : genre === "ilahi_sufi"
+            ? "[Instrumental break: kanun cascade with ney response, daf rhythm subtle, 4 bars]"
+            : "[Instrumental break: kanun and kemençe melodic dialogue, refined ornamentation, 4 bars]";
+
+      const outro =
+        genre === "halk_turku"
+          ? "[Outro: solo bağlama fading, single sustained note, raw emotional, 4 bars]"
+          : genre === "ilahi_sufi"
+            ? "[Outro: ney flute fading slowly, sustained final note, 4 bars]"
+            : "[Outro: ud taksim closing, kanun final cadence, slow fade, 4 bars]";
+
+      let out = lyrics.trim();
+
+      // 1. INTRO — başta yoksa ekle
+      if (!/^\s*\[Intro/i.test(out)) {
+        out = `${intro}\n\n${out}`;
+      }
+
+      // 2. INSTRUMENTAL BREAK — Verse 2 ile Chorus arasına veya 2. Verse'ten sonra
+      // Eğer hiç break yoksa, ilk Chorus'tan ÖNCE enjekte et.
+      if (!/\[Instrumental break|\[Break|\[Solo/i.test(out)) {
+        // İlk [Chorus]'un öncesine yerleştir
+        const chorusMatch = out.match(/\n\s*\[Chorus/i);
+        if (chorusMatch && chorusMatch.index !== undefined) {
+          out =
+            out.slice(0, chorusMatch.index) +
+            `\n\n${breakBlock}` +
+            out.slice(chorusMatch.index);
+        }
+      }
+
+      // 3. OUTRO — sonda yoksa ekle
+      if (!/\[Outro/i.test(out)) {
+        out = `${out}\n\n${outro}`;
+      }
+
+      return out;
+    }
+
+    // Folk için lyrics başına zengin performance directive bloğu + arrangement bloklarını yerleştir
     const lyricsWithDirectives =
       hasLyrics && isFolk
-        ? folkPerformanceHeader + sunoOpt.optimizedLyrics
+        ? folkPerformanceHeader +
+          injectArrangementBlocks(sunoOpt.optimizedLyrics, validGenreId)
         : sunoOpt.optimizedLyrics;
 
     // Suno limit'leri: non-custom 500 char, custom 5000 char.
