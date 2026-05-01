@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2 } from "lucide-react";
 import { MusicNotes } from "@phosphor-icons/react";
@@ -46,6 +46,12 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [animState, setAnimState] = useState<AnimState>("closed");
 
+  // Swipe-to-dismiss (sadece mobil drag zone'unda)
+  const [dragOffset, setDragOffset] = useState(0);
+  const [snapping, setSnapping] = useState(false);
+  const dragStartY = useRef<number | null>(null);
+  const isDragging = useRef(false);
+
   const tpl = occasion ? OCCASIONS[occasion] : null;
   const generateCost = costs.generate ?? 10;
   const hasEnoughCredits = (credits?.balance ?? 0) >= generateCost;
@@ -84,6 +90,47 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  // Reset drag state on close
+  useEffect(() => {
+    if (!open) {
+      setDragOffset(0);
+      setSnapping(false);
+      isDragging.current = false;
+      dragStartY.current = null;
+    }
+  }, [open]);
+
+  const onDragStart = (e: React.TouchEvent) => {
+    if (submitting) return;
+    dragStartY.current = e.touches[0].clientY;
+    isDragging.current = true;
+    setSnapping(false);
+  };
+
+  const onDragMove = (e: React.TouchEvent) => {
+    if (!isDragging.current || dragStartY.current === null) return;
+    const dy = e.touches[0].clientY - dragStartY.current;
+    setDragOffset(dy > 0 ? dy : 0);
+  };
+
+  const onDragEnd = () => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    dragStartY.current = null;
+    setSnapping(true);
+    if (dragOffset > 110) {
+      // Eşik aşıldı — slide-out devam et, sonra kapat
+      setDragOffset(window.innerHeight);
+      setTimeout(() => {
+        onClose();
+      }, 220);
+    } else {
+      // Snap back
+      setDragOffset(0);
+      setTimeout(() => setSnapping(false), 300);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!occasion || !tpl || submitting) return;
@@ -162,24 +209,44 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
       />
 
       <div
-        className={`relative w-full md:max-w-[480px] bg-[#0d0d0d] border-t md:border border-[#1f1f1f] rounded-t-[28px] md:rounded-[24px] shadow-2xl overflow-hidden flex flex-col max-h-[92vh] md:max-h-[86vh] transition-transform duration-300 ${
-          visible
-            ? "translate-y-0"
-            : "translate-y-full md:translate-y-0 md:scale-95 md:opacity-0"
+        className={`relative w-full md:max-w-[480px] bg-[#0d0d0d] border-t md:border border-[#1f1f1f] rounded-t-[28px] md:rounded-[24px] shadow-2xl overflow-hidden flex flex-col max-h-[92vh] md:max-h-[86vh] ${
+          dragOffset > 0
+            ? ""
+            : `transition-transform duration-300 ${
+                visible
+                  ? "translate-y-0"
+                  : "translate-y-full md:translate-y-0 md:scale-95 md:opacity-0"
+              }`
         }`}
         style={{
           transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          ...(dragOffset > 0 && {
+            transform: `translateY(${dragOffset}px)`,
+            transition: snapping ? "transform 0.25s ease-out" : "none",
+          }),
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drag handle — mobilde görünür */}
-        <div className="md:hidden flex justify-center pt-3 pb-1">
+        {/* Drag handle + header — drag zone (sadece mobil) */}
+        <div
+          className="md:hidden flex justify-center pt-3 pb-2 touch-none cursor-grab active:cursor-grabbing"
+          onTouchStart={onDragStart}
+          onTouchMove={onDragMove}
+          onTouchEnd={onDragEnd}
+          onTouchCancel={onDragEnd}
+        >
           <div className="w-10 h-1.5 rounded-full bg-[#2a2a2a]" />
         </div>
 
-        {/* Header */}
-        <div className="px-6 pt-4 md:pt-6 pb-5 border-b border-[#1a1a1a] flex items-start justify-between gap-3 flex-shrink-0">
+        {/* Header — mobilde drag zone, desktop'ta normal */}
+        <div
+          className="px-6 pt-4 md:pt-6 pb-5 border-b border-[#1a1a1a] flex items-start justify-between gap-3 flex-shrink-0 md:cursor-default"
+          onTouchStart={onDragStart}
+          onTouchMove={onDragMove}
+          onTouchEnd={onDragEnd}
+          onTouchCancel={onDragEnd}
+        >
           <div className="flex items-center gap-3 min-w-0">
             <div
               className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
