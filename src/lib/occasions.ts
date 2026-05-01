@@ -24,7 +24,17 @@ export type OccasionId =
   | "mezuniyet"
   | "asker_ugurlama"
   | "is_terfi"
+  | "emeklilik"
+  | "yeni_is"
   | "anma_vefat"
+  | "eski_dost"
+  | "evcil_hayvan_anisi"
+  | "sunnet"
+  | "kina_gecesi"
+  | "hac_ugurlama"
+  | "mevlid"
+  | "roast"
+  | "dogum_gunu_saka"
   | "arkadaslik"
   | "ozel_aniya_ozel"
   | "genel";
@@ -259,6 +269,153 @@ export const OCCASIONS: Record<OccasionId, OccasionTemplate> = {
     lyricsBlueprint:
       "[Verse 1] O sahnenin başlangıcı\n[Verse 2] Detayları\n[Chorus] 'O gün' tekrarı\n[Bridge] Şimdi ne hissediyoruz\n[Outro] Hatıra olarak kalsın",
   },
+  emeklilik: {
+    id: "emeklilik",
+    label: "Emeklilik",
+    icon: "🎖️",
+    sampleHint:
+      "Babam Hasan'ın 35 yıl bankacılık sonrası emeklilik şarkısı, hep dürüst çalıştı",
+    defaultGenre: "sehir_pop",
+    defaultMood: "nostaljik",
+    defaultVibe:
+      "warm orchestral pop, soft piano, light strings, dignified celebratory tone",
+    lyricsContext:
+      "Uzun yılların ardından emeklilik — bir kariyerin onurla bitirilmesi. Geçen yılları kıymetle anan, geleceği rahat dileyen bir ton. Saygı + hafif nostalji.",
+    lyricsBlueprint:
+      "[Verse 1] Geçen yılların kısa özeti — emek\n[Verse 2] Bıraktığı izler — meslektaşları, yetiştirdikleri\n[Chorus] Adı + 'sen başardın'\n[Bridge] Yeni dönem — huzur, aile\n[Outro] Sıcak tebrik",
+  },
+  yeni_is: {
+    id: "yeni_is",
+    label: "Yeni İş",
+    icon: "🚀",
+    sampleHint:
+      "Kardeşim Ece'nin yeni işine başlarken motivasyon şarkısı, ilk gün heyecanı",
+    defaultGenre: "sehir_pop",
+    defaultMood: "coskulu",
+    defaultVibe:
+      "uplifting modern pop, building drums, bright synths, energetic hopeful",
+    lyricsContext:
+      "Yeni bir yola çıkış — heyecan, hafif kaygı, umut. Cesaretlendirici, motive edici. Klişeden uzak.",
+    lyricsBlueprint:
+      "[Verse 1] İlk gün, kapı açıldı\n[Verse 2] Geride bıraktıkların — emek\n[Chorus] Adı + 'sen yaparsın'\n[Bridge] Korkma, sen hazırsın\n[Outro] Cesaret",
+  },
+  eski_dost: {
+    id: "eski_dost",
+    label: "Eski Dost",
+    icon: "📞",
+    sampleHint:
+      "Yıllar önce kaybettiğim çocukluk arkadaşım Caner için, hâlâ özlüyorum",
+    defaultGenre: "akustik",
+    defaultMood: "nostaljik",
+    defaultVibe:
+      "warm acoustic guitar, soft piano, melancholic strings, intimate longing",
+    lyricsContext:
+      "Yolu ayrılmış eski bir dost — kavga değil sadece zaman. Pişmanlık + sıcak hatıralar. 'Neredesin' duygusu.",
+    lyricsBlueprint:
+      "[Verse 1] Eski bir hatıra — küçük detay\n[Verse 2] Şimdi nasıl yaşıyoruz, ayrı\n[Chorus] Adı + 'nerelerdesin'\n[Bridge] Söylenmemiş 'özledim'\n[Outro] Hâlâ kapım açık",
+  },
+  evcil_hayvan_anisi: {
+    id: "evcil_hayvan_anisi",
+    label: "Evcil Hayvan Anısı",
+    icon: "🐾",
+    sampleHint:
+      "Köpeğim Pamuk için anma şarkısı, 12 yıl beraberdik, geçen ay kaybettim",
+    defaultGenre: "akustik",
+    defaultMood: "huzunlu",
+    defaultVibe:
+      "tender acoustic guitar, soft piano, restrained strings, gentle mournful warmth",
+    lyricsContext:
+      "Kaybedilen evcil hayvana saygıyla anma. Sade, çok duygusal. Hayvanın küçük alışkanlıkları, beraber yaşananlar. İnsana ne kattığı.",
+    lyricsBlueprint:
+      "[Verse 1] İlk geliş — yavruyken\n[Verse 2] Beraber yaşananlar — küçük alışkanlık\n[Chorus] Adı + 'unutmadım'\n[Bridge] Bana ne öğrettin\n[Outro] 'Hep yanımdasın'",
+  },
+  sunnet: {
+    id: "sunnet",
+    label: "Sünnet",
+    icon: "✂️",
+    sampleHint: "Oğlum Yusuf'un sünnet düğünü için, prensim, koca adam oldu",
+    defaultGenre: "halk_turku",
+    defaultMood: "coskulu",
+    defaultVibe:
+      "Turkish wedding folk, davul zurna intro, joyful bağlama, celebratory traditional",
+    lyricsContext:
+      "Türk geleneğinde sünnet özel kutlama — çocuk büyüdü, erkek oldu. Aile sevinci, davul zurna. Joyful + traditional.",
+    lyricsBlueprint:
+      "[Verse 1] Çocuğum büyüdü, bugün özel\n[Verse 2] Aile etrafında, bayrak gibi\n[Chorus] '${isim} prensim' — neşeli\n[Bridge] Sağlıkla büyü dileği\n[Outro] Aile duası",
+  },
+  kina_gecesi: {
+    id: "kina_gecesi",
+    label: "Kına Gecesi",
+    icon: "🌹",
+    sampleHint: "Ablam Ayşe'nin kına gecesi için, evden ayrılışı, anneme veda",
+    defaultGenre: "halk_turku",
+    defaultMood: "ozlem",
+    defaultVibe:
+      "Turkish folk, def percussion, kanun, female vocal, traditional bittersweet wedding eve",
+    lyricsContext:
+      "Kına gecesi — Türk geleneğinde gelin alma öncesi duygulu gece. Anneye veda, baba evinden ayrılış. Hüzün + sevinç. Geleneksel.",
+    lyricsBlueprint:
+      "[Verse 1] Baba evi, anne kucağı\n[Verse 2] Çocukluktan bugüne\n[Chorus] '${isim}'in eli kınalı' — geleneksel\n[Bridge] Anneye 'ağlama'\n[Outro] Hayırlı yolculuk",
+  },
+  hac_ugurlama: {
+    id: "hac_ugurlama",
+    label: "Hac Uğurlama",
+    icon: "🕋",
+    sampleHint:
+      "Babam hac yolculuğuna çıkıyor, Mekke'ye uğurlama şarkısı, dua dolu",
+    defaultGenre: "ilahi_sufi",
+    defaultMood: "huzurlu",
+    defaultVibe:
+      "spiritual ney flute, soft kanun, restrained male vocal, sacred reverent atmosphere",
+    lyricsContext:
+      "Hacı adayını uğurlama — kutsal yolculuk. Saygı, dua, manevi duygu. İlahi/sufi tarzı uygun.",
+    lyricsBlueprint:
+      "[Verse 1] Yolculuk başlıyor — Kabe'ye\n[Verse 2] Ailenin duası, bekleyiş\n[Chorus] Hacı + adı, kabul olsun duası\n[Bridge] Manevi temizlik teması\n[Outro] Sağ salim dön duası",
+  },
+  mevlid: {
+    id: "mevlid",
+    label: "Mevlid / Hatim",
+    icon: "📿",
+    sampleHint: "Vefat eden dedem için mevlid programı, manevi anma şarkısı",
+    defaultGenre: "ilahi_sufi",
+    defaultMood: "huzurlu",
+    defaultVibe:
+      "ney flute, soft kanun, restrained classical Turkish religious tone, deeply reverent",
+    lyricsContext:
+      "Mevlid/hatim — manevi anma. Saygı, dua, sevgi. Hüzün ama umut. İlahi tarzı.",
+    lyricsBlueprint:
+      "[Verse 1] Onun ruhuna saygıyla\n[Verse 2] Bıraktığı manevi miras\n[Chorus] Adı + 'rahmet'\n[Bridge] Ailenin duası\n[Outro] Allah rahmet eylesin",
+  },
+  roast: {
+    id: "roast",
+    label: "Roast / Şaka",
+    icon: "🔥",
+    sampleHint:
+      "En yakın arkadaşım Cem'e roast şarkısı, hep geç gelir, en sevdiği şey döner",
+    defaultGenre: "rap",
+    defaultMood: "isyankar",
+    defaultVibe:
+      "comedic Turkish rap, punchy beat, playful diss-track style, fun energetic",
+    lyricsContext:
+      "Yakın arkadaşa şaka/roast şarkısı — sevgi içeren mizahi. Onun komik yanları, alışkanlıkları. Kötülük yok, gülmece var.",
+    lyricsBlueprint:
+      "[Verse 1] İlk darbe — komik bir alışkanlık\n[Hook] Adı + roast hook (komik tekrar)\n[Verse 2] İkinci darbe — başka komik şey\n[Hook] tekrar\n[Bridge] 'Ama seni seviyoruz' twist\n[Outro] Gülmeli kapanış",
+  },
+  dogum_gunu_saka: {
+    id: "dogum_gunu_saka",
+    label: "Doğum Günü Şakası",
+    icon: "🎈",
+    sampleHint:
+      "Patronum Ali Bey'in 50. yaşı için şakacı doğum günü şarkısı, herkesi kıskandırır",
+    defaultGenre: "sehir_pop",
+    defaultMood: "coskulu",
+    defaultVibe:
+      "playful upbeat pop, bouncy rhythm, comedic vocals, party celebration",
+    lyricsContext:
+      "Doğum günü ama mizahi — yaşı ile dalga, komik özellikler. Sevgi dolu mizah, hakaret yok.",
+    lyricsBlueprint:
+      "[Verse 1] Yaşı geldi, durum komik\n[Chorus] '${isim} ${yas} oldu' — komik tekrar\n[Verse 2] Diğer yaş gerçekleri (mizahi)\n[Bridge] 'Ama hâlâ gençsin' twist\n[Outro] Gülmeli kutlama",
+  },
   genel: {
     id: "genel",
     label: "Genel",
@@ -290,6 +447,60 @@ export const HERO_HINT_OCCASIONS: OccasionId[] = [
 ];
 
 /**
+ * Anasayfa sekmeli vitrini için kategori grupları.
+ * Her kategori altında ilgili occasion'lar listelenir.
+ */
+export const OCCASION_CATEGORIES: Array<{
+  id: string;
+  label: string;
+  icon: string;
+  occasions: OccasionId[];
+}> = [
+  {
+    id: "aile",
+    label: "Aile",
+    icon: "👨‍👩‍👧",
+    occasions: [
+      "anneler_gunu",
+      "babalar_gunu",
+      "bebek_hosgeldin",
+      "ninni",
+      "arkadaslik",
+    ],
+  },
+  {
+    id: "romantik",
+    label: "Romantik",
+    icon: "❤️",
+    occasions: ["sevgililer_gunu", "yil_donumu", "dugun_nisan", "kina_gecesi"],
+  },
+  {
+    id: "kutlama",
+    label: "Kutlama",
+    icon: "🎉",
+    occasions: ["dogum_gunu", "mezuniyet", "is_terfi", "emeklilik", "yeni_is"],
+  },
+  {
+    id: "kultur",
+    label: "Kültür",
+    icon: "🇹🇷",
+    occasions: ["asker_ugurlama", "sunnet", "hac_ugurlama", "mevlid"],
+  },
+  {
+    id: "anma",
+    label: "Anma",
+    icon: "🕊️",
+    occasions: ["anma_vefat", "eski_dost", "evcil_hayvan_anisi"],
+  },
+  {
+    id: "eglence",
+    label: "Eğlence",
+    icon: "🔥",
+    occasions: ["roast", "dogum_gunu_saka", "ozel_aniya_ozel"],
+  },
+];
+
+/**
  * Claude'a kullanıcının doğal dilini structured intent'e çevirten system prompt.
  * Output her zaman valid JSON — strict şema.
  */
@@ -307,7 +518,17 @@ Mevcut occasion ID'leri:
 - mezuniyet (okul mezuniyet, başarı)
 - asker_ugurlama (asker, askere uğurlama)
 - is_terfi (iş, patron, kariyer, jübile)
+- emeklilik (emeklilik, kariyer sonu, jübile)
+- yeni_is (yeni iş, ilk gün, kariyer başlangıcı)
 - anma_vefat (vefat, anma, rahmetli)
+- eski_dost (yolu ayrılmış arkadaş, kayıp arkadaşlık)
+- evcil_hayvan_anisi (kedi köpek kuş anma, kayıp evcil hayvan)
+- sunnet (sünnet düğünü, oğlan çocuğu sünnet)
+- kina_gecesi (kına gecesi, gelin alma öncesi)
+- hac_ugurlama (hac, umre, kutsal yolculuk)
+- mevlid (mevlid, hatim, manevi anma)
+- roast (roast, şaka, troll, mizahi diss)
+- dogum_gunu_saka (mizahi doğum günü, yaş şakası)
 - arkadaslik (dostluk, arkadaş)
 - ozel_aniya_ozel (özel an, hatıra)
 - genel (yukarıdakilere uymuyorsa)

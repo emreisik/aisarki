@@ -37,10 +37,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <head>
-        <link rel="icon" href="/fav.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/fav.png" />
-      </head>
       <body className="h-full">
         <SessionProvider>
           <ToastProvider>

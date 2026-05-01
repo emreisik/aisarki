@@ -1,47 +1,29 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Mic2, Upload } from "lucide-react";
+import { Mic2, Upload, Star, Music2, Clock3 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUpload } from "@/contexts/UploadContext";
 import PersonalSongModal from "@/components/PersonalSongModal";
-
-type OccasionCardId =
-  | "dogum_gunu"
-  | "anneler_gunu"
-  | "yil_donumu"
-  | "babalar_gunu"
-  | "sevgililer_gunu"
-  | "bebek_hosgeldin"
-  | "asker_ugurlama"
-  | "dugun_nisan"
-  | "ninni";
-
-const OCCASION_CARDS: Array<{
-  id: OccasionCardId;
-  icon: string;
-  label: string;
-  desc: string;
-}> = [
-  { id: "dogum_gunu", icon: "🎂", label: "Doğum Günü", desc: "Adıyla özel" },
-  { id: "anneler_gunu", icon: "👩", label: "Anneye", desc: "Sıcak duygular" },
-  { id: "yil_donumu", icon: "💍", label: "Yıldönümü", desc: "Birlikte yıllar" },
-  { id: "babalar_gunu", icon: "👨", label: "Babaya", desc: "Minnet dolu" },
-  { id: "sevgililer_gunu", icon: "❤️", label: "Sevgiliye", desc: "Romantik" },
-  { id: "bebek_hosgeldin", icon: "👶", label: "Bebeğe", desc: "Hoşgeldin" },
-  { id: "dugun_nisan", icon: "👰", label: "Düğün", desc: "İki isim" },
-  { id: "asker_ugurlama", icon: "🪖", label: "Askere", desc: "Sağ salim dön" },
-  { id: "ninni", icon: "🌙", label: "Ninni", desc: "Yumuşak uyutucu" },
-];
+import {
+  OCCASIONS,
+  OCCASION_CATEGORIES,
+  type OccasionId,
+} from "@/lib/occasions";
 
 export default function HomePage() {
   const router = useRouter();
   const { setPending: setPendingUpload, openRecord } = useUpload();
   const heroFileInputRef = useRef<HTMLInputElement>(null);
-  const [pickedOccasion, setPickedOccasion] = useState<OccasionCardId | null>(
-    null,
+  const [pickedOccasion, setPickedOccasion] = useState<OccasionId | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>(
+    OCCASION_CATEGORIES[0].id,
   );
+
+  const currentCategory =
+    OCCASION_CATEGORIES.find((c) => c.id === activeCategory) ??
+    OCCASION_CATEGORIES[0];
 
   const handleHeroFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -70,12 +52,54 @@ export default function HomePage() {
           />
         </div>
 
-        <div className="relative pt-[80px] pb-[80px] px-[20px] flex flex-col items-center">
-          <h1 className="text-white text-[28px] md:text-[36px] font-bold text-center leading-[1.2] mb-[28px]">
+        <div className="relative pt-[64px] md:pt-[80px] pb-[64px] md:pb-[80px] px-[20px] flex flex-col items-center">
+          <h1 className="text-white text-[28px] md:text-[44px] font-bold text-center leading-[1.1] mb-3 tracking-tight">
             Hayalindeki şarkıyı
             <br />
-            duymanın zamanı
+            <span
+              className="bg-clip-text text-transparent"
+              style={{
+                backgroundImage:
+                  "linear-gradient(90deg, #fcff9a 0%, #19b35c 60%, #295b53 100%)",
+              }}
+            >
+              duymanın zamanı
+            </span>
           </h1>
+
+          <p className="text-[#bbb] text-[14px] md:text-[16px] text-center mb-5 max-w-[560px] leading-relaxed">
+            Sevdiklerine özel, adıyla ve hatıralarıyla — 3 dakikada hazır.
+          </p>
+
+          {/* Sosyal kanıt rozeti */}
+          <div className="flex items-center gap-4 md:gap-6 mb-8 px-5 py-2.5 rounded-full bg-[#0a0a0a]/70 border border-[#1f1f1f] backdrop-blur-sm">
+            <div className="flex items-center gap-1.5">
+              <Music2 size={13} className="text-[#19b35c]" />
+              <span className="text-white text-[12px] md:text-[13px] font-semibold tabular-nums">
+                50K+
+              </span>
+              <span className="text-[#888] text-[11px] md:text-[12px]">
+                şarkı
+              </span>
+            </div>
+            <div className="w-px h-3.5 bg-[#1f1f1f]" />
+            <div className="flex items-center gap-1.5">
+              <Star size={13} className="text-[#fcff9a]" fill="currentColor" />
+              <span className="text-white text-[12px] md:text-[13px] font-semibold tabular-nums">
+                4.9
+              </span>
+              <span className="text-[#888] text-[11px] md:text-[12px]">
+                puan
+              </span>
+            </div>
+            <div className="w-px h-3.5 bg-[#1f1f1f]" />
+            <div className="flex items-center gap-1.5">
+              <Clock3 size={13} className="text-[#19b35c]" />
+              <span className="text-white text-[12px] md:text-[13px] font-semibold">
+                ~3 dk
+              </span>
+            </div>
+          </div>
 
           <input
             ref={heroFileInputRef}
@@ -85,32 +109,53 @@ export default function HomePage() {
             onChange={handleHeroFilePick}
           />
 
-          <p className="text-[#bbb] text-[14px] md:text-[15px] text-center mb-5 max-w-[520px] leading-relaxed">
-            Kime şarkı yapmak istiyorsun? Bir vesile seç, gerisini biz
-            halledelim.
-          </p>
-
-          <div className="grid grid-cols-3 gap-3 max-w-[640px] w-full">
-            {OCCASION_CARDS.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setPickedOccasion(c.id)}
-                className="group relative bg-[#161616]/90 backdrop-blur-xl border border-[#1f1f1f] rounded-[18px] p-4 md:p-5 flex flex-col items-center gap-1.5 hover:border-[#19b35c]/40 hover:bg-[#1a1a1a] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] shadow-lg shadow-black/30"
-              >
-                <span className="text-[28px] md:text-[32px] mb-1 group-hover:scale-110 transition-transform">
-                  {c.icon}
-                </span>
-                <span className="text-white text-[13px] md:text-[14px] font-semibold leading-tight">
-                  {c.label}
-                </span>
-                <span className="text-[#666] text-[10px] md:text-[11px] leading-tight">
-                  {c.desc}
-                </span>
-              </button>
-            ))}
+          {/* Kategori sekmeleri */}
+          <div className="w-full max-w-[760px] mb-5">
+            <div className="flex gap-2 overflow-x-auto scroll-area pb-2 justify-start md:justify-center">
+              {OCCASION_CATEGORIES.map((cat) => {
+                const active = cat.id === activeCategory;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(cat.id)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] md:text-[13px] font-semibold whitespace-nowrap transition-all ${
+                      active
+                        ? "bg-[#19b35c] text-black shadow-lg shadow-[#19b35c]/20"
+                        : "bg-[#161616] border border-[#222] text-[#bbb] hover:bg-[#1c1c1c] hover:text-white"
+                    }`}
+                  >
+                    <span className="text-[14px]">{cat.icon}</span>
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 mt-6 flex-wrap justify-center">
+          {/* Vesile grid — aktif kategoriye göre */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-w-[760px] w-full">
+            {currentCategory.occasions.map((occId) => {
+              const occ = OCCASIONS[occId];
+              if (!occ) return null;
+              return (
+                <button
+                  key={occId}
+                  onClick={() => setPickedOccasion(occId)}
+                  className="group relative bg-[#161616]/90 backdrop-blur-xl border border-[#1f1f1f] rounded-[18px] p-4 md:p-5 flex flex-col items-center gap-1.5 hover:border-[#19b35c]/40 hover:bg-[#1a1a1a] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] shadow-lg shadow-black/30 min-h-[112px]"
+                >
+                  <span className="text-[28px] md:text-[32px] mb-1 group-hover:scale-110 transition-transform">
+                    {occ.icon}
+                  </span>
+                  <span className="text-white text-[12.5px] md:text-[13.5px] font-semibold leading-tight text-center">
+                    {occ.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Alternatif giriş chip'leri */}
+          <div className="flex items-center gap-2 mt-7 flex-wrap justify-center">
             <button
               onClick={openRecord}
               className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white transition-colors"
