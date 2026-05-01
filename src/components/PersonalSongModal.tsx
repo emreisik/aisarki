@@ -46,11 +46,14 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [animState, setAnimState] = useState<AnimState>("closed");
 
-  // Swipe-to-dismiss (sadece mobil drag zone'unda)
+  // Swipe-to-dismiss — sheet üstündeki herhangi bir yerden çekilebilir,
+  // form scroll en üstte ise drag, scroll içeride ise normal scroll.
   const [dragOffset, setDragOffset] = useState(0);
   const [snapping, setSnapping] = useState(false);
   const dragStartY = useRef<number | null>(null);
   const isDragging = useRef(false);
+  const dragEngaged = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const tpl = occasion ? OCCASIONS[occasion] : null;
   const generateCost = costs.generate ?? 10;
@@ -97,27 +100,51 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
       setDragOffset(0);
       setSnapping(false);
       isDragging.current = false;
+      dragEngaged.current = false;
       dragStartY.current = null;
     }
   }, [open]);
 
   const onDragStart = (e: React.TouchEvent) => {
     if (submitting) return;
+    // Tek dokunuş — ilerlemiş gesture'lara karışma
+    if (e.touches.length !== 1) return;
     dragStartY.current = e.touches[0].clientY;
     isDragging.current = true;
+    dragEngaged.current = false;
     setSnapping(false);
   };
 
   const onDragMove = (e: React.TouchEvent) => {
     if (!isDragging.current || dragStartY.current === null) return;
     const dy = e.touches[0].clientY - dragStartY.current;
-    setDragOffset(dy > 0 ? dy : 0);
+    if (dy <= 0) {
+      // Yukarı sürükleme — sheet drag'i devre dışı, native scroll çalışsın
+      if (dragEngaged.current) setDragOffset(0);
+      return;
+    }
+    const scrollEl = scrollRef.current;
+    const atTop = !scrollEl || scrollEl.scrollTop <= 0;
+    if (!atTop) {
+      // Form içinde scroll var — drag'i devreden çıkar
+      if (dragEngaged.current) setDragOffset(0);
+      return;
+    }
+    // En üstte aşağı sürükleme: sheet'i çek
+    dragEngaged.current = true;
+    setDragOffset(dy);
   };
 
   const onDragEnd = () => {
     if (!isDragging.current) return;
+    const wasEngaged = dragEngaged.current;
     isDragging.current = false;
+    dragEngaged.current = false;
     dragStartY.current = null;
+    if (!wasEngaged) {
+      // Drag aktif olmadıysa state'i bozma (tap idi)
+      return;
+    }
     setSnapping(true);
     if (dragOffset > 110) {
       // Eşik aşıldı — slide-out devam et, sonra kapat
@@ -227,26 +254,18 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
           }),
         }}
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={onDragStart}
+        onTouchMove={onDragMove}
+        onTouchEnd={onDragEnd}
+        onTouchCancel={onDragEnd}
       >
-        {/* Drag handle + header — drag zone (sadece mobil) */}
-        <div
-          className="md:hidden flex justify-center pt-3 pb-2 touch-none cursor-grab active:cursor-grabbing"
-          onTouchStart={onDragStart}
-          onTouchMove={onDragMove}
-          onTouchEnd={onDragEnd}
-          onTouchCancel={onDragEnd}
-        >
+        {/* Drag handle — mobilde görünür ipucu */}
+        <div className="md:hidden flex justify-center pt-3 pb-2">
           <div className="w-10 h-1.5 rounded-full bg-[#2a2a2a]" />
         </div>
 
-        {/* Header — mobilde drag zone, desktop'ta normal */}
-        <div
-          className="px-6 pt-4 md:pt-6 pb-5 border-b border-[#1a1a1a] flex items-start justify-between gap-3 flex-shrink-0 md:cursor-default"
-          onTouchStart={onDragStart}
-          onTouchMove={onDragMove}
-          onTouchEnd={onDragEnd}
-          onTouchCancel={onDragEnd}
-        >
+        {/* Header */}
+        <div className="px-6 pt-4 md:pt-6 pb-5 border-b border-[#1a1a1a] flex items-start justify-between gap-3 flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div
               className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
@@ -280,7 +299,10 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
         </div>
 
         {/* Form — scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-4"
+        >
           <div>
             <label className="block text-[#aaa] text-[11px] font-semibold uppercase tracking-widest mb-2">
               {needsTwoNames ? "Damat / Eş 1" : "Kim için?"}
