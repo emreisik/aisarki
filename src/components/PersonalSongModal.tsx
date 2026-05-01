@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, Music2 } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
+import { MusicNotes } from "@phosphor-icons/react";
 import { useToast } from "@/contexts/ToastContext";
 import { useCredits } from "@/contexts/CreditsContext";
 import { localizeApiError } from "@/lib/sunoErrors";
 import { OCCASIONS, type OccasionId } from "@/lib/occasions";
-import { OccasionIcon } from "@/lib/occasionIcons";
+import {
+  OccasionIcon,
+  OCCASION_TO_CATEGORY,
+  getCategoryTheme,
+} from "@/lib/occasionIcons";
 import { useRouter } from "next/navigation";
 
 type Props = {
@@ -26,11 +31,8 @@ const GENRE_OPTIONS: Array<{ id: string; label: string }> = [
   { id: "ilahi_sufi", label: "İlahi · ruhani" },
 ];
 
-/**
- * Vesile kartına tıklayınca açılan minimal form.
- * 3 alan: kişi adı + opsiyonel detay + opsiyonel tarz.
- * "Şarkıyı Oluştur" tıklayınca direkt /api/personal-song'a structured veri gider.
- */
+type AnimState = "closed" | "opening" | "open" | "closing";
+
 export default function PersonalSongModal({ open, occasion, onClose }: Props) {
   const router = useRouter();
   const toast = useToast();
@@ -42,13 +44,15 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
   const [detay, setDetay] = useState("");
   const [genre, setGenre] = useState("auto");
   const [submitting, setSubmitting] = useState(false);
+  const [animState, setAnimState] = useState<AnimState>("closed");
 
   const tpl = occasion ? OCCASIONS[occasion] : null;
   const generateCost = costs.generate ?? 10;
   const hasEnoughCredits = (credits?.balance ?? 0) >= generateCost;
   const needsTwoNames = occasion === "dugun_nisan";
+  const categoryId = occasion ? OCCASION_TO_CATEGORY[occasion] : "kultur";
+  const theme = getCategoryTheme(categoryId);
 
-  // Modal açıldığında alanları sıfırla
   useEffect(() => {
     if (open) {
       setIsim("");
@@ -59,7 +63,19 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
     }
   }, [open, occasion]);
 
-  // ESC ile kapat
+  useEffect(() => {
+    if (open) {
+      setAnimState("opening");
+      const t = setTimeout(() => setAnimState("open"), 20);
+      return () => clearTimeout(t);
+    }
+    if (animState !== "closed") {
+      setAnimState("closing");
+      const t = setTimeout(() => setAnimState("closed"), 280);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -126,24 +142,54 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
     }
   };
 
-  if (!open || !tpl) return null;
+  if (animState === "closed" || !tpl) return null;
   if (typeof document === "undefined") return null;
+
+  const visible = animState === "open";
+  const focusInput = (el: HTMLInputElement | null) => {
+    if (el && visible) setTimeout(() => el.focus(), 50);
+  };
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[170] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[170] flex items-end md:items-center justify-center md:p-4"
       onClick={() => !submitting && onClose()}
     >
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <div
+        className={`absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-300 ${
+          visible ? "opacity-100" : "opacity-0"
+        }`}
+      />
 
       <div
-        className="relative w-full max-w-[480px] bg-[#0d0d0d] border border-[#1f1f1f] rounded-[20px] shadow-2xl overflow-hidden"
+        className={`relative w-full md:max-w-[480px] bg-[#0d0d0d] border-t md:border border-[#1f1f1f] rounded-t-[28px] md:rounded-[24px] shadow-2xl overflow-hidden flex flex-col max-h-[92vh] md:max-h-[86vh] transition-transform duration-300 ${
+          visible
+            ? "translate-y-0"
+            : "translate-y-full md:translate-y-0 md:scale-95 md:opacity-0"
+        }`}
+        style={{
+          transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header — vesile başlığı */}
-        <div className="px-6 pt-6 pb-5 border-b border-[#1a1a1a] flex items-start justify-between gap-3">
+        {/* Drag handle — mobilde görünür */}
+        <div className="md:hidden flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1.5 rounded-full bg-[#2a2a2a]" />
+        </div>
+
+        {/* Header */}
+        <div className="px-6 pt-4 md:pt-6 pb-5 border-b border-[#1a1a1a] flex items-start justify-between gap-3 flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#19b35c]/20 to-[#19b35c]/5 border border-[#19b35c]/25 flex items-center justify-center text-[#19b35c] flex-shrink-0">
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{
+                background: `linear-gradient(135deg, ${theme.accent}30, ${theme.accentSoft}10)`,
+                border: `1px solid ${theme.accent}40`,
+                color: theme.accent,
+                boxShadow: `0 8px 24px ${theme.glow}`,
+              }}
+            >
               {occasion && (
                 <OccasionIcon id={occasion} size={26} weight="duotone" />
               )}
@@ -153,27 +199,27 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
                 {tpl.label} Şarkısı
               </h2>
               <p className="text-[#777] text-[12px] mt-0.5">
-                Kime ve ne için olduğunu yaz, gerisini biz halledelim
+                3 alan doldur, 3 dakikada hazır
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             disabled={submitting}
-            className="w-8 h-8 rounded-full hover:bg-[#1a1a1a] flex items-center justify-center text-[#888] hover:text-white flex-shrink-0 disabled:opacity-40"
+            className="w-9 h-9 rounded-full hover:bg-[#1a1a1a] flex items-center justify-center text-[#888] hover:text-white flex-shrink-0 disabled:opacity-40 active:scale-90 transition-all"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Form */}
-        <div className="px-6 py-5 space-y-4">
-          {/* İsim */}
+        {/* Form — scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           <div>
             <label className="block text-[#aaa] text-[11px] font-semibold uppercase tracking-widest mb-2">
               {needsTwoNames ? "Damat / Eş 1" : "Kim için?"}
             </label>
             <input
+              ref={focusInput}
               type="text"
               value={isim}
               onChange={(e) => setIsim(e.target.value)}
@@ -186,8 +232,10 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
                       ? "Babanın adı"
                       : "İsim (örn: Serra)"
               }
-              autoFocus
-              className="w-full h-11 px-4 bg-[#0a0a0a] border border-[#1f1f1f] rounded-xl text-white text-[14px] placeholder:text-[#444] focus:outline-none focus:border-[#19b35c]/50 transition-colors"
+              className="w-full h-12 px-4 bg-[#0a0a0a] border border-[#1f1f1f] rounded-2xl text-white text-[15px] placeholder:text-[#444] focus:outline-none transition-colors"
+              style={{
+                borderColor: isim.trim() ? `${theme.accent}55` : undefined,
+              }}
             />
           </div>
 
@@ -201,12 +249,16 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
                 value={ikinciIsim}
                 onChange={(e) => setIkinciIsim(e.target.value)}
                 placeholder="Örn: Selin"
-                className="w-full h-11 px-4 bg-[#0a0a0a] border border-[#1f1f1f] rounded-xl text-white text-[14px] placeholder:text-[#444] focus:outline-none focus:border-[#19b35c]/50"
+                className="w-full h-12 px-4 bg-[#0a0a0a] border border-[#1f1f1f] rounded-2xl text-white text-[15px] placeholder:text-[#444] focus:outline-none transition-colors"
+                style={{
+                  borderColor: ikinciIsim.trim()
+                    ? `${theme.accent}55`
+                    : undefined,
+                }}
               />
             </div>
           )}
 
-          {/* Yaş — sadece doğum gününde */}
           {occasion === "dogum_gunu" && (
             <div>
               <label className="block text-[#aaa] text-[11px] font-semibold uppercase tracking-widest mb-2">
@@ -220,12 +272,11 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
                 value={yas}
                 onChange={(e) => setYas(e.target.value)}
                 placeholder="30"
-                className="w-full h-11 px-4 bg-[#0a0a0a] border border-[#1f1f1f] rounded-xl text-white text-[14px] placeholder:text-[#444] focus:outline-none focus:border-[#19b35c]/50"
+                className="w-full h-12 px-4 bg-[#0a0a0a] border border-[#1f1f1f] rounded-2xl text-white text-[15px] placeholder:text-[#444] focus:outline-none transition-colors"
               />
             </div>
           )}
 
-          {/* Detay */}
           <div>
             <label className="block text-[#aaa] text-[11px] font-semibold uppercase tracking-widest mb-2">
               Onun hakkında bir şey
@@ -237,14 +288,13 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
               rows={3}
               maxLength={500}
               placeholder="Sevdiği bir şey, paylaştığınız bir an, söylemek istediğin söz..."
-              className="w-full px-4 py-3 bg-[#0a0a0a] border border-[#1f1f1f] rounded-xl text-white text-[14px] placeholder:text-[#444] focus:outline-none focus:border-[#19b35c]/50 resize-none leading-relaxed"
+              className="w-full px-4 py-3 bg-[#0a0a0a] border border-[#1f1f1f] rounded-2xl text-white text-[15px] placeholder:text-[#444] focus:outline-none resize-none leading-relaxed transition-colors"
             />
             <div className="text-[#444] text-[10px] tabular-nums text-right mt-1">
               {detay.length}/500
             </div>
           </div>
 
-          {/* Tarz */}
           <div>
             <label className="block text-[#aaa] text-[11px] font-semibold uppercase tracking-widest mb-2">
               Müzik tarzı
@@ -252,7 +302,7 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
             <select
               value={genre}
               onChange={(e) => setGenre(e.target.value)}
-              className="w-full h-11 px-4 bg-[#0a0a0a] border border-[#1f1f1f] rounded-xl text-white text-[14px] focus:outline-none focus:border-[#19b35c]/50 cursor-pointer"
+              className="w-full h-12 px-4 bg-[#0a0a0a] border border-[#1f1f1f] rounded-2xl text-white text-[15px] focus:outline-none cursor-pointer"
             >
               {GENRE_OPTIONS.map((g) => (
                 <option key={g.id} value={g.id}>
@@ -263,16 +313,21 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
           </div>
         </div>
 
-        {/* Footer / CTA */}
-        <div className="px-6 pb-6 pt-2">
+        {/* Footer / CTA — sheet alt yapışık */}
+        <div className="px-5 pt-3 pb-5 border-t border-[#1a1a1a] flex-shrink-0 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d] to-[#0d0d0d]/80">
           <button
             onClick={handleSubmit}
             disabled={submitting || !isim.trim()}
-            className="w-full h-12 rounded-full font-bold text-white text-[14px] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full h-14 rounded-2xl font-bold text-black text-[15px] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97] transition-all"
             style={{
               background: hasEnoughCredits
-                ? "linear-gradient(45deg, #082122 0%, #295b53 40%, #19b35c 75%, #fcff9a 100%)"
+                ? `linear-gradient(135deg, ${theme.accentSoft} 0%, ${theme.accent} 100%)`
                 : "#1f1f1f",
+              color: hasEnoughCredits ? "#000" : "#fff",
+              boxShadow: hasEnoughCredits
+                ? `0 12px 32px ${theme.glow}`
+                : "none",
+              transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
             }}
           >
             {submitting ? (
@@ -284,7 +339,7 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
               <>Krediyi Yükselt — {generateCost} kredi gerekli</>
             ) : (
               <>
-                <Music2 size={15} />
+                <MusicNotes size={17} weight="fill" />
                 Şarkıyı Oluştur · {generateCost} kredi
               </>
             )}

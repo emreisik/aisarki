@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Mic2, Upload } from "lucide-react";
-import { Star, MusicNotes, Clock } from "@phosphor-icons/react";
+import { Star, MusicNotes, Clock, Sparkle } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUpload } from "@/contexts/UploadContext";
@@ -12,20 +12,27 @@ import {
   OCCASION_CATEGORIES,
   type OccasionId,
 } from "@/lib/occasions";
-import { OccasionIcon, CategoryIcon } from "@/lib/occasionIcons";
+import {
+  OccasionIcon,
+  CategoryIcon,
+  getCategoryTheme,
+} from "@/lib/occasionIcons";
 
 export default function HomePage() {
   const router = useRouter();
   const { setPending: setPendingUpload, openRecord } = useUpload();
   const heroFileInputRef = useRef<HTMLInputElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const [pickedOccasion, setPickedOccasion] = useState<OccasionId | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>(
     OCCASION_CATEGORIES[0].id,
   );
+  const [stickyVisible, setStickyVisible] = useState(false);
 
   const currentCategory =
     OCCASION_CATEGORIES.find((c) => c.id === activeCategory) ??
     OCCASION_CATEGORIES[0];
+  const theme = getCategoryTheme(activeCategory);
 
   const handleHeroFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,8 +42,19 @@ export default function HomePage() {
     router.push("/create");
   };
 
+  useEffect(() => {
+    const onScroll = () => setStickyVisible(window.scrollY > 80);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollToGrid = () => {
+    gridRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   return (
-    <div className="min-h-full bg-[#121212]">
+    <div className="min-h-full bg-[#121212] pb-[calc(96px+env(safe-area-inset-bottom,0px))] md:pb-0">
       <div
         className="relative overflow-hidden"
         style={{ background: "#06140c" }}
@@ -54,7 +72,7 @@ export default function HomePage() {
           />
         </div>
 
-        <div className="relative pt-[64px] md:pt-[80px] pb-[64px] md:pb-[80px] px-[20px] flex flex-col items-center">
+        <div className="relative pt-[56px] md:pt-[80px] pb-[64px] md:pb-[80px] px-[20px] flex flex-col items-center">
           <h1 className="text-white text-[28px] md:text-[44px] font-bold text-center leading-[1.1] mb-3 tracking-tight">
             Hayalindeki şarkıyı
             <br />
@@ -115,20 +133,30 @@ export default function HomePage() {
             onChange={handleHeroFilePick}
           />
 
-          {/* Kategori sekmeleri */}
-          <div className="w-full max-w-[760px] mb-5">
-            <div className="flex gap-2 overflow-x-auto scroll-area pb-2 justify-start md:justify-center">
+          {/* Kategori sekmeleri — snap scroll, native pill tabs */}
+          <div className="w-full max-w-[760px] mb-5 -mx-5 md:mx-0">
+            <div
+              className="flex gap-2 overflow-x-auto scroll-area pb-2 px-5 md:px-0 snap-x snap-proximity justify-start md:justify-center"
+              style={{ scrollPaddingLeft: "20px" }}
+            >
               {OCCASION_CATEGORIES.map((cat) => {
                 const active = cat.id === activeCategory;
+                const t = getCategoryTheme(cat.id);
                 return (
                   <button
                     key={cat.id}
                     onClick={() => setActiveCategory(cat.id)}
-                    className={`flex-shrink-0 flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] md:text-[13px] font-semibold whitespace-nowrap transition-all ${
-                      active
-                        ? "bg-[#19b35c] text-black shadow-lg shadow-[#19b35c]/20"
-                        : "bg-[#161616] border border-[#222] text-[#bbb] hover:bg-[#1c1c1c] hover:text-white"
-                    }`}
+                    className="flex-shrink-0 snap-start flex items-center gap-1.5 px-4 h-10 rounded-full text-[13px] font-semibold whitespace-nowrap active:scale-[0.94] transition-all duration-200"
+                    style={{
+                      background: active ? t.accent : "#161616",
+                      color: active ? "#000" : "#bbb",
+                      border: active
+                        ? `1px solid ${t.accent}`
+                        : "1px solid #222",
+                      boxShadow: active ? `0 8px 24px ${t.glow}` : "none",
+                      transitionTimingFunction:
+                        "cubic-bezier(0.34, 1.56, 0.64, 1)",
+                    }}
                   >
                     <CategoryIcon
                       id={cat.id}
@@ -142,8 +170,11 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Vesile grid — aktif kategoriye göre */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-w-[760px] w-full">
+          {/* Vesile grid — kategori rengiyle tema'lı */}
+          <div
+            ref={gridRef}
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-w-[760px] w-full"
+          >
             {currentCategory.occasions.map((occId) => {
               const occ = OCCASIONS[occId];
               if (!occ) return null;
@@ -151,9 +182,20 @@ export default function HomePage() {
                 <button
                   key={occId}
                   onClick={() => setPickedOccasion(occId)}
-                  className="group relative bg-[#161616]/90 backdrop-blur-xl border border-[#1f1f1f] rounded-[18px] p-4 md:p-5 flex flex-col items-center gap-2 hover:border-[#19b35c]/40 hover:bg-[#1a1a1a] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] shadow-lg shadow-black/30 min-h-[120px]"
+                  className="group relative bg-[#161616]/90 backdrop-blur-xl border border-[#1f1f1f] rounded-[20px] p-4 md:p-5 flex flex-col items-center gap-2.5 hover:bg-[#1a1a1a] hover:-translate-y-1 active:scale-[0.96] active:translate-y-0 transition-all duration-300 shadow-lg shadow-black/30 min-h-[124px]"
+                  style={{
+                    transitionTimingFunction:
+                      "cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  }}
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#19b35c]/15 to-[#19b35c]/5 border border-[#19b35c]/20 flex items-center justify-center text-[#19b35c] group-hover:scale-110 group-hover:from-[#19b35c]/25 group-hover:to-[#19b35c]/10 transition-all">
+                  <div
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 group-active:scale-95"
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.accent}26, ${theme.accentSoft}10)`,
+                      border: `1px solid ${theme.accent}33`,
+                      color: theme.accent,
+                    }}
+                  >
                     <OccasionIcon id={occId} size={26} weight="duotone" />
                   </div>
                   <span className="text-white text-[12.5px] md:text-[13.5px] font-semibold leading-tight text-center">
@@ -164,28 +206,76 @@ export default function HomePage() {
             })}
           </div>
 
-          {/* Alternatif giriş chip'leri */}
-          <div className="flex items-center gap-2 mt-7 flex-wrap justify-center">
+          {/* Alternatif giriş chip'leri — desktop'ta görünür, mobilde sticky bar yerini alır */}
+          <div className="hidden md:flex items-center gap-2 mt-7 flex-wrap justify-center">
             <button
               onClick={openRecord}
-              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
             >
               <Mic2 size={12} />
               Kayıt yap
             </button>
             <button
               onClick={() => heroFileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
             >
               <Upload size={12} />
               Dosya yükle
             </button>
             <Link
               href="/create"
-              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
             >
               Gelişmiş seçenekler
             </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobil sticky bottom action bar — native app tab bar hissi */}
+      <div
+        className={`md:hidden fixed bottom-0 left-0 right-0 z-40 pointer-events-none transition-all duration-300 ${
+          stickyVisible
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-3"
+        }`}
+        style={{
+          transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
+      >
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#121212] via-[#121212]/95 to-transparent" />
+        <div
+          className="relative px-4 pt-3 pointer-events-auto"
+          style={{
+            paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openRecord}
+              className="w-12 h-12 rounded-2xl bg-[#161616] border border-[#252525] flex items-center justify-center text-[#bbb] active:scale-[0.92] transition-transform shadow-lg shadow-black/40"
+            >
+              <Mic2 size={18} />
+            </button>
+            <button
+              onClick={() => heroFileInputRef.current?.click()}
+              className="w-12 h-12 rounded-2xl bg-[#161616] border border-[#252525] flex items-center justify-center text-[#bbb] active:scale-[0.92] transition-transform shadow-lg shadow-black/40"
+            >
+              <Upload size={18} />
+            </button>
+            <button
+              onClick={scrollToGrid}
+              className="flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 font-bold text-[14px] text-black active:scale-[0.97] transition-all shadow-2xl"
+              style={{
+                background:
+                  "linear-gradient(45deg, #082122 0%, #295b53 30%, #19b35c 70%, #fcff9a 100%)",
+                boxShadow: "0 12px 32px rgba(25, 179, 92, 0.45)",
+                transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+              }}
+            >
+              <Sparkle size={16} weight="fill" />
+              Şarkıyı Oluştur
+            </button>
           </div>
         </div>
       </div>
