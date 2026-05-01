@@ -250,11 +250,15 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
               }`
         }`}
         style={{
-          transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          transitionTimingFunction:
+            dragOffset > 0 && snapping
+              ? "ease-out"
+              : "cubic-bezier(0.34, 1.56, 0.64, 1)",
           ...(dragOffset > 0 && {
             transform: `translateY(${dragOffset}px)`,
-            transition: snapping ? "transform 0.25s ease-out" : "none",
+            transitionProperty: snapping ? "transform" : "none",
+            transitionDuration: snapping ? "250ms" : "0ms",
           }),
         }}
         onClick={(e) => e.stopPropagation()}
