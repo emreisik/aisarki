@@ -7,6 +7,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { useCredits } from "@/contexts/CreditsContext";
 import { localizeApiError } from "@/lib/sunoErrors";
 import { OCCASIONS, type OccasionId } from "@/lib/occasions";
+import { OccasionIcon } from "@/lib/occasionIcons";
 import { useRouter } from "next/navigation";
 
 type Props = {
@@ -142,8 +143,10 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
         {/* Header — vesile başlığı */}
         <div className="px-6 pt-6 pb-5 border-b border-[#1a1a1a] flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-[#19b35c]/10 border border-[#19b35c]/20 flex items-center justify-center text-[24px] flex-shrink-0">
-              {tpl.icon}
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#19b35c]/20 to-[#19b35c]/5 border border-[#19b35c]/25 flex items-center justify-center text-[#19b35c] flex-shrink-0">
+              {occasion && (
+                <OccasionIcon id={occasion} size={26} weight="duotone" />
+              )}
             </div>
             <div className="min-w-0">
               <h2 className="text-white text-[18px] font-bold leading-tight">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Mic2, Upload, Star, Music2, Clock3 } from "lucide-react";
+import { Mic2, Upload } from "lucide-react";
+import { Star, MusicNotes, Clock } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUpload } from "@/contexts/UploadContext";
@@ -11,6 +12,7 @@ import {
   OCCASION_CATEGORIES,
   type OccasionId,
 } from "@/lib/occasions";
+import { OccasionIcon, CategoryIcon } from "@/lib/occasionIcons";
 
 export default function HomePage() {
   const router = useRouter();
@@ -74,7 +76,11 @@ export default function HomePage() {
           {/* Sosyal kanıt rozeti */}
           <div className="flex items-center gap-4 md:gap-6 mb-8 px-5 py-2.5 rounded-full bg-[#0a0a0a]/70 border border-[#1f1f1f] backdrop-blur-sm">
             <div className="flex items-center gap-1.5">
-              <Music2 size={13} className="text-[#19b35c]" />
+              <MusicNotes
+                size={14}
+                weight="duotone"
+                className="text-[#19b35c]"
+              />
               <span className="text-white text-[12px] md:text-[13px] font-semibold tabular-nums">
                 50K+
               </span>
@@ -84,7 +90,7 @@ export default function HomePage() {
             </div>
             <div className="w-px h-3.5 bg-[#1f1f1f]" />
             <div className="flex items-center gap-1.5">
-              <Star size={13} className="text-[#fcff9a]" fill="currentColor" />
+              <Star size={14} weight="fill" className="text-[#fcff9a]" />
               <span className="text-white text-[12px] md:text-[13px] font-semibold tabular-nums">
                 4.9
               </span>
@@ -94,7 +100,7 @@ export default function HomePage() {
             </div>
             <div className="w-px h-3.5 bg-[#1f1f1f]" />
             <div className="flex items-center gap-1.5">
-              <Clock3 size={13} className="text-[#19b35c]" />
+              <Clock size={14} weight="duotone" className="text-[#19b35c]" />
               <span className="text-white text-[12px] md:text-[13px] font-semibold">
                 ~3 dk
               </span>
@@ -124,7 +130,11 @@ export default function HomePage() {
                         : "bg-[#161616] border border-[#222] text-[#bbb] hover:bg-[#1c1c1c] hover:text-white"
                     }`}
                   >
-                    <span className="text-[14px]">{cat.icon}</span>
+                    <CategoryIcon
+                      id={cat.id}
+                      size={15}
+                      weight={active ? "fill" : "duotone"}
+                    />
                     {cat.label}
                   </button>
                 );
@@ -141,11 +151,11 @@ export default function HomePage() {
                 <button
                   key={occId}
                   onClick={() => setPickedOccasion(occId)}
-                  className="group relative bg-[#161616]/90 backdrop-blur-xl border border-[#1f1f1f] rounded-[18px] p-4 md:p-5 flex flex-col items-center gap-1.5 hover:border-[#19b35c]/40 hover:bg-[#1a1a1a] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] shadow-lg shadow-black/30 min-h-[112px]"
+                  className="group relative bg-[#161616]/90 backdrop-blur-xl border border-[#1f1f1f] rounded-[18px] p-4 md:p-5 flex flex-col items-center gap-2 hover:border-[#19b35c]/40 hover:bg-[#1a1a1a] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] shadow-lg shadow-black/30 min-h-[120px]"
                 >
-                  <span className="text-[28px] md:text-[32px] mb-1 group-hover:scale-110 transition-transform">
-                    {occ.icon}
-                  </span>
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#19b35c]/15 to-[#19b35c]/5 border border-[#19b35c]/20 flex items-center justify-center text-[#19b35c] group-hover:scale-110 group-hover:from-[#19b35c]/25 group-hover:to-[#19b35c]/10 transition-all">
+                    <OccasionIcon id={occId} size={26} weight="duotone" />
+                  </div>
                   <span className="text-white text-[12.5px] md:text-[13.5px] font-semibold leading-tight text-center">
                     {occ.label}
                   </span>
