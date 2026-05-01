@@ -13,6 +13,7 @@ import {
   OCCASION_TO_CATEGORY,
   getCategoryTheme,
 } from "@/lib/occasionIcons";
+import { haptics } from "@/lib/haptics";
 import { useRouter } from "next/navigation";
 
 type Props = {
@@ -148,6 +149,7 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
     setSnapping(true);
     if (dragOffset > 110) {
       // Eşik aşıldı — slide-out devam et, sonra kapat
+      haptics.tap();
       setDragOffset(window.innerHeight);
       setTimeout(() => {
         onClose();
@@ -202,6 +204,7 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
         toast.error(e.title, e.message);
         return;
       }
+      haptics.success();
       toast.success(
         "Şarkın hazırlanıyor",
         "1-2 dakika içinde Workspace'te dinlemeye hazır olacak.",
@@ -210,6 +213,7 @@ export default function PersonalSongModal({ open, occasion, onClose }: Props) {
       refreshCredits();
       router.push("/create");
     } catch {
+      haptics.error();
       toast.error("Bağlantı hatası");
     } finally {
       setSubmitting(false);

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUpload } from "@/contexts/UploadContext";
 import PersonalSongModal from "@/components/PersonalSongModal";
+import PullToRefresh from "@/components/PullToRefresh";
 import {
   OCCASIONS,
   OCCASION_CATEGORIES,
@@ -17,6 +18,9 @@ import {
   CategoryIcon,
   getCategoryTheme,
 } from "@/lib/occasionIcons";
+import { haptics } from "@/lib/haptics";
+
+const SWIPE_THRESHOLD = 60;
 
 export default function HomePage() {
   const router = useRouter();
@@ -27,10 +31,24 @@ export default function HomePage() {
     OCCASION_CATEGORIES[0].id,
   );
 
+  // Horizontal swipe between categories
+  const swipeStartX = useRef<number | null>(null);
+  const swipeStartY = useRef<number | null>(null);
+  const swipeLocked = useRef(false);
+
   const currentCategory =
     OCCASION_CATEGORIES.find((c) => c.id === activeCategory) ??
     OCCASION_CATEGORIES[0];
   const theme = getCategoryTheme(activeCategory);
+  const currentIndex = OCCASION_CATEGORIES.findIndex(
+    (c) => c.id === activeCategory,
+  );
+
+  const switchCategory = (newId: string) => {
+    if (newId === activeCategory) return;
+    setActiveCategory(newId);
+    haptics.selection();
+  };
 
   const handleHeroFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -40,187 +58,249 @@ export default function HomePage() {
     router.push("/create");
   };
 
+  const handleRefresh = async () => {
+    router.refresh();
+  };
+
+  const onCardTap = (occId: OccasionId) => {
+    haptics.open();
+    setPickedOccasion(occId);
+  };
+
+  // Grid alanında yatay swipe → kategori değiştir
+  const onGridTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    swipeStartX.current = e.touches[0].clientX;
+    swipeStartY.current = e.touches[0].clientY;
+    swipeLocked.current = false;
+  };
+  const onGridTouchMove = (e: React.TouchEvent) => {
+    if (swipeStartX.current === null || swipeStartY.current === null) return;
+    const dx = e.touches[0].clientX - swipeStartX.current;
+    const dy = e.touches[0].clientY - swipeStartY.current;
+    // Yön kilidi: yatay > dikey ise yatay swipe
+    if (!swipeLocked.current && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      swipeLocked.current = true;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        // dikey hareket — bu turn için yatay swipe iptal
+        swipeStartX.current = null;
+        swipeStartY.current = null;
+      }
+    }
+  };
+  const onGridTouchEnd = (e: React.TouchEvent) => {
+    if (swipeStartX.current === null) return;
+    const endX = e.changedTouches[0].clientX;
+    const dx = endX - swipeStartX.current;
+    swipeStartX.current = null;
+    swipeStartY.current = null;
+    if (Math.abs(dx) < SWIPE_THRESHOLD) return;
+    if (dx < 0) {
+      // sola kaydır → sonraki kategori
+      const next = OCCASION_CATEGORIES[currentIndex + 1];
+      if (next) switchCategory(next.id);
+    } else {
+      // sağa kaydır → önceki kategori
+      const prev = OCCASION_CATEGORIES[currentIndex - 1];
+      if (prev) switchCategory(prev.id);
+    }
+  };
+
   return (
-    <div className="min-h-full bg-[#121212]">
-      <div
-        className="relative overflow-hidden"
-        style={{ background: "#06140c" }}
-      >
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="hero-neon hero-neon-1" />
-          <div className="hero-neon hero-neon-2" />
-          <div className="hero-neon hero-neon-3" />
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(ellipse at 50% 100%, transparent 0%, #121212 75%)",
-            }}
-          />
-        </div>
-
-        <div className="relative pt-[56px] md:pt-[80px] pb-[64px] md:pb-[80px] px-[20px] flex flex-col items-center">
-          <h1 className="text-white text-[28px] md:text-[44px] font-bold text-center leading-[1.1] mb-3 tracking-tight">
-            Hayalindeki şarkıyı
-            <br />
-            <span
-              className="bg-clip-text text-transparent"
+    <PullToRefresh onRefresh={handleRefresh} disabled={pickedOccasion !== null}>
+      <div className="min-h-full bg-[#121212]">
+        <div
+          className="relative overflow-hidden"
+          style={{ background: "#06140c" }}
+        >
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="hero-neon hero-neon-1" />
+            <div className="hero-neon hero-neon-2" />
+            <div className="hero-neon hero-neon-3" />
+            <div
+              className="absolute inset-0"
               style={{
-                backgroundImage:
-                  "linear-gradient(90deg, #fcff9a 0%, #19b35c 60%, #295b53 100%)",
+                background:
+                  "radial-gradient(ellipse at 50% 100%, transparent 0%, #121212 75%)",
               }}
-            >
-              duymanın zamanı
-            </span>
-          </h1>
-
-          <p className="text-[#bbb] text-[14px] md:text-[16px] text-center mb-5 max-w-[560px] leading-relaxed">
-            Sevdiklerine özel, adıyla ve hatıralarıyla — 3 dakikada hazır.
-          </p>
-
-          {/* Sosyal kanıt rozeti */}
-          <div className="flex items-center gap-4 md:gap-6 mb-8 px-5 py-2.5 rounded-full bg-[#0a0a0a]/70 border border-[#1f1f1f] backdrop-blur-sm">
-            <div className="flex items-center gap-1.5">
-              <MusicNotes
-                size={14}
-                weight="duotone"
-                className="text-[#19b35c]"
-              />
-              <span className="text-white text-[12px] md:text-[13px] font-semibold tabular-nums">
-                50K+
-              </span>
-              <span className="text-[#888] text-[11px] md:text-[12px]">
-                şarkı
-              </span>
-            </div>
-            <div className="w-px h-3.5 bg-[#1f1f1f]" />
-            <div className="flex items-center gap-1.5">
-              <Star size={14} weight="fill" className="text-[#fcff9a]" />
-              <span className="text-white text-[12px] md:text-[13px] font-semibold tabular-nums">
-                4.9
-              </span>
-              <span className="text-[#888] text-[11px] md:text-[12px]">
-                puan
-              </span>
-            </div>
-            <div className="w-px h-3.5 bg-[#1f1f1f]" />
-            <div className="flex items-center gap-1.5">
-              <Clock size={14} weight="duotone" className="text-[#19b35c]" />
-              <span className="text-white text-[12px] md:text-[13px] font-semibold">
-                ~3 dk
-              </span>
-            </div>
+            />
           </div>
 
-          <input
-            ref={heroFileInputRef}
-            type="file"
-            accept="audio/*"
-            className="hidden"
-            onChange={handleHeroFilePick}
-          />
+          <div className="relative pt-[56px] md:pt-[80px] pb-[64px] md:pb-[80px] px-[20px] flex flex-col items-center">
+            <h1 className="text-white text-[28px] md:text-[44px] font-bold text-center leading-[1.1] mb-3 tracking-tight">
+              Hayalindeki şarkıyı
+              <br />
+              <span
+                className="bg-clip-text text-transparent"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(90deg, #fcff9a 0%, #19b35c 60%, #295b53 100%)",
+                }}
+              >
+                duymanın zamanı
+              </span>
+            </h1>
 
-          {/* Kategori sekmeleri — snap scroll, native pill tabs */}
-          <div className="w-full max-w-[760px] mb-5 -mx-5 md:mx-0">
+            <p className="text-[#bbb] text-[14px] md:text-[16px] text-center mb-5 max-w-[560px] leading-relaxed">
+              Sevdiklerine özel, adıyla ve hatıralarıyla — 3 dakikada hazır.
+            </p>
+
+            {/* Sosyal kanıt rozeti */}
+            <div className="flex items-center gap-4 md:gap-6 mb-8 px-5 py-2.5 rounded-full bg-[#0a0a0a]/70 border border-[#1f1f1f] backdrop-blur-sm">
+              <div className="flex items-center gap-1.5">
+                <MusicNotes
+                  size={14}
+                  weight="duotone"
+                  className="text-[#19b35c]"
+                />
+                <span className="text-white text-[12px] md:text-[13px] font-semibold tabular-nums">
+                  50K+
+                </span>
+                <span className="text-[#888] text-[11px] md:text-[12px]">
+                  şarkı
+                </span>
+              </div>
+              <div className="w-px h-3.5 bg-[#1f1f1f]" />
+              <div className="flex items-center gap-1.5">
+                <Star size={14} weight="fill" className="text-[#fcff9a]" />
+                <span className="text-white text-[12px] md:text-[13px] font-semibold tabular-nums">
+                  4.9
+                </span>
+                <span className="text-[#888] text-[11px] md:text-[12px]">
+                  puan
+                </span>
+              </div>
+              <div className="w-px h-3.5 bg-[#1f1f1f]" />
+              <div className="flex items-center gap-1.5">
+                <Clock size={14} weight="duotone" className="text-[#19b35c]" />
+                <span className="text-white text-[12px] md:text-[13px] font-semibold">
+                  ~3 dk
+                </span>
+              </div>
+            </div>
+
+            <input
+              ref={heroFileInputRef}
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={handleHeroFilePick}
+            />
+
+            {/* Kategori sekmeleri */}
+            <div className="w-full max-w-[760px] mb-5 -mx-5 md:mx-0">
+              <div
+                className="flex gap-2 overflow-x-auto scroll-area pb-2 px-5 md:px-0 snap-x snap-proximity justify-start md:justify-center"
+                style={{ scrollPaddingLeft: "20px" }}
+              >
+                {OCCASION_CATEGORIES.map((cat) => {
+                  const active = cat.id === activeCategory;
+                  const t = getCategoryTheme(cat.id);
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => switchCategory(cat.id)}
+                      className="flex-shrink-0 snap-start flex items-center gap-1.5 px-4 h-10 rounded-full text-[13px] font-semibold whitespace-nowrap active:scale-[0.94] transition-all duration-200"
+                      style={{
+                        background: active ? t.accent : "#161616",
+                        color: active ? "#000" : "#bbb",
+                        border: active
+                          ? `1px solid ${t.accent}`
+                          : "1px solid #222",
+                        boxShadow: active ? `0 8px 24px ${t.glow}` : "none",
+                        transitionTimingFunction:
+                          "cubic-bezier(0.34, 1.56, 0.64, 1)",
+                      }}
+                    >
+                      <CategoryIcon
+                        id={cat.id}
+                        size={15}
+                        weight={active ? "fill" : "duotone"}
+                      />
+                      {cat.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Vesile grid — yatay swipe ile kategori değiştir */}
             <div
-              className="flex gap-2 overflow-x-auto scroll-area pb-2 px-5 md:px-0 snap-x snap-proximity justify-start md:justify-center"
-              style={{ scrollPaddingLeft: "20px" }}
+              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-w-[760px] w-full"
+              onTouchStart={onGridTouchStart}
+              onTouchMove={onGridTouchMove}
+              onTouchEnd={onGridTouchEnd}
             >
-              {OCCASION_CATEGORIES.map((cat) => {
-                const active = cat.id === activeCategory;
-                const t = getCategoryTheme(cat.id);
+              {currentCategory.occasions.map((occId) => {
+                const occ = OCCASIONS[occId];
+                if (!occ) return null;
                 return (
                   <button
-                    key={cat.id}
-                    onClick={() => setActiveCategory(cat.id)}
-                    className="flex-shrink-0 snap-start flex items-center gap-1.5 px-4 h-10 rounded-full text-[13px] font-semibold whitespace-nowrap active:scale-[0.94] transition-all duration-200"
+                    key={occId}
+                    onClick={() => onCardTap(occId)}
+                    className="group relative bg-[#161616]/90 backdrop-blur-xl border border-[#1f1f1f] rounded-[20px] p-4 md:p-5 flex flex-col items-center gap-2.5 hover:bg-[#1a1a1a] hover:-translate-y-1 active:scale-[0.96] active:translate-y-0 transition-all duration-300 shadow-lg shadow-black/30 min-h-[124px]"
                     style={{
-                      background: active ? t.accent : "#161616",
-                      color: active ? "#000" : "#bbb",
-                      border: active
-                        ? `1px solid ${t.accent}`
-                        : "1px solid #222",
-                      boxShadow: active ? `0 8px 24px ${t.glow}` : "none",
                       transitionTimingFunction:
                         "cubic-bezier(0.34, 1.56, 0.64, 1)",
                     }}
                   >
-                    <CategoryIcon
-                      id={cat.id}
-                      size={15}
-                      weight={active ? "fill" : "duotone"}
-                    />
-                    {cat.label}
+                    <div
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 group-active:scale-95"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.accent}26, ${theme.accentSoft}10)`,
+                        border: `1px solid ${theme.accent}33`,
+                        color: theme.accent,
+                      }}
+                    >
+                      <OccasionIcon id={occId} size={26} weight="duotone" />
+                    </div>
+                    <span className="text-white text-[12.5px] md:text-[13.5px] font-semibold leading-tight text-center">
+                      {occ.label}
+                    </span>
                   </button>
                 );
               })}
             </div>
-          </div>
 
-          {/* Vesile grid — kategori rengiyle tema'lı */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-w-[760px] w-full">
-            {currentCategory.occasions.map((occId) => {
-              const occ = OCCASIONS[occId];
-              if (!occ) return null;
-              return (
-                <button
-                  key={occId}
-                  onClick={() => setPickedOccasion(occId)}
-                  className="group relative bg-[#161616]/90 backdrop-blur-xl border border-[#1f1f1f] rounded-[20px] p-4 md:p-5 flex flex-col items-center gap-2.5 hover:bg-[#1a1a1a] hover:-translate-y-1 active:scale-[0.96] active:translate-y-0 transition-all duration-300 shadow-lg shadow-black/30 min-h-[124px]"
-                  style={{
-                    transitionTimingFunction:
-                      "cubic-bezier(0.34, 1.56, 0.64, 1)",
-                  }}
-                >
-                  <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 group-active:scale-95"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.accent}26, ${theme.accentSoft}10)`,
-                      border: `1px solid ${theme.accent}33`,
-                      color: theme.accent,
-                    }}
-                  >
-                    <OccasionIcon id={occId} size={26} weight="duotone" />
-                  </div>
-                  <span className="text-white text-[12.5px] md:text-[13.5px] font-semibold leading-tight text-center">
-                    {occ.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Alternatif giriş chip'leri — desktop'ta görünür, mobilde sticky bar yerini alır */}
-          <div className="flex items-center gap-2 mt-7 flex-wrap justify-center">
-            <button
-              onClick={openRecord}
-              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
-            >
-              <Mic2 size={12} />
-              Kayıt yap
-            </button>
-            <button
-              onClick={() => heroFileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
-            >
-              <Upload size={12} />
-              Dosya yükle
-            </button>
-            <Link
-              href="/create"
-              className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
-            >
-              Gelişmiş seçenekler
-            </Link>
+            {/* Alternatif giriş chip'leri */}
+            <div className="flex items-center gap-2 mt-7 flex-wrap justify-center">
+              <button
+                onClick={() => {
+                  haptics.tap();
+                  openRecord();
+                }}
+                className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
+              >
+                <Mic2 size={12} />
+                Kayıt yap
+              </button>
+              <button
+                onClick={() => {
+                  haptics.tap();
+                  heroFileInputRef.current?.click();
+                }}
+                className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
+              >
+                <Upload size={12} />
+                Dosya yükle
+              </button>
+              <Link
+                href="/create"
+                onClick={() => haptics.tap()}
+                className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
+              >
+                Gelişmiş seçenekler
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
 
-      <PersonalSongModal
-        open={pickedOccasion !== null}
-        occasion={pickedOccasion}
-        onClose={() => setPickedOccasion(null)}
-      />
-    </div>
+        <PersonalSongModal
+          open={pickedOccasion !== null}
+          occasion={pickedOccasion}
+          onClose={() => setPickedOccasion(null)}
+        />
+      </div>
+    </PullToRefresh>
   );
 }

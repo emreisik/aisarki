@@ -29,6 +29,20 @@ body {
   overscroll-behavior: none;
 }
 
+/* Native app hissi — UI element'lerde metin seçimi kapalı, içeriklerde açık */
+button, a, [role="button"], label, summary, nav, header, footer {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input, textarea, [contenteditable="true"], p, span, h1, h2, h3, h4, h5, h6, li {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+input, textarea {
+  -webkit-touch-callout: default;
+}
+
 /* Scrollable areas */
 .scroll-area {
   overflow-y: auto;
