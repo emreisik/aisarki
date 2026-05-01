@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Mic2, Upload } from "lucide-react";
-import { Star, MusicNotes, Clock, Sparkle } from "@phosphor-icons/react";
+import { Star, MusicNotes, Clock } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUpload } from "@/contexts/UploadContext";
@@ -22,12 +22,10 @@ export default function HomePage() {
   const router = useRouter();
   const { setPending: setPendingUpload, openRecord } = useUpload();
   const heroFileInputRef = useRef<HTMLInputElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
   const [pickedOccasion, setPickedOccasion] = useState<OccasionId | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>(
     OCCASION_CATEGORIES[0].id,
   );
-  const [stickyVisible, setStickyVisible] = useState(false);
 
   const currentCategory =
     OCCASION_CATEGORIES.find((c) => c.id === activeCategory) ??
@@ -42,19 +40,8 @@ export default function HomePage() {
     router.push("/create");
   };
 
-  useEffect(() => {
-    const onScroll = () => setStickyVisible(window.scrollY > 80);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const scrollToGrid = () => {
-    gridRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-
   return (
-    <div className="min-h-full bg-[#121212] pb-[calc(96px+env(safe-area-inset-bottom,0px))] md:pb-0">
+    <div className="min-h-full bg-[#121212]">
       <div
         className="relative overflow-hidden"
         style={{ background: "#06140c" }}
@@ -171,10 +158,7 @@ export default function HomePage() {
           </div>
 
           {/* Vesile grid — kategori rengiyle tema'lı */}
-          <div
-            ref={gridRef}
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-w-[760px] w-full"
-          >
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-w-[760px] w-full">
             {currentCategory.occasions.map((occId) => {
               const occ = OCCASIONS[occId];
               if (!occ) return null;
@@ -207,7 +191,7 @@ export default function HomePage() {
           </div>
 
           {/* Alternatif giriş chip'leri — desktop'ta görünür, mobilde sticky bar yerini alır */}
-          <div className="hidden md:flex items-center gap-2 mt-7 flex-wrap justify-center">
+          <div className="flex items-center gap-2 mt-7 flex-wrap justify-center">
             <button
               onClick={openRecord}
               className="flex items-center gap-1.5 px-3 h-8 rounded-full bg-[#1a1a1a]/60 border border-[#2a2a2a] text-[#aaa] text-[11px] font-medium hover:bg-[#222] hover:text-white active:scale-[0.95] transition-all"
@@ -228,54 +212,6 @@ export default function HomePage() {
             >
               Gelişmiş seçenekler
             </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobil sticky bottom action bar — native app tab bar hissi */}
-      <div
-        className={`md:hidden fixed bottom-0 left-0 right-0 z-40 pointer-events-none transition-all duration-300 ${
-          stickyVisible
-            ? "opacity-100 translate-y-0"
-            : "opacity-0 translate-y-3"
-        }`}
-        style={{
-          transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-        }}
-      >
-        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#121212] via-[#121212]/95 to-transparent" />
-        <div
-          className="relative px-4 pt-3 pointer-events-auto"
-          style={{
-            paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <button
-              onClick={openRecord}
-              className="w-12 h-12 rounded-2xl bg-[#161616] border border-[#252525] flex items-center justify-center text-[#bbb] active:scale-[0.92] transition-transform shadow-lg shadow-black/40"
-            >
-              <Mic2 size={18} />
-            </button>
-            <button
-              onClick={() => heroFileInputRef.current?.click()}
-              className="w-12 h-12 rounded-2xl bg-[#161616] border border-[#252525] flex items-center justify-center text-[#bbb] active:scale-[0.92] transition-transform shadow-lg shadow-black/40"
-            >
-              <Upload size={18} />
-            </button>
-            <button
-              onClick={scrollToGrid}
-              className="flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 font-bold text-[14px] text-black active:scale-[0.97] transition-all shadow-2xl"
-              style={{
-                background:
-                  "linear-gradient(45deg, #082122 0%, #295b53 30%, #19b35c 70%, #fcff9a 100%)",
-                boxShadow: "0 12px 32px rgba(25, 179, 92, 0.45)",
-                transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-              }}
-            >
-              <Sparkle size={16} weight="fill" />
-              Şarkıyı Oluştur
-            </button>
           </div>
         </div>
       </div>
